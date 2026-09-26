@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="nb">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Editor</title>
+  </head>
+  <body>
+    <div id="app">
+      <header id="topbar">
+        <div id="file-actions" class="toolbar-group"></div>
+        <div id="doc-title" title=""></div>
+        <div id="view-actions" class="toolbar-group"></div>
+      </header>
+      <nav id="toolbar" aria-label="Formatering"></nav>
+      <div id="workspace">
+        <aside id="outline" aria-label="Disposisjon"></aside>
+        <main id="editor"></main>
+      </div>
+      <footer id="statusbar">
+        <span id="status-save"></span>
+        <span id="status-count"></span>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
