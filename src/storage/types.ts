@@ -7,6 +7,8 @@
 /** Opaque reference to a file. Backends extend it with what they need (a handle, a path …). */
 export interface FileRef {
   readonly name: string;
+  /** Absolute path, when the backend has one (desktop). */
+  readonly path?: string;
 }
 
 export interface OpenedFile {
@@ -19,6 +21,16 @@ export interface StorageBackend {
   readonly canSaveInPlace: boolean;
   /** Ask the user for a file and read it. Resolves to null if cancelled. */
   open(): Promise<OpenedFile | null>;
+  /** Read a file by path, if the backend supports paths (desktop only). */
+  openPath?(path: string): Promise<OpenedFile>;
+  /**
+   * Create a new file named after `baseName` in `folder` (or the default
+   * documents folder), without asking. Used to autosave new documents.
+   * Only backends that can do this silently implement it (desktop).
+   */
+  createNew?(content: string, baseName: string, folder?: string): Promise<FileRef>;
+  /** Rename a file within its folder (keeping the extension). Desktop only. */
+  rename?(file: FileRef, baseName: string): Promise<FileRef>;
   /** Write to an already-known file. */
   save(file: FileRef, content: string): Promise<void>;
   /** Ask the user where to save. Resolves to null if cancelled. */

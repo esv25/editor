@@ -8,6 +8,7 @@ import {
   defaultHeadingSuggestionConfig,
   type HeadingSuggestionConfig,
 } from './features/headingSuggestion/rules';
+import type { RunnerConfig } from './features/codeBlockTools/runners';
 
 export type ThemeSetting = 'light' | 'dark' | 'system';
 
@@ -22,7 +23,18 @@ export interface Settings {
   /** Hide Markdown markup (#, **, `) on lines the cursor isn't on. */
   hideMarkup: boolean;
   outlineVisible: boolean;
-  autosave: { enabled: boolean; delayMs: number };
+  autosave: {
+    enabled: boolean;
+    delayMs: number;
+    /** Desktop: where new, never-saved documents are autosaved. Empty = Documents\Editor. */
+    folder: string;
+  };
+  /** Per-language overrides for running code blocks (see features/codeBlockTools/runners.ts). */
+  codeRunners: Record<string, Partial<RunnerConfig>>;
+  /** Max run time for a code block before it's stopped. */
+  codeRunTimeoutMs: number;
+  /** Opening characters that get their closing partner inserted automatically. [] = off. */
+  closeBrackets: string[];
   headingSuggestion: HeadingSuggestionConfig;
   /** Command id -> key (CodeMirror notation, e.g. "Mod-Shift-h"), or null to unbind. */
   keybindings: Record<string, string | null>;
@@ -39,7 +51,10 @@ export const defaultSettings: Settings = {
   monoFontFamily: '"Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace',
   hideMarkup: true,
   outlineVisible: true,
-  autosave: { enabled: true, delayMs: 1500 },
+  autosave: { enabled: true, delayMs: 1500, folder: '' },
+  codeRunners: {},
+  codeRunTimeoutMs: 30000,
+  closeBrackets: ['(', '[', '{', '«'],
   headingSuggestion: defaultHeadingSuggestionConfig,
   keybindings: {},
   toolbar: [

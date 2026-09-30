@@ -6,20 +6,24 @@
 import type { Feature } from './types';
 import { livePreview } from './livePreview';
 import { codeBlocks } from './codeBlocks';
+import { codeBlockTools } from './codeBlockTools';
 import { headings } from './headings';
 import { inlineFormat } from './inlineFormat';
 import { lists } from './lists';
 import { taskList } from './taskList';
 import { smartLists } from './smartLists';
 import { headingSuggestion } from './headingSuggestion';
+import { closeBrackets } from './closeBrackets';
 
 export const features: Feature[] = [
   livePreview,
   codeBlocks,
+  codeBlockTools,
   headings,
   inlineFormat,
   lists,
   taskList,
   smartLists,
   headingSuggestion,
+  closeBrackets,
 ];

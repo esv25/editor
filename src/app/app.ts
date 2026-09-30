@@ -4,7 +4,9 @@
 import type { EditorView, ViewUpdate } from '@codemirror/view';
 import { registerCommands } from '../commands/registry';
 import { createEditor } from '../editor/createEditor';
+import { runContext } from '../features/codeBlockTools';
 import { getSettings, onSettingsChange, updateSettings } from '../settings';
+import { platform } from '../platform';
 import { drafts } from '../storage';
 import { renderButtons } from '../ui/toolbar';
 import { OutlinePanel } from '../ui/outline';
@@ -28,7 +30,7 @@ export function startApp(): void {
   const getView = () => view;
 
   registerCommands([
-    { id: 'file.new', name: 'Nytt dokument', label: 'Ny', run: () => (doc.newDocument(), true) },
+    { id: 'file.new', name: 'Nytt dokument', label: 'Ny', run: () => (void doc.newDocument(), true) },
     { id: 'file.open', name: 'Åpne fil', label: 'Åpne', key: 'Mod-o', run: () => (void doc.open(), true) },
     { id: 'file.save', name: 'Lagre', label: 'Lagre', key: 'Mod-s', run: () => (void doc.save(), true) },
     { id: 'file.saveAs', name: 'Lagre som', label: 'Lagre som', key: 'Mod-Shift-s', run: () => (void doc.saveAs(), true) },
@@ -63,6 +65,8 @@ export function startApp(): void {
   const editor = createEditor(document.getElementById('editor')!, '', onUpdate);
   view = editor.view;
   doc = new DocumentController(editor);
+  // Code blocks run in the document's folder, so they can use files next to it.
+  runContext.cwd = () => doc.file?.path?.replace(/[\\/][^\\/]*$/, '');
   // Handy for debugging in the browser console during development.
   if (import.meta.env.DEV) Object.assign(window, { editorView: view, editorDoc: doc });
 
@@ -114,7 +118,11 @@ export function startApp(): void {
   if (draft) doc.load(draft.content, null, draft.name, true);
   else doc.load(seenWelcome ? '' : welcomeText, null, 'Uten tittel.md');
 
-  window.addEventListener('beforeunload', (e) => {
-    if (doc.hasUnsavedWork) e.preventDefault();
+
+  // Desktop: a file passed on the command line ("Open with" in Explorer) replaces the above.
+  void platform.startupFile().then((path) => {
+    if (path) void doc.openPath(path);
   });
+
+  platform.onCloseRequested(() => doc.hasUnsavedWork);
 }

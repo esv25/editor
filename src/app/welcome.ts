@@ -21,10 +21,11 @@ Skriv **fet**, *kursiv* og \`inline kode\` – eller marker tekst og bruk knappe
 
 ## Kode
 
-\`\`\`ts
-function hils(navn: string): string {
-  return \`Hei, \${navn}!\`; // syntax highlighting per språk
-}
+Kodeblokker får navn og språk i hodet sitt, og kan kjøres med ▶ Kjør (eller Ctrl+Shift+Enter). Utdataene vises under blokken.
+
+\`\`\`python title="hilsen.py"
+for navn in ["Kari", "Ola"]:
+    print(f"Hei, {navn}!")
 \`\`\`
 
 ## Overskriftsforslag
@@ -33,5 +34,5 @@ Skriv en kort linje med tom linje over og under, uten punktum til slutt, og stop
 
 Neste kapittel
 
-Ctrl+O åpner en fil, Ctrl+S lagrer. Når dokumentet er lagret til en fil, lagres det automatisk etter hvert.
+Ctrl+O åpner en fil, Ctrl+S lagrer. Alt lagres automatisk mens du skriver – i skrivebordsappen havner nye dokumenter i Dokumenter\\Editor, oppkalt etter første linje.
 `;

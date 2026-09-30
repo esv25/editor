@@ -4,11 +4,14 @@
  */
 import type { EditorState } from '@codemirror/state';
 import type { DocumentController } from '../app/document';
+import { platform } from '../platform';
+import { getSettings } from '../settings';
+import { storage } from '../storage';
 
 const APP_NAME = 'Editor';
 
 export function renderTitle(doc: DocumentController): void {
-  document.title = `${doc.dirty ? '● ' : ''}${doc.name} — ${APP_NAME}`;
+  platform.setWindowTitle(`${doc.dirty ? '● ' : ''}${doc.name} — ${APP_NAME}`);
   const el = document.getElementById('doc-title')!;
   el.replaceChildren();
   if (doc.dirty) {
@@ -19,7 +22,7 @@ export function renderTitle(doc: DocumentController): void {
     el.append(dot);
   }
   el.append(doc.name);
-  el.title = doc.file ? doc.name : `${doc.name} (ikke lagret til fil ennå)`;
+  el.title = doc.file ? (doc.file.path ?? doc.name) : `${doc.name} (ikke lagret til fil ennå)`;
 }
 
 export function renderSaveStatus(doc: DocumentController): void {
@@ -31,7 +34,10 @@ export function renderSaveStatus(doc: DocumentController): void {
       el.textContent = doc.file ? 'Lagret' : '';
       break;
     case 'dirty':
-      el.textContent = doc.file ? 'Ulagrede endringer' : 'Ikke lagret – Ctrl+S for å lagre til fil';
+      if (doc.file) el.textContent = 'Ulagrede endringer';
+      else if (storage.createNew && getSettings().autosave.enabled)
+        el.textContent = `Lagres automatisk i ${getSettings().autosave.folder || 'Dokumenter\\Editor'}`;
+      else el.textContent = 'Ikke lagret – Ctrl+S for å lagre til fil';
       break;
     case 'saving':
       el.textContent = 'Lagrer …';
