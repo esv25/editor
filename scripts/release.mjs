@@ -16,7 +16,10 @@ const REPO = 'esv25/editor';
 const root = path.resolve(import.meta.dirname, '..');
 const keyPath = path.join(homedir(), '.tauri', 'editor.key');
 
-const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { cwd: root, encoding: 'utf8', shell: process.platform === 'win32', ...opts }).trim();
+// npx is a .cmd script on Windows and needs a shell; git and gh don't, and running
+// them without one keeps arguments with spaces (commit messages, titles) intact.
+const run = (cmd, args, opts = {}) =>
+  (execFileSync(cmd, args, { cwd: root, encoding: 'utf8', shell: cmd === 'npx', ...opts }) ?? '').trim();
 const fail = (msg) => {
   console.error(`\n✗ ${msg}`);
   process.exit(1);
@@ -24,8 +27,9 @@ const fail = (msg) => {
 
 // ---- Arguments ----
 const args = process.argv.slice(2);
+// Everything after --notes is the text (npm on Windows may drop the quotes and split it).
 const notesIndex = args.indexOf('--notes');
-let notes = notesIndex >= 0 ? args.splice(notesIndex, 2)[1] : '';
+let notes = notesIndex >= 0 ? args.splice(notesIndex).slice(1).join(' ') : '';
 const bump = args[0] ?? 'patch';
 
 // ---- Checks ----
