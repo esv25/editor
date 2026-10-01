@@ -10,8 +10,15 @@ import { showContextMenu, type MenuItem } from './contextMenu';
 
 const OPENABLE = new Set(['md', 'markdown', 'txt', ...codeFileExtensions]);
 
-const folderIcon =
-  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+const svg = (body: string) =>
+  `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+const icons = {
+  folder: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
+  folderOpen: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1"/><path d="M3 7v10a2 2 0 0 0 2 2h12.5l3.5-8H7.5L4 19"/>'),
+  note: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
+  code: svg('<path d="m9 8-4 4 4 4M15 8l4 4-4 4"/>'),
+  chevron: svg('<path d="m9 6 6 6-6 6"/>'),
+};
 
 export interface FileTreeActions {
   /** Ask for a folder and link it to the group. */
@@ -113,24 +120,29 @@ export class FileTree {
   private row(entry: FolderEntry, depth: number): HTMLElement {
     const row = document.createElement('button');
     row.type = 'button';
-    row.className = `file-row ${entry.isDirectory ? 'dir' : 'file'}`;
-    row.style.paddingLeft = `${6 + depth * 14}px`;
+    const expanded = entry.isDirectory && this.expanded.has(entry.path);
+    const isCode = !entry.isDirectory && kindForName(entry.name) === 'code';
+    row.className = `file-row ${entry.isDirectory ? 'dir' : isCode ? 'file code' : 'file note'}${expanded ? ' expanded' : ''}`;
     row.title = entry.path;
 
+    // One guide per level, so it's clear which folder a row belongs to.
+    for (let i = 0; i < depth; i++) {
+      const guide = document.createElement('span');
+      guide.className = 'file-guide';
+      row.append(guide);
+    }
     const chevron = document.createElement('span');
     chevron.className = 'file-chevron';
-    chevron.textContent = entry.isDirectory ? (this.expanded.has(entry.path) ? '▾' : '▸') : '';
+    if (entry.isDirectory) chevron.innerHTML = icons.chevron;
     const icon = document.createElement('span');
     icon.className = 'file-icon';
-    if (entry.isDirectory) icon.innerHTML = folderIcon;
-    else icon.textContent = kindForName(entry.name) === 'code' ? '{ }' : '';
+    icon.innerHTML = entry.isDirectory ? (expanded ? icons.folderOpen : icons.folder) : isCode ? icons.code : icons.note;
     const name = document.createElement('span');
     name.className = 'file-name';
     name.textContent = entry.name;
     row.append(chevron, icon, name);
 
     if (!entry.isDirectory && samePath(this.ws.activeDoc?.file?.path, entry.path)) row.classList.add('active');
-    if (!entry.isDirectory && this.ws.allDocs().some((d) => samePath(d.file?.path, entry.path))) row.classList.add('open');
 
     row.addEventListener('mousedown', (e) => e.preventDefault());
     row.addEventListener('click', () => {

@@ -42,10 +42,13 @@ export class TabsUI {
       }),
     );
     const group = ws.activeGroup;
+    const codeButton = button('tab-add tab-add-code', '', 'Ny kodefil', () => this.actions.newCodeFile());
+    codeButton.innerHTML =
+      '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 8-4 4 4 4M15 8l4 4-4 4"/></svg>';
     this.docsEl.replaceChildren(
       ...group.docs.map((d) => this.docTab(d)),
       button('tab-add', '+', 'Nytt dokument (Ctrl+N)', () => this.actions.newDocument()),
-      button('tab-add tab-add-code', '{ }', 'Ny kodefil', () => this.actions.newCodeFile()),
+      codeButton,
     );
     this.docsEl.querySelector('.tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     this.renaming?.input.focus();
@@ -131,7 +134,8 @@ export class TabsUI {
     if (doc.kind === 'code') {
       const icon = document.createElement('span');
       icon.className = 'tab-icon';
-      icon.textContent = '{ }';
+      icon.innerHTML =
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 8-4 4 4 4M15 8l4 4-4 4"/></svg>';
       tab.append(icon);
     }
     const label = document.createElement('span');

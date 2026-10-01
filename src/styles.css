@@ -402,7 +402,7 @@ html, body {
   border-color: var(--border);
   border-bottom-color: var(--bg);
 }
-.tab-icon { font: 600 10px var(--font-mono); color: var(--accent); }
+.tab-icon { display: inline-flex; color: var(--accent); opacity: 0.8; }
 .tab-close, .tab-add {
   display: inline-flex;
   align-items: center;
@@ -525,16 +525,22 @@ html, body {
 .sidebar-link:hover { background: var(--button-hover); }
 .file-tree { display: flex; flex-direction: column; }
 .file-row {
-  display: flex; align-items: center; gap: 4px; width: 100%;
-  padding: 2px 6px; border: none; border-radius: 4px; background: none;
+  display: flex; align-items: center; width: 100%; height: 24px;
+  padding: 0 6px 0 4px; border: none; border-radius: 4px; background: none;
   color: var(--fg); font: 13px var(--font-ui); text-align: left; cursor: pointer;
 }
 .file-row:hover { background: var(--button-hover); }
 .file-row.active { background: var(--button-active); color: var(--accent); }
-.file-row.open .file-name { font-weight: 600; }
-.file-row.dir { color: var(--muted); }
-.file-chevron { width: 10px; flex-shrink: 0; color: var(--faint); font-size: 10px; }
-.file-icon { display: inline-flex; width: 16px; flex-shrink: 0; justify-content: center; color: var(--faint); font: 600 9px var(--font-mono); }
+/* Indent guide: a 14px step with a thin line in the middle. */
+.file-guide { align-self: stretch; width: 14px; flex-shrink: 0; position: relative; }
+.file-guide::before { content: ""; position: absolute; left: 7px; top: 0; bottom: 0; border-left: 1px solid var(--border); }
+.file-chevron { display: inline-flex; width: 14px; flex-shrink: 0; color: var(--faint); }
+.file-chevron svg { width: 12px; height: 12px; transition: transform 0.12s; }
+.file-row.expanded .file-chevron svg { transform: rotate(90deg); }
+.file-icon { display: inline-flex; width: 18px; margin-right: 5px; flex-shrink: 0; justify-content: center; color: var(--faint); }
+.file-row.dir .file-icon { color: var(--muted); }
+.file-row.code .file-icon { color: var(--accent); opacity: 0.8; }
+.file-row.active .file-icon { color: var(--accent); opacity: 1; }
 .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .context-menu {
