@@ -549,3 +549,6 @@ html, body {
 .context-menu button:hover:not(:disabled) { background: var(--button-active); color: var(--accent); }
 .context-menu button:disabled { color: var(--faint); cursor: default; }
 .context-menu-separator { height: 1px; margin: 4px 6px; background: var(--border); }
+
+/* Hidden closing fence: the line collapses to the code block's bottom padding. */
+.cm-codeblock-close-hidden { font-size: 0 !important; line-height: 0 !important; height: 0.5rem; padding-bottom: 0 !important; }
