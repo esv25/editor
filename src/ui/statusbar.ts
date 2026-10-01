@@ -28,8 +28,11 @@ export function renderSaveStatus(doc: EditorDocument, message: string | null): v
       break;
     case 'dirty':
       if (doc.file) el.textContent = 'Ulagrede endringer';
-      else if (storage.createNew && getSettings().autosave.enabled)
-        el.textContent = `Lagres automatisk i ${getSettings().autosave.folder || 'Dokumenter\\Editor'}`;
+      else if (storage.createNew && getSettings().autosave.enabled) {
+        const folder = doc.targetFolder || doc.folderProvider() || getSettings().autosave.folder;
+        el.textContent = `Lagres automatisk i ${folder ? folder.split(/[\\/]/).filter(Boolean).pop() : 'Dokumenter\\Editor'}`;
+        el.title = folder ?? '';
+      }
       else el.textContent = 'Ikke lagret – Ctrl+S for å lagre til fil';
       break;
     case 'saving':

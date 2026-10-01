@@ -1,10 +1,11 @@
 /**
  * Header on a fenced code block's opening line: name, language menu and a
- * Run button. It replaces the raw ```lang title="…" text unless the cursor
- * is on that line itself, so selecting or typing in the code never makes
- * the block change shape. The name is edited in its own input field.
+ * Run button. It always replaces the raw ```lang title="…" text, and the
+ * closing ``` is hidden, so the block never changes shape. The name is
+ * edited in its own input field, the language in the menu.
  */
-import { RangeSet, type Range } from '@codemirror/state';
+import { EditorSelection, EditorState, RangeSet, type Line, type Range } from '@codemirror/state';
+import type { SyntaxNode } from '@lezer/common';
 import {
   Decoration,
   EditorView,
@@ -15,9 +16,11 @@ import {
 } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { describeCommand } from '../../commands/registry';
-import { parseFence, rewriteFence } from '../util/fence';
+import { isClosingFence, parseFence, rewriteFence } from '../util/fence';
 import { languageChoices, normalizeLang } from './runners';
 import { runnability } from './run';
+
+const hiddenCloseLine = Decoration.line({ class: 'cm-codeblock-close-hidden' });
 
 export interface HeaderActions {
   run(view: EditorView, pos: number): void;
@@ -122,21 +125,9 @@ class HeaderWidget extends WidgetType {
   }
 }
 
-/** Lines the cursor/selection ends are on (only those show raw fence text). */
-function cursorLines(view: EditorView): Set<number> {
-  const lines = new Set<number>();
-  if (!view.hasFocus) return lines;
-  for (const r of view.state.selection.ranges) {
-    lines.add(view.state.doc.lineAt(r.head).number);
-    lines.add(view.state.doc.lineAt(r.anchor).number);
-  }
-  return lines;
-}
-
 function build(view: EditorView, hideMarkup: boolean, actions: HeaderActions): DecorationSet {
   const { state } = view;
   const { doc } = state;
-  const onLine = cursorLines(view);
   const decos: Range<Decoration>[] = [];
   const seen = new Set<number>();
   for (const { from, to } of view.visibleRanges) {
@@ -149,11 +140,18 @@ function build(view: EditorView, hideMarkup: boolean, actions: HeaderActions): D
         if (seen.has(open.from)) return false;
         seen.add(open.from);
         const info = parseFence(open.text);
-        // Show the raw fence while the cursor is on it, so it can be edited as text.
-        if (!info || !hideMarkup || onLine.has(open.number)) return false;
+        if (!info || !hideMarkup) return false;
+        // The fence lines are never shown as text: name and language are edited in
+        // the header, so the block keeps its shape wherever the cursor is.
         const indent = open.text.length - open.text.trimStart().length;
         const widget = new HeaderWidget(info.lang, info.title, actions);
         decos.push(Decoration.replace({ widget }).range(open.from + indent, open.to));
+        // The closing ``` line shrinks to the block's bottom edge.
+        const close = doc.lineAt(node.to);
+        if (close.number > open.number && isClosingFence(close.text, info.fence)) {
+          decos.push(hiddenCloseLine.range(close.from));
+          if (close.length > 0) decos.push(Decoration.replace({}).range(close.from, close.to));
+        }
         return false;
       },
     });
@@ -161,7 +159,47 @@ function build(view: EditorView, hideMarkup: boolean, actions: HeaderActions): D
   return RangeSet.of(decos, true);
 }
 
+/** Whether `line` is the opening or closing fence of a code block. */
+function isFenceLine(state: EditorState, line: Line): boolean {
+  for (let node: SyntaxNode | null = syntaxTree(state).resolveInner(line.from, 1); node; node = node.parent) {
+    if (node.name !== 'FencedCode') continue;
+    const open = state.doc.lineAt(node.from);
+    if (open.number === line.number) return true;
+    const info = parseFence(open.text);
+    return !!info && state.doc.lineAt(node.to).number === line.number && isClosingFence(line.text, info.fence);
+  }
+  return false;
+}
+
+/**
+ * The fence lines are hidden, so the cursor must never rest on them (typing
+ * there would edit invisible text). Moving onto one continues to the next line
+ * in the direction of travel. Edits are left alone, so typing ``` still works.
+ */
+const skipHiddenFences = EditorState.transactionFilter.of((tr) => {
+  if (!tr.selection || tr.docChanged || tr.selection.ranges.length > 1) return tr;
+  const range = tr.selection.main;
+  if (!range.empty) return tr;
+  const state = tr.startState;
+  const { doc } = state;
+  const forward = range.head >= state.selection.main.head;
+  let line = doc.lineAt(range.head);
+  for (let i = 0; i < 3 && isFenceLine(state, line); i++) {
+    const next = forward ? line.number + 1 : line.number - 1;
+    if (next < 1 || next > doc.lines) break;
+    line = doc.line(next);
+  }
+  if (line.number === doc.lineAt(range.head).number) return tr;
+  const head = forward ? line.from : line.to;
+  return [tr, { selection: EditorSelection.cursor(head), sequential: true }];
+});
+
 export function headerPlugin(hideMarkup: boolean, actions: HeaderActions) {
+  if (!hideMarkup) return [];
+  return [skipHiddenFences, headerViewPlugin(hideMarkup, actions)];
+}
+
+function headerViewPlugin(hideMarkup: boolean, actions: HeaderActions) {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;

@@ -141,10 +141,10 @@ kode), `codeBlocks`, `codeBlockTools`, `headings`, `inlineFormat`, `lists`, `tas
 
 - Navn og språk står i fence-linja: ` ```python title="navn.py" `. Parsing i
   `features/util/fence.ts` (ren tekst, testet i `tests/fence.test.ts`).
-- `header.ts`: hode på åpningslinja (navn, språkmeny, ▶ Kjør). Hodet erstatter rå-teksten
-  unntatt når markøren står på selve fence-linja – ikke bare i blokken – så markering og
-  skriving i koden aldri endrer blokkens form. Navnet redigeres i et eget `<input>`;
-  endringer skrives tilbake med `rewriteFence()`.
+- `header.ts`: hode på åpningslinja (navn, språkmeny, ▶ Kjør). Hodet erstatter *alltid*
+  rå-teksten, og lukke-``` skjules (linja krymper til blokkens nederste kant), så blokken
+  aldri endrer form. Navnet redigeres i et eget `<input>`, språket i menyen; endringer
+  skrives tilbake med `rewriteFence()`.
 - Bakgrunner på linjer (kode, inline kode) må være halvgjennomsiktige: CodeMirror tegner
   markeringen *bak* teksten, så en ugjennomsiktig linjebakgrunn skjuler den.
 - `run.ts`: skrivebord → `platform.runProgram` (Rust-kommandoen `run_program` i
