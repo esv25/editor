@@ -44,6 +44,8 @@ export interface Platform {
   startupFile(): Promise<string | null>;
   /** Files opened while running, e.g. "Open with" forwarded from a second launch. */
   onOpenFile?(handler: (path: string) => void): void;
+  /** Show a file or folder in the system file manager (desktop only). */
+  revealPath?(path: string): Promise<void>;
   /** The installed app's version (desktop only). */
   appVersion?(): Promise<string>;
   /** Look for a newer published version (desktop only). */

@@ -82,6 +82,13 @@ Signeringsnøkkelen ligger i `C:\Users\<deg>\.tauri\editor.key` – ta vare på 
 gruppe har sine åpne dokumenter som faner i raden under. ● betyr ulagrede endringer;
 midtklikk eller ✕ lukker en fane. Fanene huskes til neste gang du åpner programmet.
 
+### Mapper
+
+En gruppe kan kobles til en mappe på disken (høyreklikk på gruppen → «Koble til mappe …»,
+eller knappen i sidefeltet). Da vises mappa med undermapper i sidefeltet, og nye
+dokumenter i gruppen lagres der. Høyreklikk på en undermappe for «Nytt dokument her».
+Grupper uten mappe fungerer som før.
+
 ## Kodefiler
 
 Filer som .py, .js og .ts åpnes som ren kode med linjenumre. Velg språk øverst og trykk

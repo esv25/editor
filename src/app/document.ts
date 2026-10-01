@@ -27,6 +27,8 @@ export interface DocumentInit {
   state: EditorState;
   /** Content differs from what's on disk (e.g. restored unsaved work). */
   dirty?: boolean;
+  /** Folder to autosave a new document in. */
+  targetFolder?: string;
 }
 
 let idCounter = 0;
@@ -44,6 +46,10 @@ export class EditorDocument {
   state: EditorState;
   dirty: boolean;
   status: SaveStatus;
+  /** Folder a new document should be autosaved in (e.g. a subfolder picked in the file tree). */
+  targetFolder: string | undefined;
+  /** Fallback folder from outside (the group's folder); set by the workspace. */
+  folderProvider: () => string | undefined = () => undefined;
   /** Settings version the state was configured with (see createEditor). */
   settingsVersion = currentSettingsVersion();
 
@@ -64,6 +70,7 @@ export class EditorDocument {
     this.name = init.name;
     this.kind = init.kind;
     this.lang = init.lang ?? '';
+    this.targetFolder = init.targetFolder;
     this.state = init.state;
     this.dirty = !!init.dirty && init.state.doc.length > 0;
     this.savedDoc = this.dirty ? Text.empty : init.state.doc;
@@ -145,7 +152,8 @@ export class EditorDocument {
       const ext = isMarkdown ? 'md' : extensionOf(this.name) || extensionForLang[this.lang] || 'txt';
       // Code files are named by time; Markdown by its first line (and follows it).
       const baseName = isMarkdown ? suggestFileName(content) : suggestFileName('').replace('Notat', 'Kode');
-      const file = await storage.createNew(content, baseName, ext, getSettings().autosave.folder || undefined);
+      const folder = this.targetFolder || this.folderProvider() || getSettings().autosave.folder || undefined;
+      const file = await storage.createNew(content, baseName, ext, folder);
       this.file = file;
       this.name = file.name;
       this.autoNamed = isMarkdown;

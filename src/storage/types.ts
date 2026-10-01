@@ -16,6 +16,12 @@ export interface OpenedFile {
   content: string;
 }
 
+export interface FolderEntry {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+}
+
 export interface StorageBackend {
   /** Whether `save` can write back to the same file (enables autosave). */
   readonly canSaveInPlace: boolean;
@@ -31,6 +37,10 @@ export interface StorageBackend {
   createNew?(content: string, baseName: string, extension: string, folder?: string): Promise<FileRef>;
   /** Rename a file within its folder (keeping the extension). Desktop only. */
   rename?(file: FileRef, baseName: string): Promise<FileRef>;
+  /** Ask the user for a folder. Resolves to its path, or null if cancelled. Desktop only. */
+  pickFolder?(): Promise<string | null>;
+  /** List a folder: subfolders first, then files, each sorted by name. Desktop only. */
+  listFolder?(path: string): Promise<FolderEntry[]>;
   /** Write to an already-known file. */
   save(file: FileRef, content: string): Promise<void>;
   /** Ask the user where to save. Resolves to null if cancelled. */

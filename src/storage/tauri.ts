@@ -4,9 +4,9 @@
  */
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { documentDir, join } from '@tauri-apps/api/path';
-import { exists, mkdir, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { exists, mkdir, readDir, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
 import { codeFileExtensions } from '../code/languages';
-import type { FileRef, OpenedFile, StorageBackend } from './types';
+import type { FileRef, FolderEntry, OpenedFile, StorageBackend } from './types';
 
 interface PathRef extends FileRef {
   readonly path: string;
@@ -52,6 +52,24 @@ export const tauriStorage: StorageBackend = {
     }
     if (path !== oldPath) await rename(oldPath, path);
     return refFor(path);
+  },
+
+  async pickFolder(): Promise<string | null> {
+    const path = await open({ directory: true, multiple: false, title: 'Velg mappe for gruppen' });
+    return typeof path === 'string' ? path : null;
+  },
+
+  async listFolder(path: string): Promise<FolderEntry[]> {
+    const entries = await readDir(path);
+    const collator = new Intl.Collator('nb', { numeric: true, sensitivity: 'base' });
+    return (
+      await Promise.all(
+        entries
+          // Hidden files and tool folders are just noise in a notes sidebar.
+          .filter((e) => !e.name.startsWith('.') && e.name !== 'node_modules' && e.name !== '__pycache__')
+          .map(async (e) => ({ name: e.name, path: await join(path, e.name), isDirectory: e.isDirectory })),
+      )
+    ).sort((a, b) => Number(b.isDirectory) - Number(a.isDirectory) || collator.compare(a.name, b.name));
   },
 
   async save(file: FileRef, content: string): Promise<void> {

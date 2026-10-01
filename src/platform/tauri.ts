@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { ask } from '@tauri-apps/plugin-dialog';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
 import type { AvailableUpdate, Platform, RunRequest, RunResult } from './types';
@@ -33,6 +34,10 @@ export const tauriPlatform: Platform = {
 
   onOpenFile(handler) {
     void listen<string>('open-file', (event) => handler(event.payload));
+  },
+
+  revealPath(path: string) {
+    return revealItemInDir(path);
   },
 
   appVersion() {

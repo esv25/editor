@@ -23,7 +23,10 @@ UI-tekst er på norsk (bokmål). Kode, identifikatorer og kodekommentarer er på
 - `npm run dev` – utviklingsserver på http://localhost:5173
 - `npm test` – enhetstester
 - `npm run typecheck` / `npm run build`
-- `npm run app` – skrivebordsappen i utviklingsmodus (starter Vite selv; port 5173 må være ledig)
+- `npm run app` – skrivebordsappen i utviklingsmodus (starter Vite selv; port 5173 må være ledig).
+  Bruker `src-tauri/tauri.dev.conf.json`: egen identitet «Editor (dev)» (`com.eirik.editor.dev`),
+  så den har egne faner/innstillinger og ikke kolliderer med den installerte appen
+  (single-instance ville ellers sendt oppstarten videre til den installerte).
 - `npm run app:build` – installasjonsfil lokalt (usignert, uten publisering)
 - `npm run release` – publiserer en ny versjon som installerte apper oppdaterer seg til
   (se «Oppdateringer» under)
@@ -73,8 +76,8 @@ src/
     fileNames.ts          filnavn fra første linje (autolagring)
     appearance.ts         tema og typografi → CSS-variabler / data-theme
     welcome.ts            velkomsttekst første gang
-  ui/                     faner (tabs.ts), verktøylinjer (toolbar.ts, codeBar.ts),
-                          disposisjon, statuslinje
+  ui/                     faner (tabs.ts), verktøylinjer (toolbar.ts, codeBar.ts), filtre
+                          (fileTree.ts), høyreklikkmeny, disposisjon, statuslinje, updates
   styles.css              layout, temafarger (CSS-variabler) og editorklasser
 tests/                    Vitest; helpers.ts har `run(command, "tekst med | markør")`
 src-tauri/
@@ -120,6 +123,11 @@ kode), `codeBlocks`, `codeBlockTools`, `headings`, `inlineFormat`, `lists`, `tas
   localStorage og gjenopprettes ved oppstart; filer med sti leses på nytt fra disk.
 - Kommandoer har `scope`: `'markdown'` (standard), `'code'` eller `'any'` – keymapen for
   en tilstand bygges bare av kommandoene som gjelder dens type.
+- En gruppe *kan* kobles til en mappe (`group.folder`, valgfritt). Da viser sidefeltet et
+  filtre (`ui/fileTree.ts`, med undermapper som kan åpnes; skjuler punktfiler,
+  `node_modules` og filtyper editoren ikke kan åpne), og nye dokumenter autolagres i
+  mappa. Et dokument kan ha `targetFolder` (f.eks. en undermappe valgt i treet) som går
+  foran gruppens mappe. Høyreklikk på gruppefanen/treet gir valgene (`ui/contextMenu.ts`).
 
 ### Kodefiler (`code/`)
 

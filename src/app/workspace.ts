@@ -20,6 +20,8 @@ import { saveSession, type Session, type SessionDoc } from './session';
 export interface Group {
   id: string;
   name: string;
+  /** Linked folder (optional): shown in the sidebar, new documents are saved here. */
+  folder?: string;
   docs: EditorDocument[];
   activeDocId: string | null;
 }
@@ -94,6 +96,7 @@ export class Workspace {
   // ---------- Documents ----------
 
   private adopt(doc: EditorDocument): void {
+    doc.folderProvider = () => this.groups.find((g) => g.docs.includes(doc))?.folder;
     doc.onChange(() => {
       // "Save as" with a different extension turns a note into code or back.
       if (doc.file && kindForName(doc.name) !== doc.kind) void this.convert(doc);
@@ -127,7 +130,8 @@ export class Workspace {
     this.view.focus();
   }
 
-  async newDocument(kind: DocKind = 'markdown', lang = 'python'): Promise<EditorDocument> {
+  /** New untitled document in the active group; `folder`: autosave it there (e.g. a subfolder). */
+  async newDocument(kind: DocKind = 'markdown', lang = 'python', folder?: string): Promise<EditorDocument> {
     const name = kind === 'markdown' ? `${UNTITLED}.md` : `${UNTITLED}.${extensionForLang[lang] ?? 'txt'}`;
     const doc = new EditorDocument({
       file: null,
@@ -135,6 +139,7 @@ export class Workspace {
       kind,
       lang: kind === 'code' ? lang : '',
       state: await stateFor(kind, '', lang),
+      targetFolder: folder,
     });
     this.insertDoc(this.activeGroup, doc);
     this.activate(doc);
@@ -278,6 +283,13 @@ export class Workspace {
     }
   }
 
+  /** Link a folder to a group (or unlink with undefined). */
+  setGroupFolder(group: Group, folder: string | undefined): void {
+    group.folder = folder;
+    for (const fn of this.activeListeners) fn();
+    this.changed();
+  }
+
   renameGroup(group: Group, name: string): void {
     const trimmed = name.trim();
     if (!trimmed || trimmed === group.name) return;
@@ -327,12 +339,14 @@ export class Workspace {
       groups: this.groups.map((g) => ({
         id: g.id,
         name: g.name,
+        folder: g.folder,
         activeDocId: g.activeDocId,
         docs: g.docs.map((d) => {
           const path = d.file?.path;
           const entry: SessionDoc = { id: d.id, name: d.name, kind: d.kind, cursor: d.state.selection.main.head };
           if (path) entry.path = path;
           if (d.kind === 'code') entry.lang = d.lang;
+          if (!path && d.targetFolder) entry.targetFolder = d.targetFolder;
           if (!path || d.dirty) {
             entry.content = d.content;
             entry.dirty = d.dirty;
@@ -380,6 +394,7 @@ export class Workspace {
           lang,
           state: await stateFor(kind, sd.content ?? '', lang),
           dirty: sd.dirty || (sd.path !== undefined && !!sd.content),
+          targetFolder: sd.targetFolder,
         });
       }
       if (sd.cursor !== undefined && sd.cursor <= doc.state.doc.length) {
@@ -390,7 +405,7 @@ export class Workspace {
 
     for (const sg of session.groups) {
       const docs = (await Promise.all(sg.docs.map(restoreDoc))).filter((d): d is EditorDocument => d !== null);
-      const group: Group = { id: sg.id, name: sg.name, docs, activeDocId: sg.activeDocId };
+      const group: Group = { id: sg.id, name: sg.name, folder: sg.folder, docs, activeDocId: sg.activeDocId };
       if (docs.length === 0) {
         docs.push(new EditorDocument({ file: null, name: `${UNTITLED}.md`, kind: 'markdown', state: createMarkdownState('') }));
       }

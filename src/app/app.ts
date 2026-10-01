@@ -7,8 +7,9 @@ import { createMarkdownState, createView } from '../editor/createEditor';
 import { runContext } from '../features/codeBlockTools';
 import { platform } from '../platform';
 import { getSettings, onSettingsChange, updateSettings } from '../settings';
-import { drafts } from '../storage';
+import { drafts, storage } from '../storage';
 import { CodeBar } from '../ui/codeBar';
+import { FileTree } from '../ui/fileTree';
 import { OutlinePanel } from '../ui/outline';
 import { renderCount, renderSaveStatus, renderTitle } from '../ui/statusbar';
 import { TabsUI } from '../ui/tabs';
@@ -18,7 +19,7 @@ import { initAppearance, resolvedTheme } from './appearance';
 import { EditorDocument } from './document';
 import { loadSession } from './session';
 import { welcomeText } from './welcome';
-import { Workspace } from './workspace';
+import { Workspace, type Group } from './workspace';
 
 const svg = (body: string) =>
   `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
@@ -98,7 +99,7 @@ export async function startApp(): Promise<void> {
     },
     {
       id: 'view.toggleOutline',
-      name: 'Vis/skjul disposisjon',
+      name: 'Vis/skjul sidefeltet',
       icon: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>'),
       key: 'Mod-Shift-o',
       scope: 'any',
@@ -138,10 +139,30 @@ export async function startApp(): Promise<void> {
   const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save'], getView);
   const viewBar = renderButtons(el('view-actions'), ['view.toggleOutline', 'view.toggleTheme'], getView);
   const outline = new OutlinePanel(el('outline'), getView);
+  const linkFolder = async (group: Group) => {
+    const folder = await storage.pickFolder?.();
+    if (folder) ws.setGroupFolder(group, folder);
+  };
   const tabs = new TabsUI(el('group-tabs'), el('doc-tabs'), ws, {
     newDocument: () => void ws.newDocument(),
     newCodeFile: () => void ws.newDocument('code', 'python'),
+    linkFolder: (group) => void linkFolder(group),
   });
+  const fileTree = new FileTree(el('files'), ws, {
+    linkFolder: (group) => void linkFolder(group),
+    newDocument: (folder, kind) => void ws.newDocument(kind, 'python', folder),
+  });
+  // Re-read the folder when the group changes, files appear (autosave/rename), or the
+  // window regains focus (files may have changed outside the app).
+  let treeKey = '';
+  const refreshTree = (force = false) => {
+    const group = ws.activeGroup;
+    const key = `${group.id}|${group.folder ?? ''}|${ws.activeDoc?.id}|${ws.allDocs().map((d) => d.file?.path ?? '').join(',')}`;
+    if (!force && key === treeKey) return;
+    treeKey = key;
+    void fileTree.refresh();
+  };
+  window.addEventListener('focus', () => refreshTree(true));
 
   // Code blocks and code files run in the document's folder, so they can use files next to it.
   runContext.cwd = () => ws.activeDoc?.file?.path?.replace(/[\\/][^\\/]*$/, '');
@@ -151,6 +172,7 @@ export async function startApp(): Promise<void> {
     const doc = ws.activeDoc;
     if (!doc) return;
     tabs.render();
+    refreshTree();
     renderTitle(doc);
     renderSaveStatus(doc, ws.message);
   });
@@ -170,12 +192,14 @@ export async function startApp(): Promise<void> {
   });
 
   onSettingsChange((next, prev) => {
+    el('sidebar').hidden = !next.outlineVisible;
     outline.visible = next.outlineVisible;
     viewBar.update(view.state);
     if (next.keybindings !== prev.keybindings) {
       for (const bar of [mdToolbar, fileBar, viewBar]) bar.refreshTooltips();
     }
   });
+  el('sidebar').hidden = !getSettings().outlineVisible;
   outline.visible = getSettings().outlineVisible;
 
   // Restore the last session, or start with one group ("Notater").

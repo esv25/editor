@@ -3,6 +3,9 @@
  */
 import type { EditorDocument } from '../app/document';
 import type { Group, Workspace } from '../app/workspace';
+import { platform } from '../platform';
+import { storage } from '../storage';
+import { showContextMenu } from './contextMenu';
 
 function button(className: string, text: string, title: string, onClick: () => void): HTMLButtonElement {
   const b = document.createElement('button');
@@ -26,7 +29,7 @@ export class TabsUI {
     private groupsEl: HTMLElement,
     private docsEl: HTMLElement,
     private ws: Workspace,
-    private actions: { newDocument(): void; newCodeFile(): void },
+    private actions: { newDocument(): void; newCodeFile(): void; linkFolder(group: Group): void },
   ) {}
 
   render(): void {
@@ -60,17 +63,35 @@ export class TabsUI {
 
     const icon = document.createElement('span');
     icon.className = 'group-icon';
-    icon.innerHTML =
-      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+    // Filled folder = the group is linked to a folder on disk.
+    icon.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="${group.folder ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
     const label = document.createElement('span');
     label.className = 'tab-label';
     label.textContent = group.name;
-    tab.title = `Gruppe «${group.name}» – dobbeltklikk for å gi nytt navn`;
+    tab.title = group.folder
+      ? `Gruppe «${group.name}» – mappe: ${group.folder}\nHøyreklikk for flere valg`
+      : `Gruppe «${group.name}» – dobbeltklikk for å gi nytt navn, høyreklikk for flere valg`;
     tab.append(icon, label);
     tab.append(button('tab-close', '✕', 'Lukk gruppen', () => void this.ws.closeGroup(group)));
     tab.addEventListener('mousedown', (e) => e.button === 0 && e.preventDefault());
     tab.addEventListener('click', () => this.ws.activateGroup(group));
     tab.addEventListener('dblclick', () => this.startRename(group));
+    tab.addEventListener('contextmenu', (e) => {
+      const canLink = !!storage.pickFolder;
+      showContextMenu(e, [
+        { label: 'Gi nytt navn', action: () => this.startRename(group) },
+        'separator',
+        { label: group.folder ? 'Bytt mappe …' : 'Koble til mappe …', action: () => this.actions.linkFolder(group), disabled: !canLink },
+        ...(group.folder
+          ? [
+              { label: 'Vis mappa i Utforsker', action: () => void platform.revealPath?.(group.folder!), disabled: !platform.revealPath },
+              { label: 'Fjern mappekobling', action: () => this.ws.setGroupFolder(group, undefined) },
+            ]
+          : []),
+        'separator',
+        { label: 'Lukk gruppen', action: () => void this.ws.closeGroup(group) },
+      ]);
+    });
     return tab;
   }
 

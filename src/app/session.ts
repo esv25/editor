@@ -15,11 +15,14 @@ export interface SessionDoc {
   content?: string;
   dirty?: boolean;
   cursor?: number;
+  targetFolder?: string;
 }
 
 export interface SessionGroup {
   id: string;
   name: string;
+  /** Linked folder (optional). */
+  folder?: string;
   activeDocId: string | null;
   docs: SessionDoc[];
 }
