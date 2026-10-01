@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { ask } from '@tauri-apps/plugin-dialog';
 import type { Platform, RunRequest, RunResult } from './types';
@@ -25,6 +26,10 @@ export const tauriPlatform: Platform = {
 
   startupFile() {
     return invoke<string | null>('startup_file');
+  },
+
+  onOpenFile(handler) {
+    void listen<string>('open-file', (event) => handler(event.payload));
   },
 
   runProgram(request: RunRequest) {

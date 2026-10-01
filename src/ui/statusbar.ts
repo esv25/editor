@@ -1,34 +1,27 @@
 /**
- * Window title, document title in the top bar, and the status bar
- * (save status + word count).
+ * Window title and the status bar (save status, word count / code info).
  */
-import type { EditorState } from '@codemirror/state';
-import type { DocumentController } from '../app/document';
+import type { EditorDocument } from '../app/document';
+import { languageChoices } from '../features/codeBlockTools/runners';
 import { platform } from '../platform';
 import { getSettings } from '../settings';
 import { storage } from '../storage';
 
 const APP_NAME = 'Editor';
 
-export function renderTitle(doc: DocumentController): void {
+export function renderTitle(doc: EditorDocument): void {
   platform.setWindowTitle(`${doc.dirty ? '● ' : ''}${doc.name} — ${APP_NAME}`);
-  const el = document.getElementById('doc-title')!;
-  el.replaceChildren();
-  if (doc.dirty) {
-    const dot = document.createElement('span');
-    dot.className = 'dirty';
-    dot.textContent = '●';
-    dot.title = 'Ulagrede endringer';
-    el.append(dot);
-  }
-  el.append(doc.name);
-  el.title = doc.file ? (doc.file.path ?? doc.name) : `${doc.name} (ikke lagret til fil ennå)`;
 }
 
-export function renderSaveStatus(doc: DocumentController): void {
+/** Save status of the active document, or a workspace message (errors) if there is one. */
+export function renderSaveStatus(doc: EditorDocument, message: string | null): void {
   const el = document.getElementById('status-save')!;
   const s = doc.status;
-  el.classList.toggle('error', s.kind === 'error');
+  el.classList.toggle('error', s.kind === 'error' || message !== null);
+  if (message) {
+    el.textContent = message;
+    return;
+  }
   switch (s.kind) {
     case 'clean':
       el.textContent = doc.file ? 'Lagret' : '';
@@ -51,9 +44,18 @@ export function renderSaveStatus(doc: DocumentController): void {
   }
 }
 
-export function renderCount(state: EditorState): void {
+/** Words and characters for notes; language, lines and cursor position for code. */
+export function renderCount(doc: EditorDocument): void {
+  const { state } = doc;
+  const el = document.getElementById('status-count')!;
+  if (doc.kind === 'code') {
+    const head = state.selection.main.head;
+    const line = state.doc.lineAt(head);
+    const lang = languageChoices.find((c) => c.id === doc.lang)?.label ?? (doc.lang || 'Ren tekst');
+    el.textContent = `${lang} · linje ${line.number}, kol ${head - line.from + 1} · ${state.doc.lines} linjer`;
+    return;
+  }
   const text = state.doc.toString();
   const words = text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
-  document.getElementById('status-count')!.textContent =
-    `${words.toLocaleString('nb-NO')} ord · ${text.length.toLocaleString('nb-NO')} tegn`;
+  el.textContent = `${words.toLocaleString('nb-NO')} ord · ${text.length.toLocaleString('nb-NO')} tegn`;
 }

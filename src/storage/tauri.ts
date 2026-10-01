@@ -5,6 +5,7 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { documentDir, join } from '@tauri-apps/api/path';
 import { exists, mkdir, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { codeFileExtensions } from '../code/languages';
 import type { FileRef, OpenedFile, StorageBackend } from './types';
 
 interface PathRef extends FileRef {
@@ -12,6 +13,7 @@ interface PathRef extends FileRef {
 }
 
 const filters = [
+  { name: 'Markdown og kode', extensions: ['md', 'markdown', 'txt', ...codeFileExtensions] },
   { name: 'Markdown og tekst', extensions: ['md', 'markdown', 'txt'] },
   { name: 'Alle filer', extensions: ['*'] },
 ];
@@ -30,11 +32,11 @@ export const tauriStorage: StorageBackend = {
     return { file: refFor(path), content: await readTextFile(path) };
   },
 
-  async createNew(content: string, baseName: string, folder?: string): Promise<FileRef> {
+  async createNew(content: string, baseName: string, extension: string, folder?: string): Promise<FileRef> {
     const dir = folder || (await join(await documentDir(), 'Editor'));
     await mkdir(dir, { recursive: true });
-    let path = await join(dir, `${baseName}.md`);
-    for (let i = 2; await exists(path); i++) path = await join(dir, `${baseName} (${i}).md`);
+    let path = await join(dir, `${baseName}.${extension}`);
+    for (let i = 2; await exists(path); i++) path = await join(dir, `${baseName} (${i}).${extension}`);
     await writeTextFile(path, content);
     return refFor(path);
   },

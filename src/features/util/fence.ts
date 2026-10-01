@@ -47,6 +47,29 @@ export function parseFence(text: string): FenceInfo | null {
   return { fence, lang, langFrom, langTo, title, titleFrom, titleTo };
 }
 
+/**
+ * Rewrite a fence line with a new language and/or title, keeping the
+ * indent, fence characters and any other attributes. An empty title
+ * removes it. Returns null if `text` isn't a fence line.
+ */
+export function rewriteFence(text: string, change: { lang?: string; title?: string }): string | null {
+  const info = parseFence(text);
+  if (!info) return null;
+  const indent = /^ */.exec(text)![0];
+  const lang = (change.lang ?? info.lang).trim();
+  const title = (change.title ?? info.title ?? '').replace(/"/g, "'").trim();
+  // Everything after the language, minus the old title attribute.
+  const rest = text
+    .slice(info.langTo)
+    .replace(TITLE_RE, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const parts = [lang, title ? `title="${title}"` : '', rest].filter(Boolean);
+  const infoString = parts.join(' ');
+  // Without a language, keep a space so `title=` isn't read as the language.
+  return indent + info.fence + (lang || !infoString ? infoString : ' ' + infoString);
+}
+
 /** Whether `text` closes a block opened with `fence`. */
 export function isClosingFence(text: string, fence: string): boolean {
   const m = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(text);

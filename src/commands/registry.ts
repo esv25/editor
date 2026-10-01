@@ -9,6 +9,12 @@ import { Prec, type EditorState, type Extension } from '@codemirror/state';
 import { keymap, type EditorView, type KeyBinding } from '@codemirror/view';
 import { getSettings } from '../settings';
 
+/**
+ * Which kind of document a command applies to. Markdown formatting
+ * commands shouldn't fire in a code file and vice versa.
+ */
+export type CommandScope = 'markdown' | 'code' | 'any';
+
 export interface EditorCommand {
   id: string;
   /** Human-readable name, used in tooltips and (later) a command palette. */
@@ -17,8 +23,13 @@ export interface EditorCommand {
   label?: string;
   /** Inline SVG markup for the toolbar button. */
   icon?: string;
-  /** Default key in CodeMirror notation ("Mod-b", "Mod-Shift-7"). Overridable in settings. */
-  key?: string;
+  /**
+   * Default key(s) in CodeMirror notation ("Mod-b", "Mod-Shift-7"). The first
+   * is shown in tooltips. Overridable in settings.
+   */
+  key?: string | string[];
+  /** Where the command applies. Default: 'markdown'. */
+  scope?: CommandScope;
   run: (view: EditorView) => boolean;
   /** Whether the command's effect is active at the cursor (for toggle buttons). */
   isActive?: (state: EditorState) => boolean;
@@ -47,19 +58,29 @@ export function runCommand(view: EditorView, id: string): boolean {
   return command ? command.run(view) : false;
 }
 
-/** The effective key for a command: the settings override if any, else the default. */
-export function keyFor(id: string): string | undefined {
+/** The effective keys for a command: the settings override if any, else the defaults. */
+export function keysFor(id: string): string[] {
   const overrides = getSettings().keybindings;
-  if (id in overrides) return overrides[id] ?? undefined;
-  return commands.get(id)?.key;
+  const key = id in overrides ? overrides[id] : commands.get(id)?.key;
+  if (!key) return [];
+  return Array.isArray(key) ? key : [key];
 }
 
-/** Keymap built from the registry. Rebuild (via compartment) when settings change. */
-export function commandKeymap(): Extension {
+/** The main key for a command (shown in tooltips and hints). */
+export function keyFor(id: string): string | undefined {
+  return keysFor(id)[0];
+}
+
+/**
+ * Keymap for one kind of document, built from the registry.
+ * Rebuild (via compartment) when settings change.
+ */
+export function commandKeymap(scope: 'markdown' | 'code'): Extension {
   const bindings: KeyBinding[] = [];
   for (const command of commands.values()) {
-    const key = keyFor(command.id);
-    if (key) bindings.push({ key, run: command.run, preventDefault: false });
+    const commandScope = command.scope ?? 'markdown';
+    if (commandScope !== scope && commandScope !== 'any') continue;
+    for (const key of keysFor(command.id)) bindings.push({ key, run: command.run, preventDefault: false });
   }
   return Prec.high(keymap.of(bindings));
 }

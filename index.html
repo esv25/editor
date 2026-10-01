@@ -9,10 +9,14 @@
     <div id="app">
       <header id="topbar">
         <div id="file-actions" class="toolbar-group"></div>
-        <div id="doc-title" title=""></div>
+        <div id="group-tabs" class="tabs" role="tablist" aria-label="Grupper"></div>
         <div id="view-actions" class="toolbar-group"></div>
       </header>
-      <nav id="toolbar" aria-label="Formatering"></nav>
+      <div id="doc-tabs" class="tabs" role="tablist" aria-label="Dokumenter"></div>
+      <nav id="toolbar" aria-label="Verktøy">
+        <div id="md-tools" class="toolbar-group"></div>
+        <div id="code-tools" class="toolbar-group" hidden></div>
+      </nav>
       <div id="workspace">
         <aside id="outline" aria-label="Disposisjon"></aside>
         <main id="editor"></main>

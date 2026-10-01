@@ -35,6 +35,8 @@ export interface Platform {
   onCloseRequested(hasUnsavedWork: () => boolean): void;
   /** Path of the file the app was launched with ("Open with"), if any. */
   startupFile(): Promise<string | null>;
+  /** Files opened while running, e.g. "Open with" forwarded from a second launch. */
+  onOpenFile?(handler: (path: string) => void): void;
   /** Run a program on a code snippet (desktop only). */
   runProgram?(request: RunRequest): Promise<RunResult>;
 }

@@ -1,15 +1,14 @@
 /**
- * The open document: which file it belongs to, whether it has unsaved
- * changes, autosave and draft backup. Talks to storage only through the
- * `storage` module.
+ * One open document (one tab): its file, editor state, unsaved-changes
+ * tracking and autosave. Talks to storage only through `storage`.
  */
-import { Text } from '@codemirror/state';
+import { Text, type EditorState } from '@codemirror/state';
 import type { ViewUpdate } from '@codemirror/view';
-import type { EditorHandle } from '../editor/createEditor';
-import { platform } from '../platform';
-import { suggestFileName, titleFromContent } from './fileNames';
+import { extensionForLang, extensionOf, type DocKind } from '../code/languages';
+import { currentSettingsVersion } from '../editor/createEditor';
 import { getSettings } from '../settings';
-import { drafts, NeedsPermissionError, storage, type FileRef, type OpenedFile } from '../storage';
+import { NeedsPermissionError, storage, type FileRef } from '../storage';
+import { suggestFileName, titleFromContent } from './fileNames';
 
 export type SaveStatus =
   | { kind: 'clean' }
@@ -18,17 +17,38 @@ export type SaveStatus =
   | { kind: 'saved'; at: Date }
   | { kind: 'error'; message: string };
 
-const UNTITLED = 'Uten tittel.md';
+export interface DocumentInit {
+  id?: string;
+  file: FileRef | null;
+  name: string;
+  kind: DocKind;
+  /** Language of a code document (runner id, e.g. "python"). */
+  lang?: string;
+  state: EditorState;
+  /** Content differs from what's on disk (e.g. restored unsaved work). */
+  dirty?: boolean;
+}
 
-export class DocumentController {
-  file: FileRef | null = null;
-  name = UNTITLED;
-  dirty = false;
-  status: SaveStatus = { kind: 'clean' };
+let idCounter = 0;
+const newId = () => `d${Date.now().toString(36)}${(idCounter++).toString(36)}`;
 
-  private savedDoc: Text = Text.empty;
+const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+export class EditorDocument {
+  readonly id: string;
+  file: FileRef | null;
+  name: string;
+  kind: DocKind;
+  lang: string;
+  /** The editor state; kept current by the workspace while the document is active. */
+  state: EditorState;
+  dirty: boolean;
+  status: SaveStatus;
+  /** Settings version the state was configured with (see createEditor). */
+  settingsVersion = currentSettingsVersion();
+
+  private savedDoc: Text;
   private autosaveTimer: ReturnType<typeof setTimeout> | undefined;
-  private draftTimer: ReturnType<typeof setTimeout> | undefined;
   /** True while a new document is being autosaved to its first file. */
   private creating = false;
   /**
@@ -37,66 +57,70 @@ export class DocumentController {
    */
   private autoNamed = false;
   private listeners = new Set<() => void>();
-  private loadListeners = new Set<() => void>();
 
-  constructor(private editor: EditorHandle) {}
-
-  onChange(fn: () => void): void {
-    this.listeners.add(fn);
+  constructor(init: DocumentInit) {
+    this.id = init.id ?? newId();
+    this.file = init.file;
+    this.name = init.name;
+    this.kind = init.kind;
+    this.lang = init.lang ?? '';
+    this.state = init.state;
+    this.dirty = !!init.dirty && init.state.doc.length > 0;
+    this.savedDoc = this.dirty ? Text.empty : init.state.doc;
+    this.status = { kind: this.dirty ? 'dirty' : 'clean' };
+    if (this.dirty) this.scheduleAutosave();
   }
 
-  /** Called after the whole document has been replaced (new/open/restore). */
-  onLoad(fn: () => void): void {
-    this.loadListeners.add(fn);
+  onChange(fn: () => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
   }
 
   private notify(): void {
     for (const fn of this.listeners) fn();
   }
 
-  private get content(): string {
-    return this.editor.view.state.doc.toString();
+  get content(): string {
+    return this.state.doc.toString();
   }
 
-  /** Replace the editor content. `dirty` is for restored drafts that were never saved. */
-  load(content: string, file: FileRef | null, name: string, dirty = false): void {
-    clearTimeout(this.autosaveTimer);
-    this.editor.setDocument(content);
-    this.file = file;
-    this.name = name;
-    this.autoNamed = false;
-    this.savedDoc = dirty ? Text.empty : this.editor.view.state.doc;
-    this.dirty = dirty && content !== '';
-    this.status = { kind: this.dirty ? 'dirty' : 'clean' };
-    if (!this.dirty) drafts.clear();
-    this.editor.view.focus();
-    this.notify();
-    for (const fn of this.loadListeners) fn();
+  /** Untitled, unchanged and empty – safe to replace when opening a file. */
+  get isBlank(): boolean {
+    return !this.file && !this.dirty && this.state.doc.length === 0;
   }
 
-  /** Call from the editor's update listener. */
+  /** Call with every editor update while this document is active. */
   handleUpdate(update: ViewUpdate): void {
+    this.state = update.state;
     if (!update.docChanged) return;
     const wasDirty = this.dirty;
     this.dirty = !update.state.doc.eq(this.savedDoc);
-
-    clearTimeout(this.draftTimer);
     if (this.dirty) {
-      this.draftTimer = setTimeout(() => drafts.save(this.name, this.content), 500);
       if (this.status.kind !== 'saving') this.status = { kind: 'dirty' };
       this.scheduleAutosave();
     } else {
-      drafts.clear();
       clearTimeout(this.autosaveTimer);
       if (this.status.kind === 'dirty') this.status = { kind: 'clean' };
     }
     if (wasDirty !== this.dirty || this.status.kind === 'dirty') this.notify();
   }
 
-  /** Whether autosave will take care of the current document. */
+  /** Swap in a rebuilt state (e.g. after a language change), keeping unsaved-change tracking. */
+  replaceState(state: EditorState): void {
+    this.state = state;
+    this.settingsVersion = currentSettingsVersion();
+    this.notify();
+  }
+
+  /** Whether autosave will take care of this document. */
   private get autosaves(): boolean {
     if (!getSettings().autosave.enabled) return false;
     return this.file ? storage.canSaveInPlace : storage.createNew !== undefined;
+  }
+
+  /** True if there's unsaved work that autosave won't take care of. */
+  get hasUnsavedWork(): boolean {
+    return this.dirty && !this.autosaves;
   }
 
   private scheduleAutosave(): void {
@@ -110,20 +134,24 @@ export class DocumentController {
 
   /** Autosave a new document: give it a file in the autosave folder. */
   private async createFile(): Promise<void> {
-    const snapshot = this.editor.view.state.doc;
-    if (this.file || this.creating || !storage.createNew || snapshot.toString().trim() === '') return;
+    const snapshot = this.state.doc;
+    const content = snapshot.toString();
+    if (this.file || this.creating || !storage.createNew || content.trim() === '') return;
     this.creating = true;
     this.status = { kind: 'saving' };
     this.notify();
     try {
-      const content = snapshot.toString();
-      const file = await storage.createNew(content, suggestFileName(content), getSettings().autosave.folder || undefined);
+      const isMarkdown = this.kind === 'markdown';
+      const ext = isMarkdown ? 'md' : extensionOf(this.name) || extensionForLang[this.lang] || 'txt';
+      // Code files are named by time; Markdown by its first line (and follows it).
+      const baseName = isMarkdown ? suggestFileName(content) : suggestFileName('').replace('Notat', 'Kode');
+      const file = await storage.createNew(content, baseName, ext, getSettings().autosave.folder || undefined);
       this.file = file;
       this.name = file.name;
-      this.autoNamed = true;
+      this.autoNamed = isMarkdown;
       this.markSaved(snapshot);
     } catch (err) {
-      this.status = { kind: 'error', message: `Kunne ikke autolagre: ${err instanceof Error ? err.message : String(err)}` };
+      this.status = { kind: 'error', message: `Kunne ikke autolagre: ${errorText(err)}` };
       this.notify();
     } finally {
       this.creating = false;
@@ -133,7 +161,7 @@ export class DocumentController {
   /** Save to the current file, or ask where to save if there is none. */
   async save(opts: { silent?: boolean } = {}): Promise<boolean> {
     if (!this.file || !storage.canSaveInPlace) return opts.silent ? false : this.saveAs();
-    const snapshot = this.editor.view.state.doc;
+    const snapshot = this.state.doc;
     this.status = { kind: 'saving' };
     this.notify();
     try {
@@ -143,9 +171,7 @@ export class DocumentController {
       return true;
     } catch (err) {
       const message =
-        err instanceof NeedsPermissionError
-          ? 'Trenger skrivetilgang – trykk Ctrl+S'
-          : `Kunne ikke lagre: ${err instanceof Error ? err.message : String(err)}`;
+        err instanceof NeedsPermissionError ? 'Trenger skrivetilgang – trykk Ctrl+S' : `Kunne ikke lagre: ${errorText(err)}`;
       this.status = { kind: 'error', message };
       this.notify();
       return false;
@@ -153,7 +179,7 @@ export class DocumentController {
   }
 
   async saveAs(): Promise<boolean> {
-    const snapshot = this.editor.view.state.doc;
+    const snapshot = this.state.doc;
     try {
       const file = await storage.saveAs(snapshot.toString(), this.name);
       if (!file) return false;
@@ -163,7 +189,7 @@ export class DocumentController {
       this.markSaved(snapshot);
       return true;
     } catch (err) {
-      this.status = { kind: 'error', message: `Kunne ikke lagre: ${err instanceof Error ? err.message : String(err)}` };
+      this.status = { kind: 'error', message: `Kunne ikke lagre: ${errorText(err)}` };
       this.notify();
       return false;
     }
@@ -182,48 +208,18 @@ export class DocumentController {
     }
   }
 
-  async open(): Promise<void> {
-    if (!(await this.confirmDiscard())) return;
-    await this.tryOpen(() => storage.open());
-  }
-
-  /** Open a file by path (desktop: the file the app was launched with). */
-  async openPath(path: string): Promise<void> {
-    if (!storage.openPath || !(await this.confirmDiscard())) return;
-    await this.tryOpen(() => storage.openPath!(path));
-  }
-
-  async newDocument(): Promise<void> {
-    if (!(await this.confirmDiscard())) return;
-    this.load('', null, UNTITLED);
-  }
-
-  private async tryOpen(read: () => Promise<OpenedFile | null>): Promise<void> {
-    try {
-      const opened = await read();
-      if (opened) this.load(opened.content, opened.file, opened.file.name);
-    } catch (err) {
-      this.status = { kind: 'error', message: `Kunne ikke åpne: ${err instanceof Error ? err.message : String(err)}` };
-      this.notify();
-    }
-  }
-
-  /** True if there's unsaved work that autosave won't take care of. */
-  get hasUnsavedWork(): boolean {
-    return this.dirty && !this.autosaves;
-  }
-
-  private async confirmDiscard(): Promise<boolean> {
-    return !this.dirty || platform.confirm('Dokumentet har ulagrede endringer. Forkaste dem?');
-  }
-
   private markSaved(snapshot: Text): void {
     this.savedDoc = snapshot;
-    this.dirty = !this.editor.view.state.doc.eq(snapshot);
+    this.dirty = !this.state.doc.eq(snapshot);
     this.status = { kind: 'saved', at: new Date() };
-    if (!this.dirty) drafts.clear();
     // Typed more while saving? Save that too.
-    else this.scheduleAutosave();
+    if (this.dirty) this.scheduleAutosave();
     this.notify();
+  }
+
+  /** Stop timers; call when the tab is closed. */
+  dispose(): void {
+    clearTimeout(this.autosaveTimer);
+    this.listeners.clear();
   }
 }

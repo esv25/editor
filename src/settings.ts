@@ -36,8 +36,8 @@ export interface Settings {
   /** Opening characters that get their closing partner inserted automatically. [] = off. */
   closeBrackets: string[];
   headingSuggestion: HeadingSuggestionConfig;
-  /** Command id -> key (CodeMirror notation, e.g. "Mod-Shift-h"), or null to unbind. */
-  keybindings: Record<string, string | null>;
+  /** Command id -> key(s) (CodeMirror notation, e.g. "Mod-Shift-h"), or null to unbind. */
+  keybindings: Record<string, string | string[] | null>;
   /** Command ids shown in the formatting toolbar; "|" is a separator. */
   toolbar: string[];
 }

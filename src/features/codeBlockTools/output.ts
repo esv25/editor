@@ -70,9 +70,8 @@ function buildDecorations(state: EditorState, entries: OutputEntry[]) {
   return Decoration.set(decos, true);
 }
 
-function statusText(entry: OutputEntry): { text: string; cls: string } {
-  const o = entry.outcome;
-  if (entry.running || !o) return { text: 'Kjører …', cls: 'running' };
+function statusText(running: boolean, o: RunOutcome | undefined): { text: string; cls: string } {
+  if (running || !o) return { text: 'Kjører …', cls: 'running' };
   if (o.kind === 'html') return { text: 'Forhåndsvisning', cls: 'ok' };
   if (o.kind === 'error') return { text: 'Kunne ikke kjøre', cls: 'error' };
   const r = o.result;
@@ -80,6 +79,66 @@ function statusText(entry: OutputEntry): { text: string; cls: string } {
   if (r.timedOut) return { text: `Stoppet etter ${time} (tidsgrense)`, cls: 'error' };
   if (r.exitCode === 0) return { text: `Ferdig · ${time}`, cls: 'ok' };
   return { text: `Avsluttet med kode ${r.exitCode ?? '?'} · ${time}`, cls: 'error' };
+}
+
+/**
+ * The output box (status line, rerun/close buttons, output text or HTML
+ * preview). Shared by code blocks and the run panel for code files.
+ */
+export function renderOutput(opts: {
+  running: boolean;
+  outcome?: RunOutcome;
+  onRerun?: () => void;
+  onClose: () => void;
+}): HTMLElement {
+  const root = document.createElement('div');
+  root.className = 'cm-code-output';
+
+  const head = document.createElement('div');
+  head.className = 'cm-code-output-head';
+  const status = statusText(opts.running, opts.outcome);
+  const label = document.createElement('span');
+  label.className = `cm-code-output-status ${status.cls}`;
+  label.textContent = status.text;
+  head.append(label);
+
+  const button = (text: string, title: string, onClick: () => void) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    b.title = title;
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', onClick);
+    head.append(b);
+  };
+  if (!opts.running && opts.onRerun) button('⟳', 'Kjør igjen', opts.onRerun);
+  button('✕', 'Skjul utdata', opts.onClose);
+  root.append(head);
+
+  const o = opts.outcome;
+  if (o?.kind === 'html') {
+    const frame = document.createElement('iframe');
+    frame.className = 'cm-code-output-frame';
+    frame.setAttribute('sandbox', 'allow-scripts');
+    frame.srcdoc = o.html;
+    root.append(frame);
+  } else if (o) {
+    const pre = document.createElement('pre');
+    if (o.kind === 'error') {
+      pre.append(errorSpan(o.message));
+    } else {
+      if (o.result.stdout) pre.append(o.result.stdout);
+      if (o.result.stderr) pre.append(errorSpan(o.result.stderr));
+      if (!o.result.stdout && !o.result.stderr) {
+        const empty = document.createElement('span');
+        empty.className = 'empty';
+        empty.textContent = '(ingen utdata)';
+        pre.append(empty);
+      }
+    }
+    root.append(pre);
+  }
+  return root;
 }
 
 class OutputWidget extends WidgetType {
@@ -94,60 +153,16 @@ class OutputWidget extends WidgetType {
 
   toDOM(view: EditorView) {
     const { entry } = this;
-    const root = document.createElement('div');
-    root.className = 'cm-code-output';
-
-    const head = document.createElement('div');
-    head.className = 'cm-code-output-head';
-    const status = statusText(entry);
-    const label = document.createElement('span');
-    label.className = `cm-code-output-status ${status.cls}`;
-    label.textContent = status.text;
-    head.append(label);
-
-    const button = (text: string, title: string, onClick: () => void) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = text;
-      b.title = title;
-      b.addEventListener('mousedown', (e) => e.preventDefault());
-      b.addEventListener('click', onClick);
-      head.append(b);
-    };
     const currentPos = () => view.state.field(outputField).find((e) => e.id === entry.id)?.pos;
-    if (!entry.running) {
-      button('⟳', 'Kjør igjen', () => {
+    return renderOutput({
+      running: entry.running,
+      outcome: entry.outcome,
+      onRerun: () => {
         const pos = currentPos();
         if (pos !== undefined) actions.rerun(view, pos);
-      });
-    }
-    button('✕', 'Skjul utdata', () => view.dispatch({ effects: clearOutput.of(entry.id) }));
-    root.append(head);
-
-    const o = entry.outcome;
-    if (o?.kind === 'html') {
-      const frame = document.createElement('iframe');
-      frame.className = 'cm-code-output-frame';
-      frame.setAttribute('sandbox', 'allow-scripts');
-      frame.srcdoc = o.html;
-      root.append(frame);
-    } else if (o) {
-      const pre = document.createElement('pre');
-      if (o.kind === 'error') {
-        pre.append(errorSpan(o.message));
-      } else {
-        if (o.result.stdout) pre.append(o.result.stdout);
-        if (o.result.stderr) pre.append(errorSpan(o.result.stderr));
-        if (!o.result.stdout && !o.result.stderr) {
-          const empty = document.createElement('span');
-          empty.className = 'empty';
-          empty.textContent = '(ingen utdata)';
-          pre.append(empty);
-        }
-      }
-      root.append(pre);
-    }
-    return root;
+      },
+      onClose: () => view.dispatch({ effects: clearOutput.of(entry.id) }),
+    });
   }
 
   ignoreEvent() {

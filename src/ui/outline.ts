@@ -4,6 +4,7 @@
 import type { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { ensureSyntaxTree, syntaxTree } from '@codemirror/language';
+import { docKind } from '../editor/createEditor';
 
 export interface HeadingEntry {
   level: number;
@@ -68,12 +69,13 @@ export class OutlinePanel {
 
   refresh(state: EditorState): void {
     if (!this.visible) return;
-    this.headings = extractHeadings(state);
+    const isCode = state.facet(docKind) === 'code';
+    this.headings = isCode ? [] : extractHeadings(state);
     this.list.replaceChildren();
     if (this.headings.length === 0) {
       const empty = document.createElement('li');
       empty.className = 'empty';
-      empty.textContent = 'Ingen overskrifter ennå';
+      empty.textContent = isCode ? 'Kodefiler har ingen disposisjon' : 'Ingen overskrifter ennå';
       this.list.append(empty);
       return;
     }

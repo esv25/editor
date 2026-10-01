@@ -57,6 +57,21 @@ npm run build     # produksjonsbygg til dist/
 | Åpne / lagre / lagre som | Ctrl+O / Ctrl+S / Ctrl+Shift+S |
 | Vis/skjul disposisjon | Ctrl+Shift+O |
 | Søk | Ctrl+F |
+| Nytt dokument / ny gruppe | Ctrl+N / Ctrl+Shift+N |
+| Lukk fane | Ctrl+W |
+| Neste / forrige fane | Ctrl+Tab / Ctrl+Shift+Tab (eller Ctrl+PageDown / PageUp) |
+
+## Faner
+
+Øverste rad er grupper du lager selv (+ for ny, dobbeltklikk for å gi nytt navn). Hver
+gruppe har sine åpne dokumenter som faner i raden under. ● betyr ulagrede endringer;
+midtklikk eller ✕ lukker en fane. Fanene huskes til neste gang du åpner programmet.
+
+## Kodefiler
+
+Filer som .py, .js og .ts åpnes som ren kode med linjenumre. Velg språk øverst og trykk
+▶ Kjør (Ctrl+Shift+Enter) for å kjøre hele filen; utdataene vises nederst. Lag en ny
+kodefil med { } ved siden av fanene.
 
 ## Kodeblokker
 

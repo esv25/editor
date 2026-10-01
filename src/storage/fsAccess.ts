@@ -2,6 +2,7 @@
  * Storage backend using the File System Access API (Chrome, Edge).
  * Files are opened and saved in place, so autosave works.
  */
+import { codeFileExtensions } from '../code/languages';
 import { NeedsPermissionError, type FileRef, type OpenedFile, type StorageBackend } from './types';
 
 interface HandleRef extends FileRef {
@@ -10,8 +11,11 @@ interface HandleRef extends FileRef {
 
 const pickerTypes: FilePickerAcceptType[] = [
   {
-    description: 'Markdown og tekst',
-    accept: { 'text/markdown': ['.md', '.markdown'], 'text/plain': ['.txt'] },
+    description: 'Markdown og kode',
+    accept: {
+      'text/markdown': ['.md', '.markdown'],
+      'text/plain': ['.txt', ...codeFileExtensions.map((ext) => `.${ext}` as const)],
+    },
   },
 ];
 

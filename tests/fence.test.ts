@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Text } from '@codemirror/state';
-import { blockAt, parseFence } from '../src/features/util/fence';
+import { blockAt, parseFence, rewriteFence } from '../src/features/util/fence';
 
 describe('parseFence', () => {
   it('reads language and title', () => {
@@ -32,5 +32,26 @@ describe('blockAt', () => {
     const doc = Text.of(['```py', 'x = 1']);
     expect(blockAt(doc, 0)!.code).toBe('x = 1');
     expect(blockAt(doc, 0)!.close).toBeNull();
+  });
+});
+
+describe('rewriteFence', () => {
+  it('sets and replaces the title', () => {
+    expect(rewriteFence('```', { title: 'navn.py' })).toBe('``` title="navn.py"');
+    expect(rewriteFence('```python', { title: 'a b' })).toBe('```python title="a b"');
+    expect(rewriteFence('```python title="gammel"', { title: 'ny' })).toBe('```python title="ny"');
+  });
+  it('removes an empty title', () => {
+    expect(rewriteFence('```python title="x"', { title: '  ' })).toBe('```python');
+    expect(rewriteFence('``` title="x"', { title: '' })).toBe('```');
+  });
+  it('changes language and keeps title and other attributes', () => {
+    expect(rewriteFence('``` title="x"', { lang: 'js' })).toBe('```js title="x"');
+    expect(rewriteFence('```py {1,3} title="x"', { lang: 'python' })).toBe('```python title="x" {1,3}');
+    expect(rewriteFence('  ~~~js', { lang: '' })).toBe('  ~~~');
+  });
+  it('keeps the parse round-trip stable', () => {
+    const line = rewriteFence('```', { lang: 'python', title: 'fil "1".py' })!;
+    expect(parseFence(line)).toMatchObject({ lang: 'python', title: "fil '1'.py" });
   });
 });

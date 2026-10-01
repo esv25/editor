@@ -14,7 +14,8 @@
   --button-hover: #ebe8e1;
   --button-active: #dfe7f3;
   --selection: #cfe0f5;
-  --code-bg: #f0eee8;
+  /* Translucent so the selection layer (drawn behind the text) shows through. */
+  --code-bg: rgb(120 105 80 / 0.09);
   --search-match: #f6e7a6;
   --search-match-selected: #f1c65f;
 
@@ -45,7 +46,7 @@
   --button-hover: #34363c;
   --button-active: #2f4263;
   --selection: #2f4a6b;
-  --code-bg: #27292d;
+  --code-bg: rgb(255 255 255 / 0.05);
   --search-match: #5a4e1c;
   --search-match-selected: #85701f;
 
@@ -77,7 +78,7 @@ html, body {
 
 #app {
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto auto 1fr auto;
   height: 100vh;
 }
 
@@ -90,16 +91,6 @@ html, body {
   border-bottom: 1px solid var(--border);
   font-size: 13px;
 }
-
-#doc-title {
-  flex: 1;
-  text-align: center;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-#doc-title .dirty { color: var(--accent); margin-right: 4px; }
 
 #toolbar {
   display: flex;
@@ -266,18 +257,14 @@ html, body {
 
 /* Code block header (name, language, run) */
 .cm-codeblock-header {
-  float: right;
   display: inline-flex;
+  width: 100%;
   align-items: center;
   gap: 6px;
   font: 12px var(--font-ui);
   color: var(--muted);
   line-height: 1.6;
-}
-.cm-codeblock-header.full {
-  float: none;
-  display: inline-flex;
-  width: 100%;
+  vertical-align: top;
 }
 .cm-codeblock-title {
   flex: 1;
@@ -289,6 +276,17 @@ html, body {
   white-space: nowrap;
 }
 .cm-codeblock-title.placeholder { font-weight: 400; color: var(--faint); font-style: italic; }
+.cm-codeblock-title-input {
+  flex: 1;
+  min-width: 0;
+  font: 600 12px var(--font-ui);
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 1px 6px;
+  outline: none;
+}
 .cm-codeblock-lang,
 .cm-codeblock-run,
 .cm-code-output-head button {
@@ -349,3 +347,124 @@ html, body {
   background: #fff;
   resize: vertical;
 }
+
+/* ---------- Tabs ---------- */
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+#group-tabs { flex: 1; align-items: center; }
+#doc-tabs {
+  padding: 4px 12px 0;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: 220px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  font: 13px var(--font-ui);
+  cursor: pointer;
+  user-select: none;
+}
+.tab:hover { background: var(--button-hover); color: var(--fg); }
+.tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* File buttons (icons) | groups: a divider and different shapes keep them apart. */
+#file-actions { padding-right: 10px; margin-right: 4px; border-right: 1px solid var(--border); }
+#group-tabs { gap: 4px; }
+.group-tab {
+  border-color: var(--border);
+  background: var(--bg);
+  padding: 3px 4px 3px 8px;
+}
+.group-tab:hover { background: var(--button-hover); }
+.group-icon { display: inline-flex; color: var(--faint); }
+/* Text in the page background colour: readable on the accent in both themes. */
+.group-tab.active { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.group-tab.active .group-icon, .group-tab.active .tab-close { color: var(--bg); opacity: 0.85; }
+.group-tab.active .tab-close:hover { background: rgb(128 128 128 / 0.3); color: var(--bg); opacity: 1; }
+.doc-tab { border-radius: 6px 6px 0 0; margin-bottom: -1px; padding-top: 5px; padding-bottom: 5px; }
+.doc-tab.active {
+  background: var(--bg);
+  color: var(--fg);
+  border-color: var(--border);
+  border-bottom-color: var(--bg);
+}
+.tab-icon { font: 600 10px var(--font-mono); color: var(--accent); }
+.tab-close, .tab-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+  border-radius: 4px;
+  font: 12px var(--font-ui);
+}
+.tab-close { width: 18px; height: 18px; visibility: hidden; }
+.tab:hover .tab-close, .tab.active .tab-close { visibility: visible; }
+.tab-close:hover, .tab-add:hover { background: var(--button-hover); color: var(--fg); }
+.tab-add { height: 26px; min-width: 26px; padding: 0 6px; flex-shrink: 0; font-size: 15px; }
+.tab-add-code { font: 600 11px var(--font-mono); }
+/* Unsaved: a dot instead of the close button (the close button returns on hover). */
+.tab-dirty { display: none; color: var(--accent); font-size: 10px; width: 18px; text-align: center; }
+.tab.dirty .tab-dirty { display: inline; }
+.tab.dirty .tab-close { display: none; }
+.tab.dirty:hover .tab-dirty { display: none; }
+.tab.dirty:hover .tab-close { display: inline-flex; }
+.tab-rename {
+  font: 600 13px var(--font-ui);
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 1px 6px;
+  outline: none;
+}
+
+/* ---------- Code files ---------- */
+#toolbar > [hidden] { display: none; }
+.code-bar-label { font: 12px var(--font-ui); color: var(--muted); margin-right: 4px; }
+.code-bar-lang {
+  font: 12px var(--font-ui);
+  color: var(--fg);
+  background: var(--button-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  margin-right: 8px;
+}
+.code-bar-run { color: var(--accent); }
+.code-bar-run:disabled { color: var(--faint); cursor: default; }
+
+.cm-code-mode .cm-scroller {
+  font-family: var(--font-mono) !important;
+  font-size: 0.82em;
+  line-height: 1.55 !important;
+  overflow-x: auto !important;
+}
+/* !important: the editor theme's prose layout is injected after this file. */
+.cm-code-mode .cm-content { max-width: none !important; margin: 0 !important; padding: 12px 0 40vh !important; }
+.cm-code-mode .cm-line { padding: 0 16px 0 6px; }
+.cm-code-mode .cm-gutters {
+  background: var(--bg);
+  color: var(--faint);
+  border-right: 1px solid var(--border);
+}
+.cm-code-mode .cm-activeLine { background: rgb(128 128 128 / 0.07); }
+.cm-code-mode .cm-activeLineGutter { background: rgb(128 128 128 / 0.1); color: var(--muted); }
+.cm-code-mode .cm-matchingBracket { background: rgb(80 140 255 / 0.18); outline: 1px solid rgb(80 140 255 / 0.4); }
+.cm-run-panel { margin: 0; border: none; border-top: 1px solid var(--border); border-radius: 0; }
+.cm-run-panel pre { max-height: 35vh; }
