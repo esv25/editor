@@ -11,7 +11,7 @@ import { syntaxTree } from '@codemirror/language';
 import type { Feature } from './types';
 
 const hidden = Decoration.replace({});
-const inlineCode = Decoration.mark({ class: 'cm-inline-code' });
+const inlineCode = Decoration.mark({ class: 'cm-inline-code', attributes: { spellcheck: 'false' } });
 const headingLine = (level: number) => Decoration.line({ class: `cm-heading cm-heading-${level}` });
 const headingLines = [1, 2, 3, 4, 5, 6].map(headingLine);
 

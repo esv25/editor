@@ -11,7 +11,8 @@ import type { Feature } from './types';
 
 const FENCE_RE = /^\s*(`{3,}|~{3,})/;
 
-const lineDeco = (cls: string) => Decoration.line({ class: cls });
+// No spellcheck in code: the prose dictionary would underline every identifier.
+const lineDeco = (cls: string) => Decoration.line({ class: cls, attributes: { spellcheck: 'false' } });
 const deco = {
   body: lineDeco('cm-codeblock'),
   begin: lineDeco('cm-codeblock cm-codeblock-begin cm-codeblock-fence'),
