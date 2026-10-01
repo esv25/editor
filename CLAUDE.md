@@ -24,7 +24,9 @@ UI-tekst er på norsk (bokmål). Kode, identifikatorer og kodekommentarer er på
 - `npm test` – enhetstester
 - `npm run typecheck` / `npm run build`
 - `npm run app` – skrivebordsappen i utviklingsmodus (starter Vite selv; port 5173 må være ledig)
-- `npm run app:build` – installasjonsfiler (NSIS/MSI) i `src-tauri/target/release/bundle/`
+- `npm run app:build` – installasjonsfil lokalt (usignert, uten publisering)
+- `npm run release` – publiserer en ny versjon som installerte apper oppdaterer seg til
+  (se «Oppdateringer» under)
 
 I dev-modus ligger `window.editorView` og `window.workspace` tilgjengelig for feilsøking
 i nettleserkonsollen.
@@ -190,6 +192,21 @@ File System Access API → nedlasting. Autolagring er bare på når backenden ha
 Annet som varierer (vindustittel, ja/nei-dialog, advarsel ved lukking, fil fra
 kommandolinja) går gjennom `platform` – bruk aldri `window.confirm`/`document.title`
 direkte. Nye Tauri-API-kall krever ofte en tillatelse i `capabilities/default.json`.
+
+### Oppdateringer (`ui/updates.ts`, `scripts/release.mjs`)
+
+- Repoet er offentlig på https://github.com/esv25/editor. Appen bruker Tauri-updateren
+  og sjekker `releases/latest/download/latest.json` ved oppstart (bare i bygget app),
+  og når man klikker versjonsnummeret i statuslinja.
+- Oppdateringer er signert. Privatnøkkelen ligger i `~/.tauri/editor.key` (utenfor repoet,
+  skal **aldri** committes); den offentlige nøkkelen står i `tauri.conf.json`. Mistes
+  privatnøkkelen, kan ikke installerte apper oppdateres lenger – da må en ny versjon
+  installeres manuelt.
+- `npm run release [patch|minor|major|x.y.z] [--notes "…"]`: øker versjonen i
+  package.json, tauri.conf.json og Cargo.toml, kjører typesjekk og tester, bygger og
+  signerer (lav prioritet), skriver `latest.json`, committer «Versjon x.y.z», tagger,
+  pusher og lager GitHub-release med installasjonsfil + `latest.json`. Krever ren
+  arbeidsmappe. Publisering er utadrettet – kjør det bare når brukeren ber om det.
 
 ### Innstillinger
 

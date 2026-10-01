@@ -42,6 +42,21 @@ npm test          # enhetstester
 npm run build     # produksjonsbygg til dist/
 ```
 
+## Oppdateringer
+
+Programmet ser etter nye versjoner når det starter (og når du klikker versjonsnummeret
+nederst til høyre). Finnes det en, får du «Ny versjon er klar – Oppdater nå»; programmet
+lagrer, installerer og starter på nytt.
+
+Ny versjon publiseres med:
+
+```bash
+npm run release
+```
+
+Det bygger, signerer og laster opp til https://github.com/esv25/editor/releases.
+Signeringsnøkkelen ligger i `C:\Users\<deg>\.tauri\editor.key` – ta vare på den.
+
 ## Hurtigtaster
 
 | Handling | Tast |

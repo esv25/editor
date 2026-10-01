@@ -23,6 +23,13 @@ export interface RunResult {
   durationMs: number;
 }
 
+export interface AvailableUpdate {
+  version: string;
+  notes?: string;
+  /** Download, install and restart. `onProgress` gets 0–1, or null if the size is unknown. */
+  install(onProgress?: (fraction: number | null) => void): Promise<void>;
+}
+
 export interface Platform {
   readonly isDesktop: boolean;
   setWindowTitle(title: string): void;
@@ -37,6 +44,10 @@ export interface Platform {
   startupFile(): Promise<string | null>;
   /** Files opened while running, e.g. "Open with" forwarded from a second launch. */
   onOpenFile?(handler: (path: string) => void): void;
+  /** The installed app's version (desktop only). */
+  appVersion?(): Promise<string>;
+  /** Look for a newer published version (desktop only). */
+  checkForUpdate?(): Promise<AvailableUpdate | null>;
   /** Run a program on a code snippet (desktop only). */
   runProgram?(request: RunRequest): Promise<RunResult>;
 }
