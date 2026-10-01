@@ -3,6 +3,8 @@
 //   npm run release                    -> next patch version (0.2.0 -> 0.2.1)
 //   npm run release -- minor           -> 0.3.0   (or: major, or an exact 1.2.3)
 //   npm run release -- --notes "Tekst" -> release notes shown in the update notice
+//   npm run release -- --fast          -> build with all cores at normal priority
+//                                         (default: 2 cores, low priority – quieter)
 //
 // Steps: bump version, test, build + sign the installer (low priority),
 // write latest.json, commit + tag + push, create a GitHub release.
@@ -27,6 +29,9 @@ const fail = (msg) => {
 
 // ---- Arguments ----
 const args = process.argv.slice(2);
+const fastIndex = args.indexOf('--fast');
+const fast = fastIndex >= 0;
+if (fast) args.splice(fastIndex, 1);
 // Everything after --notes is the text (npm on Windows may drop the quotes and split it).
 const notesIndex = args.indexOf('--notes');
 let notes = notesIndex >= 0 ? args.splice(notesIndex).slice(1).join(' ') : '';
@@ -83,16 +88,17 @@ try {
   run('npx', ['tsc', '--noEmit'], { stdio: 'inherit' });
   run('npx', ['vitest', 'run'], { stdio: 'inherit' });
 
-  console.log('→ Bygger og signerer (lav prioritet, 2 kjerner – tar noen minutter)');
+  console.log(fast ? '→ Bygger og signerer (full fart)' : '→ Bygger og signerer (lav prioritet, 2 kjerner – tar noen minutter)');
   const cargoBin = path.join(homedir(), '.cargo', 'bin');
   const env = {
     ...process.env,
     PATH: `${process.env.PATH}${path.delimiter}${cargoBin}`,
     TAURI_SIGNING_PRIVATE_KEY: keyPath,
     TAURI_SIGNING_PRIVATE_KEY_PASSWORD: '',
-    CARGO_BUILD_JOBS: '2',
+    ...(fast ? {} : { CARGO_BUILD_JOBS: '2' }),
   };
-  const build = spawnSync('cmd', ['/c', 'start', '/low', '/b', '/wait', 'npx', 'tauri', 'build', '--bundles', 'nsis'], {
+  const priority = fast ? [] : ['/low'];
+  const build = spawnSync('cmd', ['/c', 'start', ...priority, '/b', '/wait', 'npx', 'tauri', 'build', '--bundles', 'nsis'], {
     cwd: root,
     env,
     stdio: 'inherit',
