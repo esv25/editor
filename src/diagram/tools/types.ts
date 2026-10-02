@@ -1,0 +1,57 @@
+import type { Diagram, DiagramEdge, DiagramNode, Point } from '../model';
+import type { SvgNode } from '../svg';
+
+export interface Selection {
+  kind: 'node' | 'edge';
+  id: string;
+}
+
+/** What a tool can see and do. Provided by the canvas. */
+export interface ToolContext {
+  readonly diagram: Diagram;
+  readonly selection: Selection | null;
+  readonly grid: number;
+  /** How far from a figure a click still counts as hitting it (drawing units). */
+  readonly tolerance: number;
+  /** Size of on-screen handles in drawing units (so they stay the same size when zooming). */
+  readonly handleSize: number;
+  /** Replace the drawing (undoable, saved). */
+  commit(next: Diagram): void;
+  select(selection: Selection | null): void;
+  /** Start typing the text of a figure. */
+  editText(nodeId: string): void;
+  setTool(id: string): void;
+  nodeAt(p: Point): DiagramNode | null;
+  edgeAt(p: Point): DiagramEdge | null;
+  /** Something in the tool's own state changed: redraw and update the hint. */
+  refresh(): void;
+}
+
+export interface Preview {
+  /** Show this instead of the real drawing (e.g. a figure being moved). */
+  diagram?: Diagram;
+  /** Extra things on top (ghosts, the arrow being drawn). */
+  overlay?: SvgNode[];
+  /** Don't highlight the figure under the pointer. */
+  noHover?: boolean;
+}
+
+/**
+ * A tool decides what clicks do. Everything is click–click (pick up, then put
+ * down) – nothing needs dragging with the button held, which is hard with a
+ * joystick. To add one: create tools/<name>.ts and list it in tools/index.ts.
+ */
+export interface Tool {
+  id: string;
+  name: string;
+  icon: string;
+  key: string;
+  /** What to do next, shown in the hint bar. */
+  hint(ctx: ToolContext): string;
+  pointerDown(ctx: ToolContext, p: Point): void;
+  preview?(ctx: ToolContext, pointer: Point | null): Preview;
+  /** Esc. Return true if the tool cancelled something of its own (else: back to Velg). */
+  cancel?(ctx: ToolContext): boolean;
+  /** The tool is being switched away from. */
+  reset?(): void;
+}

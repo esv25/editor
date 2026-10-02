@@ -1,0 +1,91 @@
+/**
+ * The drawing window's toolbar (big buttons with text: easy to hit and to
+ * understand) and the hint bar that always says what a click will do.
+ */
+import type { DiagramCanvas } from './canvas';
+import { shapeIcon } from './shapes/common';
+import { tools } from './tools';
+
+export interface Toolbar {
+  update(): void;
+  setStatus(text: string): void;
+}
+
+const icons = {
+  undo: shapeIcon('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),
+  redo: shapeIcon('<path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>'),
+  delete: shapeIcon('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'),
+};
+
+export function renderToolbar(
+  bar: HTMLElement,
+  hintBar: HTMLElement,
+  canvas: DiagramCanvas,
+  actions: { save(): void; canSaveAs: () => boolean },
+): Toolbar {
+  const button = (parent: HTMLElement, label: string, title: string, icon: string | null, onClick: () => void) => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'dg-button';
+    el.title = title;
+    el.innerHTML = icon ?? '';
+    const text = document.createElement('span');
+    text.textContent = label;
+    el.append(text);
+    // Keep keyboard focus where it was (the canvas listens on the window).
+    el.addEventListener('mousedown', (e) => e.preventDefault());
+    el.addEventListener('click', onClick);
+    parent.append(el);
+    return el;
+  };
+  const group = () => {
+    const el = document.createElement('div');
+    el.className = 'dg-group';
+    bar.append(el);
+    return el;
+  };
+
+  const toolGroup = group();
+  const toolButtons = tools.map((tool) => ({
+    tool,
+    el: button(toolGroup, tool.name, `${tool.name} (${tool.key.toUpperCase()})`, tool.icon, () => canvas.setTool(tool.id)),
+  }));
+
+  const editGroup = group();
+  button(editGroup, 'Angre', 'Angre (Ctrl+Z)', icons.undo, () => canvas.undo());
+  button(editGroup, 'Gjør om', 'Gjør om (Ctrl+Y)', icons.redo, () => canvas.redo());
+  const deleteButton = button(editGroup, 'Slett', 'Slett det valgte (Delete)', icons.delete, () => canvas.deleteSelection());
+
+  const zoomGroup = group();
+  button(zoomGroup, '−', 'Zoom ut (-)', null, () => canvas.zoomBy(1 / 1.25));
+  const zoomLabel = button(zoomGroup, '100 %', 'Tilbake til 100 % (0)', null, () => canvas.zoomReset());
+  button(zoomGroup, '+', 'Zoom inn (+)', null, () => canvas.zoomBy(1.25));
+
+  const right = group();
+  right.classList.add('dg-right');
+  const status = document.createElement('span');
+  status.className = 'dg-status';
+  right.append(status);
+  const saveButton = button(right, 'Lagre som …', 'Lagre tegningen som fil (Ctrl+S)', null, () => actions.save());
+
+  const hint = document.createElement('span');
+  hintBar.append(hint);
+
+  const toolbar: Toolbar = {
+    update() {
+      for (const { tool, el } of toolButtons) {
+        const active = canvas.tool.id === tool.id;
+        el.classList.toggle('active', active);
+        el.setAttribute('aria-pressed', String(active));
+      }
+      deleteButton.disabled = !canvas.selection;
+      zoomLabel.querySelector('span')!.textContent = `${canvas.zoomPercent} %`;
+      saveButton.hidden = !actions.canSaveAs();
+      hint.textContent = canvas.hint;
+    },
+    setStatus(text) {
+      status.textContent = text;
+    },
+  };
+  return toolbar;
+}

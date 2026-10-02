@@ -52,4 +52,16 @@ export interface Platform {
   checkForUpdate?(): Promise<AvailableUpdate | null>;
   /** Run a program on a code snippet (desktop only). */
   runProgram?(request: RunRequest): Promise<RunResult>;
+  /**
+   * Open another page of the app (e.g. "diagram.html") with query `params`: a
+   * new window on the desktop (or focus the one already open for `key`), a new
+   * tab in the browser.
+   */
+  openWindow(page: string, params: Record<string, string>, options: { title: string; key: string }): Promise<void>;
+  /** Tell the app's other windows something happened (e.g. "file-saved"). */
+  notify(event: string, payload: unknown): void;
+  /** Hear what other windows tell (see `notify`). */
+  listen(event: string, handler: (payload: unknown) => void): void;
+  /** Run `flush` (e.g. a last save) before the window closes; the desktop waits for it. */
+  beforeClose(flush: () => Promise<void>): void;
 }

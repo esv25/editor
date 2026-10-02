@@ -1,0 +1,116 @@
+/* The drawing window. UI colours come from theme.css. */
+:root {
+  /* The canvas is paper in both themes (like the saved file), so these don't change with the theme. */
+  --dg-paper: #fbfaf7;
+  --dg-grid: #d6d1c7;
+  --dg-ink: #2b2a28;
+  --dg-white: #ffffff;
+  --dg-mark: #3867a6;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+}
+
+#dg-app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+}
+
+/* ---------- Toolbar: big buttons with text, easy to hit ---------- */
+#dg-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 8px 12px;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+}
+.dg-group { display: flex; align-items: center; gap: 4px; }
+.dg-right { margin-left: auto; gap: 10px; }
+
+.dg-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 12px;
+  font: 14px var(--font-ui);
+  color: var(--fg);
+  background: var(--button-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.dg-button:hover { background: var(--button-hover); }
+.dg-button.active {
+  background: var(--button-active);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.dg-button:disabled { color: var(--faint); cursor: default; background: var(--button-bg); }
+.dg-button[hidden] { display: none; }
+.dg-status { font-size: 13px; color: var(--muted); }
+
+/* ---------- Canvas ---------- */
+#dg-canvas {
+  position: relative;
+  overflow: hidden;
+  /* The paper colour of saved drawings, so what you see is what's saved. */
+  background: var(--dg-paper);
+}
+.dg-svg { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.dg-grid-dot { fill: var(--dg-grid); }
+
+.dg-ghost { opacity: 0.45; pointer-events: none; }
+.dg-hover { fill: none; stroke: var(--dg-mark); stroke-opacity: 0.45; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dg-hover-edge { stroke: var(--dg-mark); stroke-opacity: 0.35; stroke-width: 10; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.dg-selection { fill: none; stroke: var(--dg-mark); stroke-width: 2.5; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; }
+.dg-selection-edge { stroke: var(--dg-mark); stroke-opacity: 0.5; stroke-width: 10; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.dg-source { fill: var(--dg-mark); fill-opacity: 0.08; stroke: var(--dg-mark); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.dg-handle { fill: var(--dg-white); stroke: var(--dg-mark); stroke-width: 2; vector-effect: non-scaling-stroke; }
+
+.dg-text-input {
+  position: absolute;
+  padding: 8px;
+  border: 2px solid var(--dg-mark);
+  border-radius: 6px;
+  background: var(--dg-white);
+  color: var(--dg-ink);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  line-height: 1.3;
+  text-align: center;
+  resize: none;
+  outline: none;
+  overflow: hidden;
+}
+
+.dg-error {
+  max-width: 34em;
+  margin: 15vh auto;
+  padding: 16px 20px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* ---------- Hint bar: always says what a click will do ---------- */
+#dg-hint {
+  padding: 8px 14px;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--panel-bg);
+  border-top: 1px solid var(--border);
+  min-height: 2.4em;
+}

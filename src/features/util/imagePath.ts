@@ -135,5 +135,6 @@ export function imageMarkdown(dest: string, alt = ''): string {
 /** "C:\a\Lenket liste.png" → "Lenket liste". */
 export function baseNameOf(path: string): string {
   const name = path.split(/[\\/]/).pop() ?? path;
-  return name.replace(/\.[^.]+$/, '');
+  // Drawings lose their whole ".diagram.svg".
+  return name.replace(/(\.diagram)?\.[^.]+$/i, '');
 }

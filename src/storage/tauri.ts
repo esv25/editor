@@ -5,7 +5,7 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { documentDir, join } from '@tauri-apps/api/path';
 import { exists, mkdir, readDir, readFile, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
-import { codeFileExtensions } from '../code/languages';
+import { codeFileExtensions } from '../code/fileTypes';
 import type { FileRef, FolderEntry, OpenedFile, StorageBackend } from './types';
 
 interface PathRef extends FileRef {
