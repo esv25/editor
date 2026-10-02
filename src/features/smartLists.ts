@@ -9,11 +9,12 @@
  * CommonMark: a child item starts at the parent's content column, so
  * "1. foo" nests children by 3 spaces and "- foo" by 2.
  */
-import { Prec, type EditorState, type StateCommand } from '@codemirror/state';
+import { Prec, type ChangeSpec, type EditorState, type StateCommand } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
-import { indentLess, indentMore } from '@codemirror/commands';
+import { indentLess } from '@codemirror/commands';
 import { deleteMarkupBackward, insertNewlineContinueMarkupCommand } from '@codemirror/lang-markdown';
-import { applyChanges, leadingWhitespace, parseListLine, selectedLines } from './util/markdown';
+import { insertIndent } from '../code/indentation';
+import { applyChanges, findEnclosing, leadingWhitespace, parseListLine, selectedLines } from './util/markdown';
 import type { Feature } from './types';
 
 type Direction = 'in' | 'out';
@@ -47,7 +48,8 @@ function shiftListItems(dir: Direction): StateCommand {
     const lines = selectedLines(state);
     const first = lines[0];
     const item = parseListLine(first.text);
-    if (!item) return false;
+    // Code that merely looks like a list item ("- x" in a code block) isn't one.
+    if (!item || inCodeBlock(state)) return false;
     const target = targetIndent(state, first.number, dir);
     if (target === null) return true; // in a list, but can't move: swallow Tab so focus stays
     const delta = target - item.indent.length;
@@ -83,6 +85,30 @@ export const continueList = insertNewlineContinueMarkupCommand({ nonTightLists: 
 export const indentListItem = shiftListItems('in');
 export const outdentListItem = shiftListItems('out');
 
+/** Prose outside lists: Tab/Shift+Tab move the selected lines by two spaces. */
+function shiftProse(dir: Direction): StateCommand {
+  return ({ state, dispatch }) => {
+    const changes = selectedLines(state).flatMap((line): ChangeSpec[] => {
+      if (dir === 'in') return [{ from: line.from, insert: '  ' }];
+      const remove = Math.min(2, leadingWhitespace(line.text).length);
+      return remove ? [{ from: line.from, to: line.from + remove }] : [];
+    });
+    applyChanges(state, dispatch, changes, dir === 'in' ? 'input.indent' : 'delete.dedent');
+    return true;
+  };
+}
+
+function inCodeBlock(state: EditorState): boolean {
+  const { from, to } = state.selection.main;
+  return findEnclosing(state, from, to, 'FencedCode') !== null;
+}
+
+/** Tab outside lists: code-style indent inside code blocks, a small shift in prose. */
+export const tabOutsideList: StateCommand = (target) =>
+  inCodeBlock(target.state) ? insertIndent(target) : shiftProse('in')(target);
+export const shiftTabOutsideList: StateCommand = (target) =>
+  inCodeBlock(target.state) ? indentLess(target) : shiftProse('out')(target);
+
 export const smartLists: Feature = {
   id: 'smartLists',
   extension: () => [
@@ -92,8 +118,8 @@ export const smartLists: Feature = {
         { key: 'Backspace', run: deleteMarkupBackward },
       ]),
     ),
-    // Outside lists, Tab/Shift+Tab indent normally (and keep focus in the editor).
-    keymap.of([{ key: 'Tab', run: indentMore, shift: indentLess }]),
+    // Outside lists (and so also keeping focus in the editor).
+    keymap.of([{ key: 'Tab', run: tabOutsideList, shift: shiftTabOutsideList }]),
   ],
   commands: [
     { id: 'list.indent', name: 'Rykk inn listepunkt', key: 'Tab', run: indentListItem },

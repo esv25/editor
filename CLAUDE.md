@@ -136,6 +136,12 @@ kode), `codeBlocks`, `codeBlockTools`, `headings`, `inlineFormat`, `lists`, `tas
 - `code.run` (Ctrl+Shift+Enter / ▶ Kjør i `ui/codeBar.ts`) kjører hele filen med samme
   maskineri som kodeblokker; utdata vises i et panel nederst (`showPanel`).
 - «Lagre som» med annen filendelse gjør om dokumentet mellom Markdown og kode.
+- Innrykk (`code/indentation.ts`): kodefiler får `indentUnit` fra filens eget innrykk
+  (`detectIndent`), ellers språkets vanlige (4; 2 for JS/TS/JSON/HTML/CSS/YAML; tab for
+  Go). Tab er som i VS Code (`insertIndent`: mellomrom til neste tabulatorstopp ved
+  markøren, eller rykk inn markerte linjer). Notater har `indentUnit` 4 for kodeblokkene;
+  Tab i kodeblokk = `insertIndent`, i vanlig tekst flyttes linja 2 mellomrom, og
+  listekommandoene gjelder ikke inni kodeblokker. Testet i `tests/indentation.test.ts`.
 
 ### Kodeblokker: navn, språk og kjøring (`features/codeBlockTools/`)
 

@@ -17,7 +17,9 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { search, searchKeymap } from '@codemirror/search';
+import { indentUnit } from '@codemirror/language';
 import { codeCommands, codeLanguage, codeModeExtensions } from '../code/codeMode';
+import { indentationFor } from '../code/indentation';
 import { loadLanguage, type DocKind } from '../code/languages';
 import { commandKeymap, registerCommands } from '../commands/registry';
 import { features } from '../features';
@@ -73,6 +75,8 @@ export function createMarkdownState(text: string): EditorState {
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({ spellcheck: 'true', lang: 'nb' }),
       markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false }),
+      // Used by code blocks (auto-indent after "for …:" etc.); lists and prose indent on their own.
+      indentUnit.of('    '),
       placeholder('Begynn å skrive …'),
       dynamic.of(dynamicExtensions('markdown', getSettings())),
       sharedExtensions(),
@@ -89,6 +93,7 @@ export async function createCodeState(text: string, lang: string): Promise<Edito
       docKind.of('code'),
       codeLanguage.of(lang),
       support,
+      indentationFor(text, lang),
       codeModeExtensions(),
       dynamic.of(dynamicExtensions('code', getSettings())),
       sharedExtensions(),

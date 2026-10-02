@@ -14,7 +14,8 @@ import {
   type Panel,
 } from '@codemirror/view';
 import { bracketMatching, foldGutter, indentOnInput } from '@codemirror/language';
-import { indentWithTab } from '@codemirror/commands';
+import { indentLess } from '@codemirror/commands';
+import { insertIndent } from './indentation';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import type { EditorCommand } from '../commands/registry';
 import { renderOutput } from '../features/codeBlockTools/output';
@@ -86,7 +87,7 @@ export function codeModeExtensions(): Extension {
     bracketMatching(),
     indentOnInput(),
     closeBrackets(),
-    keymap.of([...closeBracketsKeymap, indentWithTab]),
+    keymap.of([...closeBracketsKeymap, { key: 'Tab', run: insertIndent, shift: indentLess }]),
     runField,
     EditorView.editorAttributes.of({ class: 'cm-code-mode' }),
     EditorView.contentAttributes.of({ spellcheck: 'false' }),
