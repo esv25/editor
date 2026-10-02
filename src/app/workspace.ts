@@ -5,6 +5,7 @@
 import { EditorSelection } from '@codemirror/state';
 import type { EditorView, ViewUpdate } from '@codemirror/view';
 import { extensionForLang, kindForName, langForName, withExtension, type DocKind } from '../code/languages';
+import { breakpointLines, setBreakpointsEffect } from '../debug/breakpoints';
 import {
   createCodeState,
   createMarkdownState,
@@ -241,7 +242,10 @@ export class Workspace {
 
   private swapState(doc: EditorDocument, state: EditorDocument['state']): void {
     const head = Math.min(doc.state.selection.main.head, state.doc.length);
-    const next = state.update({ selection: EditorSelection.cursor(head) }).state;
+    const next = state.update({
+      selection: EditorSelection.cursor(head),
+      effects: setBreakpointsEffect.of(breakpointLines(doc.state)),
+    }).state;
     const active = this.activeDoc === doc;
     doc.replaceState(next);
     if (active) {
@@ -346,6 +350,8 @@ export class Workspace {
           const entry: SessionDoc = { id: d.id, name: d.name, kind: d.kind, cursor: d.state.selection.main.head };
           if (path) entry.path = path;
           if (d.kind === 'code') entry.lang = d.lang;
+          const breakpoints = breakpointLines(d.state);
+          if (breakpoints.length) entry.breakpoints = breakpoints;
           if (!path && d.targetFolder) entry.targetFolder = d.targetFolder;
           if (!path || d.dirty) {
             entry.content = d.content;
@@ -400,6 +406,7 @@ export class Workspace {
       if (sd.cursor !== undefined && sd.cursor <= doc.state.doc.length) {
         doc.state = doc.state.update({ selection: EditorSelection.cursor(sd.cursor) }).state;
       }
+      if (sd.breakpoints?.length) doc.state = doc.state.update({ effects: setBreakpointsEffect.of(sd.breakpoints) }).state;
       return doc;
     };
 

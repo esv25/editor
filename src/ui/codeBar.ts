@@ -1,22 +1,27 @@
 /**
  * Toolbar shown instead of the formatting buttons when a code file is active:
- * language menu and Run.
+ * language menu, Run, Run in terminal and Debug.
  */
 import type { EditorView } from '@codemirror/view';
 import type { EditorDocument } from '../app/document';
-import { runFile } from '../code/codeMode';
-import { describeCommand } from '../commands/registry';
+import { describeCommand, runCommand } from '../commands/registry';
+import type { DebugController } from '../debug/controller';
 import { runnability } from '../features/codeBlockTools/run';
-import { languageChoices } from '../features/codeBlockTools/runners';
+import { languageChoices, runnerFor } from '../features/codeBlockTools/runners';
+import { platform } from '../platform';
+import { debugIcons } from './debugPanel';
 
 export class CodeBar {
   private select = document.createElement('select');
-  private run = document.createElement('button');
+  private run: HTMLButtonElement;
+  private runInTerminal: HTMLButtonElement;
+  private debugButton: HTMLButtonElement;
   private doc: EditorDocument | null = null;
 
   constructor(
     container: HTMLElement,
-    getView: () => EditorView,
+    private getView: () => EditorView,
+    private debug: DebugController,
     onLanguage: (doc: EditorDocument, lang: string) => void,
   ) {
     const label = document.createElement('span');
@@ -29,17 +34,28 @@ export class CodeBar {
       if (this.doc) onLanguage(this.doc, this.select.value);
     });
 
-    this.run.type = 'button';
-    this.run.className = 'tb-button code-bar-run';
-    this.run.textContent = '▶ Kjør';
-    this.run.addEventListener('mousedown', (e) => e.preventDefault());
-    this.run.addEventListener('click', () => {
-      const view = getView();
-      runFile(view);
+    this.run = this.button('code.run', '▶ Kjør', 'code-bar-run');
+    this.runInTerminal = this.button('code.runInTerminal', '▶ Kjør i terminal', 'code-bar-run');
+    this.debugButton = this.button('debug.start', '', 'code-bar-debug');
+    this.debugButton.innerHTML = `${debugIcons.start}<span>Feilsøk</span>`;
+
+    container.replaceChildren(label, this.select, this.run, this.runInTerminal, this.debugButton);
+    debug.onChange(() => this.doc && this.update(this.doc));
+  }
+
+  private button(command: string, text: string, className: string): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `tb-button ${className}`;
+    b.textContent = text;
+    b.dataset.command = command;
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', () => {
+      const view = this.getView();
+      runCommand(view, b.dataset.command!);
       view.focus();
     });
-
-    container.replaceChildren(label, this.select, this.run);
+    return b;
   }
 
   update(doc: EditorDocument): void {
@@ -58,5 +74,24 @@ export class CodeBar {
     const can = runnability(doc.lang);
     this.run.disabled = !can.ok;
     this.run.title = can.ok ? describeCommand('code.run') : can.reason;
+
+    // Running in the terminal (so the program can read input) needs the desktop app and a runner.
+    this.runInTerminal.hidden = !platform.processes;
+    const inTerminal = !!runnerFor(doc.lang);
+    this.runInTerminal.disabled = !inTerminal;
+    this.runInTerminal.title = inTerminal
+      ? `${describeCommand('code.runInTerminal')} – programmet kan lese det du skriver`
+      : 'Dette språket kan ikke kjøres i terminalen';
+
+    // Debug, or stop the session that's running.
+    const { debug } = this;
+    this.debugButton.hidden = !platform.processes;
+    const stopping = debug.active;
+    this.debugButton.dataset.command = stopping ? 'debug.stop' : 'debug.start';
+    this.debugButton.innerHTML = stopping ? `${debugIcons.stop}<span>Stopp feilsøking</span>` : `${debugIcons.start}<span>Feilsøk</span>`;
+    this.debugButton.classList.toggle('active', stopping);
+    const problem = stopping ? null : debug.problem(doc);
+    this.debugButton.disabled = problem !== null;
+    this.debugButton.title = problem ?? describeCommand(this.debugButton.dataset.command);
   }
 }

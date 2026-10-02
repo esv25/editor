@@ -9,4 +9,4 @@ export const isTauri = '__TAURI_INTERNALS__' in window;
 
 export const platform: Platform = isTauri ? tauriPlatform : webPlatform;
 
-export type { AvailableUpdate, Platform, RunRequest, RunResult } from './types';
+export type { AdapterProcess, AvailableUpdate, Platform, ProcessHost, Pty, PtyOptions, RunRequest, RunResult } from './types';

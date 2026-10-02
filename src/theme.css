@@ -32,6 +32,31 @@
   --syn-punct: #5c5f66;
   --syn-invalid: #e0321f;
 
+  /* Debugging: breakpoint dot, paused line (translucent: the selection is drawn behind it). */
+  --breakpoint: #d93a2b;
+  --exec-arrow: #d99a00;
+  --exec-line: rgb(255 196 0 / 0.2);
+  --exec-frame: #4f9a5a;
+  --exec-line-frame: rgb(80 160 90 / 0.15);
+
+  /* Terminal colours (ANSI). */
+  --term-black: #2b2a28;
+  --term-red: #c8312b;
+  --term-green: #3b7d2c;
+  --term-yellow: #8a6100;
+  --term-blue: #2a5fb0;
+  --term-magenta: #a626a4;
+  --term-cyan: #137a87;
+  --term-white: #8c887f;
+  --term-bright-black: #6d6a64;
+  --term-bright-red: #e0321f;
+  --term-bright-green: #4c9a3a;
+  --term-bright-yellow: #a67600;
+  --term-bright-blue: #3a6fd8;
+  --term-bright-magenta: #bc3fbc;
+  --term-bright-cyan: #1c8fa3;
+  --term-bright-white: #b5b1a8;
+
   color-scheme: light;
 }
 
@@ -62,6 +87,29 @@
   --syn-variable: #dcdad5;
   --syn-punct: #abb2bf;
   --syn-invalid: #ff6b5b;
+
+  --breakpoint: #f0564a;
+  --exec-arrow: #f2c14e;
+  --exec-line: rgb(255 200 60 / 0.14);
+  --exec-frame: #7cc489;
+  --exec-line-frame: rgb(120 200 130 / 0.12);
+
+  --term-black: #3b3d42;
+  --term-red: #e06c75;
+  --term-green: #98c379;
+  --term-yellow: #e5c07b;
+  --term-blue: #61afef;
+  --term-magenta: #c678dd;
+  --term-cyan: #56b6c2;
+  --term-white: #dcdad5;
+  --term-bright-black: #7f848e;
+  --term-bright-red: #ff7b86;
+  --term-bright-green: #b5e890;
+  --term-bright-yellow: #f0d197;
+  --term-bright-blue: #7fc0ff;
+  --term-bright-magenta: #d99ae8;
+  --term-bright-cyan: #7fd0da;
+  --term-bright-white: #ffffff;
 
   color-scheme: dark;
 }

@@ -17,6 +17,7 @@ UI-tekst er på norsk (bokmål). Kode, identifikatorer og kodekommentarer er på
   `@codemirror/language-data` for språk i kodeblokker (lastes ved behov)
 - Vitest for tester av kommandoer og regler (kjører i Node, uten DOM)
 - Tauri 2 (`src-tauri/`) med pluginene `dialog` og `fs`; krever Rust + MSVC Build Tools
+- xterm.js (terminalvisning) og portable-pty (pseudokonsoll i Rust)
 
 ## Kommandoer
 
@@ -49,6 +50,7 @@ src/
   appearance.ts           tema og typografi → CSS-variabler / data-theme (delt med tegnevinduet)
   theme.css               fargevariabler for lyst/mørkt tema (delt med tegnevinduet)
   commands/registry.ts    kommandoregisteret (id, navn, ikon, hurtigtast, run, isActive)
+  commands/keys.ts        app-hurtigtaster utenfor editoren (terminal, sidefelt) + tastematching
   editor/
     createEditor.ts       én EditorView + én EditorState per dokument (Markdown eller kode)
     theme.ts              editortema og HighlightStyle (farger via CSS-variabler)
@@ -56,6 +58,15 @@ src/
     languages.ts          filtyper: Markdown vs. kode, språk fra filendelse, språklasting
     fileTypes.ts          filendelsene som ren data (uten CodeMirror; brukes av storage)
     codeMode.ts           kode-modus: linjenumre, kjør hele filen, utdatapanel
+  terminal/
+    terminalPanel.ts      terminalpanelet under editoren (xterm.js, faner, kjør program i fane)
+  debug/                  feilsøker (se «Terminal og feilsøking» under)
+    types.ts              DebugBackend-grensesnittet (DAP-formet) + datatyper
+    controller.ts         DebugController: økt, stopp, kallstakk, variabler, uttrykk
+    breakpoints.ts        stoppunkter og pauselinje (StateField + gutter)
+    debuggers.ts          språk → feilsøker (standard + settings.debuggers)
+    dap.ts                DAP-klient + backend (debugpy for Python)
+    node.ts               Node-backend over Chrome DevTools Protocol (JS/TS)
   features/               én CodeMirror-funksjon per fil (se under)
     index.ts              listen over aktive features
     types.ts              Feature-grensesnittet
@@ -69,7 +80,8 @@ src/
     drafts.ts             gammelt enkeltdokument-utkast (leses bare for migrering)
     index.ts              velger backend
   platform/               det som ellers skiller nettleser og skrivebord
-    types.ts              Platform: vindustittel, bekreftelsesdialog, lukking, oppstartsfil
+    types.ts              Platform: vindustittel, bekreftelsesdialog, lukking, oppstartsfil,
+                          `processes` (terminaler og feilsøkere, bare skrivebord)
     web.ts / tauri.ts     implementasjonene; index.ts velger (`isTauri`)
   app/
     app.ts                kobler sammen editor, arbeidsområde, UI og app-kommandoer
@@ -79,7 +91,8 @@ src/
     fileNames.ts          filnavn fra første linje (autolagring)
     welcome.ts            velkomsttekst første gang
   ui/                     faner (tabs.ts), verktøylinjer (toolbar.ts, codeBar.ts), filtre
-                          (fileTree.ts), høyreklikkmeny, disposisjon, statuslinje, updates
+                          (fileTree.ts), høyreklikkmeny, disposisjon, statuslinje, updates,
+                          feilsøkingsvisningen i sidefeltet (debugPanel.ts)
   styles.css              editorens layout og klasser (fargene ligger i theme.css)
   diagram/                tegnevinduet – et eget lite program (se «Tegnevinduet» under)
 diagram.html              inngangen til tegnevinduet (Vite bygger to sider: index + diagram)
@@ -90,6 +103,9 @@ src-tauri/
   src/lib.rs              Tauri-oppsett, single-instance (videresender «Åpne med» som
                           hendelsen `open-file`) + kommandoen `startup_file`
   src/runner.rs           kommandoen `run_program` (kjøring av kodeblokker)
+  src/terminal.rs         terminaler i pseudokonsoll (portable-pty/ConPTY), utdata via Channel
+  src/debug.rs            DAP-adaptere over stdin/stdout (rammer meldinger), ledig port,
+                          WebSocket-adressen til Node sin inspector
   icons/                  generert fra app-icon.svg med `npx tauri icon src-tauri/app-icon.svg`
 ```
 
@@ -240,6 +256,33 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
 - `output.ts`: utdata ligger i en StateField (ikke i teksten), følger blokken og
   forsvinner når blokken slettes.
 
+### Terminal og feilsøking (`terminal/`, `debug/`)
+
+- Bare skrivebord: alt går gjennom `platform.processes` (`ProcessHost` i `platform/types.ts`).
+  Rust holder prosessene; `processes_reset` ved oppstart dreper det som var igjen fra før en
+  reload. I nettleseren er knappene skjult.
+- `TerminalPanel`: én fane per program. Skall (`settings.terminal.shell`, standard
+  PowerShell) lukker fanen når de avslutter; programmer editoren starter (`runProgram(kind,
+  key, …)`) gjenbruker fanen sin per `key` («run», «debug») og blir stående med utdata.
+  xterm.js lastes ved første bruk; farger fra `--term-*`-variablene i `styles.css`.
+- Taster i terminalen går til skallet, unntatt F-taster, Ctrl+Tab/PageUp/PageDown og
+  Ctrl+J (`isAppKeyInTerminal`). Utenfor editoren kjører `installGlobalKeys` kommandoer med
+  scope `'any'`; i installert app blokkeres F5/Ctrl+R (reload).
+- «Kjør i terminal» (`code.runInTerminal`, Ctrl+F5) kjører filen på disk med samme
+  runner som ▶ Kjør, men interaktivt. ▶ Kjør tilbyr det når programmet ville lese input.
+- Feilsøking: `DebugController` snakker bare med `DebugBackend`. Python = debugpy over DAP
+  (`python -m debugpy.adapter`; programmet startes i terminalen via `runInTerminal`, så
+  `input()` virker). JS/TS = `node --inspect-brk` i terminalen + CDP over WebSocket.
+  Nye DAP-språk kan legges til i `settings.debuggers` uten kode. Mangler debugpy, tilbys
+  installasjon (`pip install debugpy` i terminalen) og økten startes etterpå.
+- Stoppunkter ligger i dokumentets EditorState (`breakpointField`), følger teksten, huskes i
+  økten (`SessionDoc.breakpoints`) og sendes til feilsøkeren når de endres (utsatt mens man
+  skriver, men alltid før fortsett/steg). Gutteren finnes bare for språk med feilsøker.
+- Pauselinja (`executionField`) settes bare i den aktive tilstanden; ved fanebytte settes den
+  på nytt (`onActiveChange`). Uttrykk evalueres på nytt ved hvert stopp.
+- Feilsøking i dev: `window.debug` og `window.terminal`. Testes uten DOM:
+  `tests/breakpoints.test.ts`, `tests/debugProtocols.test.ts`, `tests/keys.test.ts`.
+
 ### Autolagring
 
 `EditorDocument` autolagrer dokumenter som har en fil. Nye dokumenter får på
@@ -263,7 +306,9 @@ Standard hurtigtaster: Ctrl+Shift+1/2/3 overskrift, Ctrl+B/I fet/kursiv, Ctrl+E 
 kode, Ctrl+Shift+8/7/9 punkt-/nummerert/huskeliste, Ctrl+Shift+E kodeblokk,
 Ctrl+Enter kryss av oppgave, Ctrl+Shift+Enter kjør kodeblokk/fil, Ctrl+Shift+H gjør til
 overskrift, Ctrl+N nytt dokument, Ctrl+O/S/Shift+S fil, Ctrl+W lukk fane, Ctrl+Tab /
-Ctrl+PageDown neste fane, Ctrl+Shift+N ny gruppe, Ctrl+Shift+O disposisjon.
+Ctrl+PageDown neste fane, Ctrl+Shift+N ny gruppe, Ctrl+Shift+O disposisjon, Ctrl+J
+terminal, Ctrl+F5 kjør i terminal, F5 feilsøk/fortsett, F9 stoppunkt, F10/F11/Shift+F11
+steg, F6 pause, Shift+F5 stopp, Ctrl+Shift+F5 start på nytt.
 **Unngå Ctrl+Alt-kombinasjoner**: på norsk tastatur er Ctrl+Alt = AltGr (@, {, [ osv.).
 
 ### Kommandoer som `StateCommand`

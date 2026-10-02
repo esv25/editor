@@ -186,6 +186,19 @@ export class EditorDocument {
     }
   }
 
+  /**
+   * Make sure the current text is in a file on disk (before running or
+   * debugging it): saves now instead of waiting for autosave, and gives a new
+   * document its file. False if there's still no file (e.g. "Save as" cancelled).
+   */
+  async ensureSaved(): Promise<boolean> {
+    clearTimeout(this.autosaveTimer);
+    if (this.file) return this.dirty ? this.save({ silent: true }) : true;
+    if (storage.createNew && getSettings().autosave.enabled) await this.createFile();
+    else await this.saveAs();
+    return this.file !== null;
+  }
+
   async saveAs(): Promise<boolean> {
     const snapshot = this.state.doc;
     try {

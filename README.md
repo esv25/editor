@@ -75,6 +75,12 @@ Signeringsnøkkelen ligger i `C:\Users\<deg>\.tauri\editor.key` – ta vare på 
 | Nytt dokument / ny gruppe | Ctrl+N / Ctrl+Shift+N |
 | Lukk fane | Ctrl+W |
 | Neste / forrige fane | Ctrl+Tab / Ctrl+Shift+Tab (eller Ctrl+PageDown / PageUp) |
+| Vis/skjul terminalen | Ctrl+J |
+| Kjør kodefilen i terminalen | Ctrl+F5 |
+| Feilsøk / fortsett | F5 |
+| Stoppunkt av/på | F9 (eller klikk på linjenummeret) |
+| Neste linje / gå inn i / gå ut av funksjon | F10 / F11 / Shift+F11 |
+| Pause / stopp / start på nytt | F6 / Shift+F5 / Ctrl+Shift+F5 |
 
 ## Faner
 
@@ -95,6 +101,33 @@ Filer som .py, .js og .ts åpnes som ren kode med linjenumre. Velg språk øvers
 ▶ Kjør (Ctrl+Shift+Enter) for å kjøre hele filen; utdataene vises nederst. Lag en ny
 kodefil med { } ved siden av fanene.
 
+Programmer som leser det du skriver (`input()` o.l.), må kjøres med **▶ Kjør i terminal**
+(Ctrl+F5); da kjører de i terminalpanelet nederst, og du svarer der.
+
+## Terminal
+
+Skrivebordsappen har en terminal (PowerShell) i et panel under editoren: terminalknappen
+øverst til høyre eller Ctrl+J. + gir flere terminaler; de starter i mappa til dokumentet
+du står i. Ctrl+C kopierer når tekst er merket (ellers stopper den programmet), Ctrl+V
+limer inn, og høyreklikk gir en meny. Dra i kanten over panelet for å endre høyden, eller
+bruk pila for større terminal.
+
+## Feilsøking
+
+Python-, JavaScript- og TypeScript-filer kan feilsøkes i skrivebordsappen:
+
+1. Klikk på et linjenummer (eller trykk F9) for å sette et **stoppunkt** – en rød prikk.
+2. Trykk **🐞 Feilsøk** (F5). Programmet kjører i terminalen og stopper på stoppunktet;
+   linja markeres med gult.
+3. Sidefeltet viser **variabler** (klikk for å åpne lister og objekter), **kallstakken**
+   (klikk for å se hvor en funksjon ble kalt fra) og **uttrykk** du vil følge med på.
+4. Gå videre med knappene øverst i sidefeltet eller tastene: F5 fortsett, F10 neste linje,
+   F11 inn i funksjonen, Shift+F11 ut av den, Shift+F5 stopp.
+
+Stopper programmet på en feil, vises feilmeldingen i sidefeltet og linja der det skjedde.
+Python-feilsøking bruker tillegget `debugpy`; mangler det, spør editoren om å installere
+det første gang. JavaScript og TypeScript bruker Node sin innebygde feilsøker.
+
 ## Kodeblokker
 
 Skriv ` ```python title="navn.py" ` for å gi en blokk språk og navn, eller bruk hodet på
@@ -111,5 +144,5 @@ etter første overskrift.
 
 ## Tilpasse
 
-Innstillinger (linjebredde, font, tema, overskriftsforslag, hurtigtaster, knapper)
-ligger i `src/settings.ts`. Arkitekturen er beskrevet i `CLAUDE.md`.
+Innstillinger (linjebredde, font, tema, overskriftsforslag, hurtigtaster, knapper,
+terminalprogram, feilsøkere for flere språk) ligger i `src/settings.ts`. Arkitekturen er beskrevet i `CLAUDE.md`.

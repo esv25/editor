@@ -16,6 +16,8 @@ export interface SessionDoc {
   dirty?: boolean;
   cursor?: number;
   targetFolder?: string;
+  /** Code files: lines with a breakpoint. */
+  breakpoints?: number[];
 }
 
 export interface SessionGroup {

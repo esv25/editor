@@ -23,6 +23,50 @@ export interface RunResult {
   durationMs: number;
 }
 
+export interface PtyOptions {
+  /** Program to start (on PATH or a full path). */
+  program: string;
+  args: string[];
+  cwd?: string;
+  /** Extra environment variables; null removes one. */
+  env?: Record<string, string | null>;
+  cols: number;
+  rows: number;
+}
+
+/** A program running in a pseudo terminal. */
+export interface Pty {
+  readonly pid: number | null;
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  kill(): void;
+}
+
+/** A debug adapter process (Debug Adapter Protocol over stdin/stdout). */
+export interface AdapterProcess {
+  /** Send one JSON message (framing is added by the host). */
+  send(message: string): Promise<void>;
+  kill(): void;
+}
+
+/** Starting processes for terminals and debugging (desktop only). */
+export interface ProcessHost {
+  spawnPty(
+    options: PtyOptions,
+    handlers: { onData(data: string): void; onExit(code: number | null): void },
+  ): Promise<Pty>;
+  startAdapter(
+    options: { program: string; args: string[]; cwd?: string },
+    handlers: { onMessage(json: string): void; onStderr(text: string): void; onExit(code: number | null): void },
+  ): Promise<AdapterProcess>;
+  /** A free local TCP port. */
+  freePort(): Promise<number>;
+  /** WebSocket URL of a Node process started with --inspect-brk=127.0.0.1:<port>. */
+  inspectorUrl(port: number, timeoutMs: number): Promise<string>;
+  /** Stop everything left over from an earlier page load. */
+  reset(): Promise<void>;
+}
+
 export interface AvailableUpdate {
   version: string;
   notes?: string;
@@ -64,4 +108,6 @@ export interface Platform {
   listen(event: string, handler: (payload: unknown) => void): void;
   /** Run `flush` (e.g. a last save) before the window closes; the desktop waits for it. */
   beforeClose(flush: () => Promise<void>): void;
+  /** Terminals and debuggers (desktop only). */
+  processes?: ProcessHost;
 }
