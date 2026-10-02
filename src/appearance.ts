@@ -2,7 +2,7 @@
  * Applies appearance settings (theme, fonts, line width) to the document
  * as CSS variables / a data-theme attribute.
  */
-import { getSettings, onSettingsChange, type Settings } from '../settings';
+import { getSettings, onSettingsChange, type Settings } from './settings';
 
 const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 

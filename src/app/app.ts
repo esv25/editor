@@ -9,7 +9,7 @@ import { DebugController } from '../debug/controller';
 import { createMarkdownState, createView } from '../editor/createEditor';
 import { runContext } from '../features/codeBlockTools';
 import { runnerFor } from '../features/codeBlockTools/runners';
-import { imageContext, redrawImages } from '../features/images';
+import { imageContext, redrawImages, reloadImages } from '../features/images';
 import { dirOf } from '../features/util/imagePath';
 import { platform } from '../platform';
 import { getSettings, onSettingsChange, updateSettings } from '../settings';
@@ -23,7 +23,7 @@ import { renderCount, renderSaveStatus, renderTitle } from '../ui/statusbar';
 import { TabsUI } from '../ui/tabs';
 import { checkForUpdates } from '../ui/updates';
 import { renderButtons } from '../ui/toolbar';
-import { initAppearance, resolvedTheme } from './appearance';
+import { initAppearance, resolvedTheme } from '../appearance';
 import { EditorDocument } from './document';
 import { loadSession } from './session';
 import { welcomeText } from './welcome';
@@ -33,6 +33,13 @@ const svg = (body: string) =>
   `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
 const FIRST_RUN_KEY = 'editor.seenWelcome';
+
+/** Short stable hash (FNV-1a), e.g. for window labels. */
+function hashOf(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193);
+  return (hash >>> 0).toString(36);
+}
 const el = (id: string) => document.getElementById(id)!;
 
 export async function startApp(): Promise<void> {
@@ -259,6 +266,15 @@ export async function startApp(): Promise<void> {
   runContext.cwd = () => ws.activeDoc?.file?.path?.replace(/[\\/][^\\/]*$/, '');
   // Relative image paths are relative to the document; redraw them if it moves (autosave, Lagre som).
   imageContext.baseDir = () => dirOf(ws.activeDoc?.file?.path);
+  // Drawings open in their own window (one per file); when it saves, the picture in the note is redrawn.
+  imageContext.openDrawing = (path) => {
+    const key = path ? `diagram-${hashOf(path.toLowerCase())}` : `diagram-new-${Date.now().toString(36)}`;
+    void platform.openWindow('diagram.html', path ? { file: path } : {}, { title: 'Tegning', key });
+  };
+  platform.listen('file-saved', (payload) => {
+    const path = (payload as { path?: unknown } | null)?.path;
+    if (typeof path === 'string') reloadImages(view, [path]);
+  });
   let imageDoc = { id: '', dir: undefined as string | undefined };
 
   // Tabs, names and save states.

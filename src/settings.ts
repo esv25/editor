@@ -51,6 +51,17 @@ export interface Settings {
   keybindings: Record<string, string | string[] | null>;
   /** Command ids shown in the formatting toolbar; "|" is a separator. */
   toolbar: string[];
+  /** The drawing window. */
+  diagram: {
+    /** Grid step: everything snaps to it. */
+    grid: number;
+    /** How far (screen px) from a figure or arrow a click still hits it. */
+    hitTolerance: number;
+    /** How far (screen px) the pointer must move with the button down before it's a drag, not a click. */
+    dragThreshold: number;
+    /** Wait this long after a change before saving. */
+    autosaveDelayMs: number;
+  };
 }
 
 export const defaultSettings: Settings = {
@@ -74,8 +85,9 @@ export const defaultSettings: Settings = {
     'heading.1', 'heading.2', 'heading.3', '|',
     'format.bold', 'format.italic', 'format.code', '|',
     'list.bullet', 'list.ordered', 'list.task', '|',
-    'codeblock.toggle', 'image.insert',
+    'codeblock.toggle', 'image.insert', 'diagram.new',
   ],
+  diagram: { grid: 20, hitTolerance: 16, dragThreshold: 6, autosaveDelayMs: 500 },
 };
 
 export type DeepPartial<T> = {

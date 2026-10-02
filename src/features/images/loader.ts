@@ -9,8 +9,11 @@ const cache = new Map<string, Promise<string>>();
 /** Natural sizes of loaded images, so re-created widgets reserve their space at once. */
 const sizes = new Map<string, { width: number; height: number }>();
 
+/** Windows paths: case and / vs \ don't matter (the drawing window may spell a path differently). */
+const pathKey = (path: string) => path.replace(/\\/g, '/').toLowerCase();
+
 export const keyOf = (source: ImageSource): string =>
-  source.kind === 'url' ? source.url : source.kind === 'file' ? source.path.toLowerCase() : '';
+  source.kind === 'url' ? source.url : source.kind === 'file' ? pathKey(source.path) : '';
 
 export function imageUrl(source: ImageSource): Promise<string> {
   if (source.kind === 'url') return Promise.resolve(source.url);
@@ -42,7 +45,7 @@ export function rememberSize(key: string, width: number, height: number): void {
 
 /** Drop cached files (all, or the given paths) so they're read again. */
 export function forgetImages(paths?: string[]): void {
-  const keys = paths ? paths.map((p) => p.toLowerCase()) : [...cache.keys()];
+  const keys = paths ? paths.map(pathKey) : [...cache.keys()];
   for (const key of keys) {
     void cache.get(key)?.then(URL.revokeObjectURL, () => {});
     cache.delete(key);

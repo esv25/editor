@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
@@ -14,6 +15,13 @@ export default defineConfig({
   build: {
     // WebView2 on Windows is Chromium-based.
     target: 'chrome105',
+    // Two pages: the editor and the drawing window.
+    rolldownOptions: {
+      input: {
+        main: resolve(import.meta.dirname, 'index.html'),
+        diagram: resolve(import.meta.dirname, 'diagram.html'),
+      },
+    },
   },
   test: { environment: 'node' },
 } as any);

@@ -59,6 +59,7 @@ describe('image helpers', () => {
 
   it('knows names, folders and types', () => {
     expect(baseNameOf('C:\\a\\Lenket liste.png')).toBe('Lenket liste');
+    expect(baseNameOf('figurer/tegning (2).diagram.svg')).toBe('tegning (2)');
     expect(dirOf('C:\\a\\b.md')).toBe('C:\\a');
     expect(dirOf(undefined)).toBeUndefined();
     expect(imageMime('a.SVG')).toBe('image/svg+xml');

@@ -6,36 +6,13 @@ import type { Extension } from '@codemirror/state';
 import { LanguageDescription } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
 import { normalizeLang } from '../features/codeBlockTools/runners';
+import { extensionForLang } from './fileTypes';
+
+export { codeFileExtensions, extensionForLang } from './fileTypes';
 
 export type DocKind = 'markdown' | 'code';
 
 const MARKDOWN_EXTENSIONS = ['md', 'markdown', 'mdown', 'txt'];
-
-/** Language id -> file extension for new code files. */
-export const extensionForLang: Record<string, string> = {
-  python: 'py',
-  javascript: 'js',
-  typescript: 'ts',
-  html: 'html',
-  css: 'css',
-  json: 'json',
-  bash: 'sh',
-  powershell: 'ps1',
-  java: 'java',
-  sql: 'sql',
-  yaml: 'yaml',
-  c: 'c',
-  cpp: 'cpp',
-  csharp: 'cs',
-  rust: 'rs',
-  go: 'go',
-  xml: 'xml',
-};
-
-/** Extensions offered in the open dialog besides Markdown. */
-export const codeFileExtensions = [
-  ...new Set([...Object.values(extensionForLang), 'mjs', 'cjs', 'mts', 'jsx', 'tsx', 'htm', 'yml', 'h', 'hpp', 'toml', 'ini', 'csv']),
-];
 
 const EXT_ALIASES: Record<string, string> = {
   yml: 'yaml',

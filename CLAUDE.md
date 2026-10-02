@@ -21,7 +21,7 @@ UI-tekst er på norsk (bokmål). Kode, identifikatorer og kodekommentarer er på
 
 ## Kommandoer
 
-- `npm run dev` – utviklingsserver på http://localhost:5173
+- `npm run dev` – utviklingsserver på http://localhost:5173 (tegnevinduet alene: /diagram.html)
 - `npm test` – enhetstester
 - `npm run typecheck` / `npm run build`
 - `npm run app` – skrivebordsappen i utviklingsmodus (starter Vite selv; port 5173 må være ledig).
@@ -47,6 +47,8 @@ kjøres helst med `CARGO_BUILD_JOBS=2` og lav prioritet (`start /low`), ellers b
 src/
   main.ts                 inngangspunkt → app/app.ts
   settings.ts             innstillinger (standardverdier + brukerens overstyringer i localStorage)
+  appearance.ts           tema og typografi → CSS-variabler / data-theme (delt med tegnevinduet)
+  theme.css               fargevariabler for lyst/mørkt tema (delt med tegnevinduet)
   commands/registry.ts    kommandoregisteret (id, navn, ikon, hurtigtast, run, isActive)
   commands/keys.ts        app-hurtigtaster utenfor editoren (terminal, sidefelt) + tastematching
   editor/
@@ -54,6 +56,7 @@ src/
     theme.ts              editortema og HighlightStyle (farger via CSS-variabler)
   code/
     languages.ts          filtyper: Markdown vs. kode, språk fra filendelse, språklasting
+    fileTypes.ts          filendelsene som ren data (uten CodeMirror; brukes av storage)
     codeMode.ts           kode-modus: linjenumre, kjør hele filen, utdatapanel
   terminal/
     terminalPanel.ts      terminalpanelet under editoren (xterm.js, faner, kjør program i fane)
@@ -86,16 +89,17 @@ src/
     document.ts           EditorDocument: én fane – fil, tilstand, ulagret-status, autolagring
     session.ts            husker grupper og faner mellom oppstarter (localStorage)
     fileNames.ts          filnavn fra første linje (autolagring)
-    appearance.ts         tema og typografi → CSS-variabler / data-theme
     welcome.ts            velkomsttekst første gang
   ui/                     faner (tabs.ts), verktøylinjer (toolbar.ts, codeBar.ts), filtre
                           (fileTree.ts), høyreklikkmeny, disposisjon, statuslinje, updates,
                           feilsøkingsvisningen i sidefeltet (debugPanel.ts)
-  styles.css              layout, temafarger (CSS-variabler) og editorklasser
+  styles.css              editorens layout og klasser (fargene ligger i theme.css)
+  diagram/                tegnevinduet – et eget lite program (se «Tegnevinduet» under)
+diagram.html              inngangen til tegnevinduet (Vite bygger to sider: index + diagram)
 tests/                    Vitest; helpers.ts har `run(command, "tekst med | markør")`
 src-tauri/
   tauri.conf.json         vindu, bundling, .md-filtilknytning
-  capabilities/default.json  tillatelser (fs-scope er `**` – det er en vanlig editor)
+  capabilities/default.json  tillatelser for `main` og `diagram-*` (fs-scope er `**` – det er en vanlig editor)
   src/lib.rs              Tauri-oppsett, single-instance (videresender «Åpne med» som
                           hendelsen `open-file`) + kommandoen `startup_file`
   src/runner.rs           kommandoen `run_program` (kjøring av kodeblokker)
@@ -161,6 +165,63 @@ kode), `codeBlocks`, `codeBlockTools`, `images`, `headings`, `inlineFormat`, `li
   `node_modules` og filtyper editoren ikke kan åpne), og nye dokumenter autolagres i
   mappa. Et dokument kan ha `targetFolder` (f.eks. en undermappe valgt i treet) som går
   foran gruppens mappe. Høyreklikk på gruppefanen/treet gir valgene (`ui/contextMenu.ts`).
+
+### Tegnevinduet (`src/diagram/`, `diagram.html`)
+
+Et eget program i samme app, for diagrammer (UML, ER, datastrukturer). Det deler bare
+`settings`, `storage`, `platform`, `appearance`/`theme.css` med editoren – ingen
+CodeMirror. Brukeren styrer med joystick-mus. Flytting og størrelse er vanlig **dra og
+slipp** (brukeren ville ha det slik – ikke erstatt vanlige grep med alternativer uten å
+spørre), med terskel (`settings.diagram.dragThreshold`, skjerm-px) så et skjelvende klikk
+ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tekst, raus treffmargin
+(`settings.diagram.hitTolerance`, skjerm-px), alt snapper til rutenettet
+(`settings.diagram.grid`), og hint-linja nederst sier alltid hva neste klikk gjør.
+
+- Filformat (`fileFormat.ts`, testet i `tests/diagram.test.ts`): `.diagram.svg` er et vanlig
+  SVG-bilde (vises i notater, nettlesere, GitHub) med tegningen som JSON i
+  `<metadata id="editor-diagram">`. SVG uten den metadataen er ikke vår og skal **aldri**
+  overskrives – vinduet nekter å åpne den. Lagret bilde har faste farger (papir), ikke tema.
+- `model.ts`: ren data (`Diagram` = nodes + edges) og rene funksjoner som gir ny `Diagram`
+  (addNode, connect, updateEdge, reverseEdge, addNeighbor, nodeAt med toleranse …). Noder kan
+  ha `double`/`dashed` kant; frihånd har `points` som brøkdeler av boksen (så flytting og
+  størrelse virker som for andre figurer). Linjer har `head`/`tail` (`EndKind`), `dashed`
+  og tekst `label`/`fromLabel`/`toLabel`. `normalizeDiagram` tar bare med gyldige felt.
+  `history.ts` angrer med øyeblikksbilder. `svg.ts`: `SvgNode`-tre → DOM (lerretet) eller
+  tekst (fila), så det man ser er det som lagres. `render.ts`: diagram → SvgNode.
+- `edges.ts`: tegning av linjer (pilspiss, åpen pil, tom trekant, rute/fylt rute, stiplet,
+  tekst ved endene og midt på) og `edgePresets` – ettklikksvalgene Pil, Linje, Arv,
+  Implementerer, Avhengighet, Aggregering, Komposisjon.
+- Figurtyper (`shapes/`, én fil per type: box, ellipse, diamond, umlClass, text, path):
+  `render` + `boundary` (hvor en linje treffer omrisset), valgfritt `fit` (størrelsen teksten
+  trenger), `distance` (klikk nær figuren; frihånd: nær streken), `multiline`/`placeholder`
+  for tekstfeltet, `ownTool` (frihånd har eget verktøy). Ny type = ny fil + linje i
+  `shapes/index.ts`; den får verktøyknapp automatisk. Tekstmarkering per linje
+  (`styledLine`): `_tekst_` understreket (ER-nøkkel, static), `*tekst*` kursiv.
+  UML-klasse: én tekst der linjer med `--` deler i navn/felt/metoder (`classSections`).
+  ER (Chen): entitet = boks, attributt = ellipse, relasjon = rombe, Linje + kardinalitet.
+- Verktøy (`tools/`, én fil per verktøy, `Tool`-grensesnittet i `tools/types.ts`;
+  `pointerDown`/`pointerMove`/`pointerUp`, lerretet fanger pekeren mens knappen er nede):
+  Velg (klikk = velg, dra = flytt, dra hjørnehåndtaket = størrelse, Esc under dra = avbryt), ett plasseringsverktøy per figurtype (gjennomsiktig «spøkelse» følger pekeren),
+  Strek (klikk start, klikk slutt → rett strek/pil hvor som helst; en frihåndsfigur med to
+  punkter og `head`/`tail`; endene hekter seg på figurers hjørner/midtpunkter og andre
+  streker via `ctx.snapPoint` og `ShapeType.anchors`, ellers et halvt rutenett), Frihånd (klikk punkter → glatt kurve; klikk første punkt = lukket; Enter/Esc = ferdig),
+  Pil (klikk fra, klikk til; linjene kjedes, klikk på tomt sted lager ny figur; nye linjer
+  får typen valgt i panelet). Høyreklikk = Esc.
+- `properties.ts`: panelet til høyre (fast bredde, så lerretet aldri flytter seg): linjetype,
+  Snu og tekst ved start/midt/slutt for en valgt linje; Skriv tekst, Dobbel/Stiplet kant
+  (og Glatt/Lukket for frihånd) for en figur; type for nye linjer når Pil er på.
+- `canvas.ts` (`DiagramCanvas`): tegner, zoom/panorering (viewBox), tastatur (Ctrl+pil = ny
+  tilkoblet figur, piltaster flytter, Enter skriver tekst, Delete, Ctrl+Z/Y), tekstfelt
+  over figuren eller midt på linja (figuren vokser så teksten får plass). I tekstfeltet
+  beholder Esc det som er skrevet (Ctrl+Z angrer); i klasser er Enter ny linje og
+  Ctrl+Enter/Esc ferdig.
+- `main.ts`: åpner `?file=`-stien, autolagrer (`settings.diagram.autosaveDelayMs`), og sier
+  fra med `platform.notify('file-saved', { path })`. Uten fil (nettleseren): «Lagre som».
+- Editoren: `diagram.new` («Ny tegning») lager `figurer/tegning.diagram.svg` ved notatet,
+  setter inn bildet og åpner vinduet; bildehodet får «Rediger tegning», og dobbeltklikk på
+  tegningen åpner den (`imageContext.openDrawing`, satt i `app.ts`). Ved `file-saved`
+  kaller `app.ts` `reloadImages`. Bildecachen sammenligner stier uten å bry seg om store
+  bokstaver og `/` vs `\`.
 
 ### Kodefiler (`code/`)
 
@@ -264,6 +325,11 @@ Resten av appen snakker kun med `storage` (et `StorageBackend`) og ser bare `Fil
 (ugjennomsiktig; backenden legger på handle/sti). `storage/index.ts` velger Tauri →
 File System Access API → nedlasting. Autolagring er bare på når backenden har
 `canSaveInPlace` og dokumentet har en fil.
+
+Vinduer: `platform.openWindow(side, parametre, { key })` åpner et nytt vindu (skrivebord;
+fokuserer det som allerede er åpent for samme `key`, label `diagram-…`) eller en ny fane
+(nettleser). `platform.notify`/`listen` sender hendelser mellom vinduene (Tauri-events /
+BroadcastChannel). `platform.beforeClose(flush)` lar tegnevinduet lagre før det lukkes.
 
 Annet som varierer (vindustittel, ja/nei-dialog, advarsel ved lukking, fil fra
 kommandolinja) går gjennom `platform` – bruk aldri `window.confirm`/`document.title`

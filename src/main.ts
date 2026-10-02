@@ -1,3 +1,4 @@
+import './theme.css';
 import './styles.css';
 import { startApp } from './app/app';
 
