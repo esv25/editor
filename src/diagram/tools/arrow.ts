@@ -1,17 +1,28 @@
 /**
- * Pil: click the figure the arrow starts at, then the one it goes to. The
- * arrows chain – the target becomes the next start – so a linked list is just
- * click, click, click. Clicking empty space makes a new box there and
- * connects it. Esc ends the chain.
+ * Pil: click the figure the line starts at, then the one it goes to. The
+ * lines chain – the target becomes the next start – so a linked list is just
+ * click, click, click. Clicking empty space makes a new figure there and
+ * connects it. Esc (or right click) ends the chain. New lines get the type
+ * chosen in the properties bar (Pil, Linje, Arv …).
  */
-import { addNode, center, connect, findNode, snap, type Point } from '../model';
-import { arrow } from '../render';
+import { edgePresets, renderEdge } from '../edges';
+import { addNode, center, connect, findNode, snap, type EdgeStyle, type Point } from '../model';
 import { shapeFor } from '../shapes';
 import { shapeIcon } from '../shapes/common';
 import { toPreview } from './preview';
 import type { Tool } from './types';
 
 let source: string | null = null;
+let style: EdgeStyle = edgePresets[0].style;
+
+/** The type new lines get. */
+export const newEdgeStyle = () => style;
+export function setNewEdgeStyle(next: EdgeStyle): void {
+  style = next;
+}
+
+/** The figure the next line starts from (highlighted by the canvas). */
+export const arrowSource = () => source;
 
 export const arrowTool: Tool = {
   id: 'arrow',
@@ -21,9 +32,9 @@ export const arrowTool: Tool = {
 
   hint(ctx) {
     if (source && findNode(ctx.diagram, source)) {
-      return 'Klikk figuren pila skal gå til – eller et tomt sted for en ny boks · Esc: ferdig';
+      return 'Klikk figuren linja skal gå til – eller et tomt sted for en ny figur · Esc/høyreklikk: ferdig';
     }
-    return 'Klikk figuren pila skal gå fra';
+    return 'Klikk figuren linja skal gå fra · velg type linje til høyre';
   },
 
   pointerDown(ctx, p) {
@@ -37,13 +48,13 @@ export const arrowTool: Tool = {
     }
     if (target) {
       if (target.id === from.id) return;
-      ctx.commit(connect(ctx.diagram, from.id, target.id).diagram);
+      ctx.commit(connect(ctx.diagram, from.id, target.id, style).diagram);
       source = target.id;
       ctx.select({ kind: 'node', id: target.id });
       return;
     }
     // Empty space: a new figure like the one we came from, connected to it.
-    const shape = shapeFor(from.shape === 'text' ? 'box' : from.shape);
+    const shape = shapeFor(from.shape === 'text' || from.shape === 'path' ? 'box' : from.shape);
     const { w, h } = shape.defaultSize;
     const added = addNode(ctx.diagram, {
       shape: shape.id,
@@ -53,7 +64,7 @@ export const arrowTool: Tool = {
       h,
       text: '',
     });
-    ctx.commit(connect(added.diagram, from.id, added.id).diagram);
+    ctx.commit(connect(added.diagram, from.id, added.id, style).diagram);
     source = added.id;
     ctx.select({ kind: 'node', id: added.id });
     ctx.editText(added.id);
@@ -65,7 +76,7 @@ export const arrowTool: Tool = {
     const target = ctx.nodeAt(pointer);
     const end: Point = target && target.id !== from.id ? shapeFor(target.shape).boundary(target, center(from)) : pointer;
     const start = shapeFor(from.shape).boundary(from, target ? center(target) : pointer);
-    return { overlay: [toPreview(arrow(start, end))] };
+    return { overlay: [toPreview(renderEdge(style, start, end))] };
   },
 
   cancel(ctx) {
@@ -79,6 +90,3 @@ export const arrowTool: Tool = {
     source = null;
   },
 };
-
-/** The figure the next arrow starts from (highlighted by the canvas). */
-export const arrowSource = () => source;

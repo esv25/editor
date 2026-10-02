@@ -12,6 +12,7 @@ import { storage, type FileRef } from '../storage';
 import { DiagramCanvas } from './canvas';
 import { DIAGRAM_EXTENSION, exportSvg, parseDiagramSvg } from './fileFormat';
 import { emptyDiagram, type Diagram } from './model';
+import { renderProperties, type PropertiesBar } from './properties';
 import { renderToolbar, type Toolbar } from './toolbar';
 
 const el = (id: string) => document.getElementById(id)!;
@@ -58,6 +59,7 @@ async function start(): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let queue = Promise.resolve();
   let toolbar!: Toolbar;
+  let properties: PropertiesBar | undefined;
 
   const save = (): Promise<void> => {
     clearTimeout(timer);
@@ -99,7 +101,10 @@ async function start(): Promise<void> {
         toolbar.setStatus('Ikke lagret');
       }
     },
-    onStateChange: () => toolbar?.update(),
+    onStateChange: () => {
+      toolbar?.update();
+      properties?.update();
+    },
     onSave: () => void (file && storage.canSaveInPlace ? save() : saveAs()),
   });
 
@@ -107,8 +112,10 @@ async function start(): Promise<void> {
     save: () => void saveAs(),
     canSaveAs: () => !(file && storage.canSaveInPlace),
   });
+  properties = renderProperties(el('dg-props'), canvas);
   toolbar.setStatus(file ? 'Lagret' : 'Ikke lagret');
   toolbar.update();
+  properties.update();
 
   platform.beforeClose(async () => {
     canvas.finishEditing(true);

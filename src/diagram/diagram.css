@@ -61,6 +61,41 @@ html, body {
 .dg-button[hidden] { display: none; }
 .dg-status { font-size: 13px; color: var(--muted); }
 
+/* ---------- Properties panel (what's selected), always there on the right ---------- */
+/* Fixed width, so the canvas never moves under the pointer when the selection changes. */
+#dg-main {
+  display: grid;
+  grid-template-columns: 1fr 230px;
+  min-height: 0;
+}
+#dg-props {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 12px;
+  overflow-y: auto;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  font-size: 13px;
+}
+.dg-small { flex: none; justify-content: flex-start; min-height: 36px; padding: 4px 10px; font-size: 13px; }
+.dg-small svg { flex: none; }
+.dg-props-heading { font-weight: 600; color: var(--muted); margin: 4px 0 2px; }
+.dg-props-heading:not(:first-child) { margin-top: 12px; }
+.dg-props-tip { color: var(--muted); margin-top: 8px; line-height: 1.5; }
+.dg-field { display: flex; flex-direction: column; gap: 3px; color: var(--muted); }
+.dg-field input {
+  min-height: 34px;
+  padding: 4px 8px;
+  font: 14px var(--font-ui);
+  color: var(--fg);
+  background: var(--button-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.dg-field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
 /* ---------- Canvas ---------- */
 #dg-canvas {
   position: relative;
@@ -77,6 +112,9 @@ html, body {
 .dg-selection { fill: none; stroke: var(--dg-mark); stroke-width: 2.5; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; }
 .dg-selection-edge { stroke: var(--dg-mark); stroke-opacity: 0.5; stroke-width: 10; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .dg-source { fill: var(--dg-mark); fill-opacity: 0.08; stroke: var(--dg-mark); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.dg-freehand { fill: none; stroke: var(--dg-ink); stroke-opacity: 0.55; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.dg-point { fill: var(--dg-mark); }
+.dg-point-first { fill: var(--dg-white); stroke: var(--dg-mark); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .dg-handle { fill: var(--dg-white); stroke: var(--dg-mark); stroke-width: 2; vector-effect: non-scaling-stroke; }
 
 .dg-text-input {

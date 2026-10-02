@@ -50,6 +50,8 @@ export interface Tool {
   hint(ctx: ToolContext): string;
   pointerDown(ctx: ToolContext, p: Point): void;
   preview?(ctx: ToolContext, pointer: Point | null): Preview;
+  /** Enter. Return true if the tool finished something of its own (else: edit the selection's text). */
+  finish?(ctx: ToolContext): boolean;
   /** Esc. Return true if the tool cancelled something of its own (else: back to Velg). */
   cancel?(ctx: ToolContext): boolean;
   /** The tool is being switched away from. */

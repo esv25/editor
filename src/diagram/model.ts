@@ -19,14 +19,52 @@ export interface DiagramNode {
   w: number;
   h: number;
   text: string;
+  /** Outline drawn twice (weak entity, multivalued attribute …). */
+  double?: boolean;
+  /** Dashed outline (derived attribute …). */
+  dashed?: boolean;
+  /** Freehand ('path'): the clicked points, as fractions (0–1) of w and h, so resizing scales them. */
+  points?: Point[];
+  /** Freehand: joined back to the first point. */
+  closed?: boolean;
+  /** Freehand: a smooth curve through the points (false: straight lines). */
+  smooth?: boolean;
 }
+
+/** What's drawn at an end of a line. */
+export type EndKind = 'none' | 'arrow' | 'open' | 'triangle' | 'diamond' | 'filledDiamond';
+
+export interface EdgeStyle {
+  /** At `to`. */
+  head: EndKind;
+  /** At `from`. */
+  tail: EndKind;
+  dashed: boolean;
+}
+
+export const defaultEdgeStyle: EdgeStyle = { head: 'arrow', tail: 'none', dashed: false };
 
 export interface DiagramEdge {
   id: string;
-  /** Node ids; the arrow head is at `to`. */
+  /** Node ids; the arrow head (by default) is at `to`. */
   from: string;
   to: string;
+  head?: EndKind;
+  tail?: EndKind;
+  dashed?: boolean;
+  /** Text in the middle of the line. */
+  label?: string;
+  /** Text near each end (multiplicity, cardinality: «1», «0..*», «N»). */
+  fromLabel?: string;
+  toLabel?: string;
 }
+
+/** An edge's style with defaults filled in. */
+export const styleOf = (e: DiagramEdge): EdgeStyle => ({
+  head: e.head ?? defaultEdgeStyle.head,
+  tail: e.tail ?? defaultEdgeStyle.tail,
+  dashed: e.dashed ?? defaultEdgeStyle.dashed,
+});
 
 export interface Diagram {
   version: 1;
@@ -84,12 +122,33 @@ export function removeEdges(d: Diagram, ids: string[]): Diagram {
 }
 
 /** Connect two nodes. No self-arrows, and no duplicate of an existing arrow. */
-export function connect(d: Diagram, from: string, to: string): { diagram: Diagram; id: string | null } {
+export function connect(
+  d: Diagram,
+  from: string,
+  to: string,
+  style: EdgeStyle = defaultEdgeStyle,
+): { diagram: Diagram; id: string | null } {
   if (from === to || !findNode(d, from) || !findNode(d, to)) return { diagram: d, id: null };
   const existing = d.edges.find((e) => e.from === from && e.to === to);
   if (existing) return { diagram: d, id: existing.id };
   const id = newId(d, 'e');
-  return { diagram: { ...d, edges: [...d.edges, { id, from, to }] }, id };
+  return { diagram: { ...d, edges: [...d.edges, { id, from, to, ...style }] }, id };
+}
+
+export function updateEdge(d: Diagram, id: string, patch: Partial<Omit<DiagramEdge, 'id' | 'from' | 'to'>>): Diagram {
+  return { ...d, edges: d.edges.map((e) => (e.id === id ? { ...e, ...patch } : e)) };
+}
+
+/** Turn the line around (ends and their texts swap places). */
+export function reverseEdge(d: Diagram, id: string): Diagram {
+  return {
+    ...d,
+    edges: d.edges.map((e) => {
+      if (e.id !== id) return e;
+      const style = styleOf(e);
+      return { ...e, from: e.to, to: e.from, head: style.tail, tail: style.head, fromLabel: e.toLabel, toLabel: e.fromLabel };
+    }),
+  };
 }
 
 const overlaps = (a: DiagramNode, b: Omit<DiagramNode, 'id'>) =>
@@ -105,6 +164,7 @@ export function addNeighbor(
   id: string,
   dir: Direction,
   grid: number,
+  style: EdgeStyle = defaultEdgeStyle,
 ): { diagram: Diagram; id: string } | null {
   const from = findNode(d, id);
   if (!from) return null;
@@ -112,17 +172,19 @@ export function addNeighbor(
   const step = { x: 0, y: 0 };
   if (dir === 'left' || dir === 'right') step.x = (from.w + gap) * (dir === 'right' ? 1 : -1);
   else step.y = (from.h + gap) * (dir === 'down' ? 1 : -1);
-  const node = { shape: from.shape, x: from.x + step.x, y: from.y + step.y, w: from.w, h: from.h, text: '' };
+  // Freehand figures continue as boxes.
+  const shape = from.shape === 'path' ? 'box' : from.shape;
+  const node = { shape, x: from.x + step.x, y: from.y + step.y, w: from.w, h: from.h, text: '' };
   for (let i = 0; i < 50 && d.nodes.some((n) => overlaps(n, node)); i++) {
     node.x += step.x;
     node.y += step.y;
   }
   const added = addNode(d, node);
-  return { diagram: connect(added.diagram, id, added.id).diagram, id: added.id };
+  return { diagram: connect(added.diagram, id, added.id, style).diagram, id: added.id };
 }
 
 /** Distance from a point to a rectangle's edge (0 inside). */
-function distanceToRect(p: Point, n: DiagramNode): number {
+export function distanceToRect(p: Point, n: DiagramNode): number {
   const dx = Math.max(n.x - p.x, 0, p.x - (n.x + n.w));
   const dy = Math.max(n.y - p.y, 0, p.y - (n.y + n.h));
   return Math.hypot(dx, dy);
@@ -132,12 +194,17 @@ function distanceToRect(p: Point, n: DiagramNode): number {
  * The node under `p`, or the nearest one within `tolerance` of it. Generous on
  * purpose: you shouldn't have to hit a figure exactly.
  */
-export function nodeAt(d: Diagram, p: Point, tolerance: number): DiagramNode | null {
+export function nodeAt(
+  d: Diagram,
+  p: Point,
+  tolerance: number,
+  distanceTo: (n: DiagramNode, p: Point) => number = (n, q) => distanceToRect(q, n),
+): DiagramNode | null {
   let best: DiagramNode | null = null;
   let bestDistance = Infinity;
   // Later nodes are drawn on top, so they win ties.
   for (const n of d.nodes) {
-    const distance = distanceToRect(p, n);
+    const distance = distanceTo(n, p);
     if (distance <= tolerance && distance <= bestDistance) {
       best = n;
       bestDistance = distance;
@@ -170,21 +237,52 @@ export function normalizeDiagram(value: unknown): Diagram | null {
   const v = value as Partial<Diagram>;
   if (!Array.isArray(v.nodes) || !Array.isArray(v.edges)) return null;
   const num = (x: unknown, fallback: number) => (typeof x === 'number' && Number.isFinite(x) ? x : fallback);
+  const str = (x: unknown) => (typeof x === 'string' && x ? x : undefined);
+  const flag = (x: unknown) => (x === true ? true : undefined);
+  const ends: EndKind[] = ['none', 'arrow', 'open', 'triangle', 'diamond', 'filledDiamond'];
+  const end = (x: unknown) => (ends.includes(x as EndKind) ? (x as EndKind) : undefined);
+  // Optional fields are only kept when set, so files stay small and tidy.
+  const compact = <T extends object>(o: T): T =>
+    Object.fromEntries(Object.entries(o).filter(([, value]) => value !== undefined)) as T;
+
   const nodes = v.nodes
     .filter((n): n is DiagramNode => typeof n === 'object' && n !== null && typeof n.id === 'string')
-    .map((n) => ({
-      id: n.id,
-      shape: typeof n.shape === 'string' ? n.shape : 'box',
-      x: num(n.x, 0),
-      y: num(n.y, 0),
-      w: Math.max(1, num(n.w, 160)),
-      h: Math.max(1, num(n.h, 80)),
-      text: typeof n.text === 'string' ? n.text : '',
-    }));
+    .map((n) =>
+      compact({
+        id: n.id,
+        shape: typeof n.shape === 'string' ? n.shape : 'box',
+        x: num(n.x, 0),
+        y: num(n.y, 0),
+        w: Math.max(1, num(n.w, 160)),
+        h: Math.max(1, num(n.h, 80)),
+        text: typeof n.text === 'string' ? n.text : '',
+        double: flag(n.double),
+        dashed: flag(n.dashed),
+        points: Array.isArray(n.points)
+          ? n.points.filter((p) => typeof p?.x === 'number' && typeof p?.y === 'number').map((p) => ({ x: p.x, y: p.y }))
+          : undefined,
+        closed: flag(n.closed),
+        smooth: n.smooth === false ? false : undefined,
+      }),
+    );
   const ids = new Set(nodes.map((n) => n.id));
-  const edges = v.edges.filter(
-    (e): e is DiagramEdge =>
-      typeof e === 'object' && e !== null && typeof e.id === 'string' && ids.has(e.from) && ids.has(e.to),
-  );
-  return { version: 1, nodes, edges: edges.map(({ id, from, to }) => ({ id, from, to })) };
+  const edges = v.edges
+    .filter(
+      (e): e is DiagramEdge =>
+        typeof e === 'object' && e !== null && typeof e.id === 'string' && ids.has(e.from) && ids.has(e.to),
+    )
+    .map((e) =>
+      compact({
+        id: e.id,
+        from: e.from,
+        to: e.to,
+        head: end(e.head),
+        tail: end(e.tail),
+        dashed: typeof e.dashed === 'boolean' ? e.dashed : undefined,
+        label: str(e.label),
+        fromLabel: str(e.fromLabel),
+        toLabel: str(e.toLabel),
+      }),
+    );
+  return { version: 1, nodes, edges };
 }

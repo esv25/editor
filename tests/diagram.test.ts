@@ -9,11 +9,18 @@ import {
   nodeAt,
   normalizeDiagram,
   removeNodes,
+  reverseEdge,
   snap,
+  updateEdge,
   type Diagram,
 } from '../src/diagram/model';
+import { edgePresets, renderEdge } from '../src/diagram/edges';
 import { edgeEnds } from '../src/diagram/render';
 import { shapeFor } from '../src/diagram/shapes';
+import { styledLine } from '../src/diagram/shapes/common';
+import { absolutePoints, curveData, pathNodeFrom } from '../src/diagram/shapes/path';
+import { classSections } from '../src/diagram/shapes/umlClass';
+import { toSvgString } from '../src/diagram/svg';
 
 const box = (x: number, y: number, text = '') => ({ shape: 'box', x, y, w: 160, h: 80, text });
 
@@ -27,7 +34,7 @@ describe('diagram model', () => {
   it('gives fresh ids', () => {
     const d = twoBoxes();
     expect(d.nodes.map((n) => n.id)).toEqual(['n1', 'n2']);
-    expect(d.edges).toEqual([{ id: 'e1', from: 'n1', to: 'n2' }]);
+    expect(d.edges).toEqual([{ id: 'e1', from: 'n1', to: 'n2', head: 'arrow', tail: 'none', dashed: false }]);
     expect(addNode(removeNodes(d, ['n1']), box(0, 0)).id).toBe('n3');
   });
 
@@ -126,5 +133,104 @@ describe('history', () => {
     expect(h.undo(b)).toBe(a);
     expect(h.redo(a)).toBe(b);
     expect(h.redo(b)).toBeNull();
+  });
+});
+
+describe('lines', () => {
+  it('get the chosen type and texts', () => {
+    const inherit = edgePresets.find((p) => p.id === 'inherit')!.style;
+    let d = addNode(addNode(emptyDiagram(), box(0, 0)).diagram, box(300, 0)).diagram;
+    d = connect(d, 'n1', 'n2', inherit).diagram;
+    expect(d.edges[0]).toMatchObject({ head: 'triangle', tail: 'none', dashed: false });
+    d = updateEdge(d, 'e1', { fromLabel: '1', toLabel: '0..*' });
+    expect(d.edges[0]).toMatchObject({ fromLabel: '1', toLabel: '0..*' });
+  });
+
+  it('turn around with their ends and texts', () => {
+    let d = addNode(addNode(emptyDiagram(), box(0, 0)).diagram, box(300, 0)).diagram;
+    d = connect(d, 'n1', 'n2', { head: 'none', tail: 'filledDiamond', dashed: false }).diagram;
+    d = updateEdge(d, 'e1', { fromLabel: '1', toLabel: 'N' });
+    expect(reverseEdge(d, 'e1').edges[0]).toMatchObject({ from: 'n2', to: 'n1', head: 'filledDiamond', tail: 'none', fromLabel: 'N', toLabel: '1' });
+  });
+
+  it('draw their end marks', () => {
+    const svg = (style: Parameters<typeof renderEdge>[0]) => toSvgString(renderEdge(style, { x: 0, y: 0 }, { x: 100, y: 0 }));
+    expect(svg({ head: 'triangle', tail: 'none', dashed: true })).toContain('stroke-dasharray="8 6"');
+    expect(svg({ head: 'triangle', tail: 'none', dashed: true })).toContain('fill="#ffffff"');
+    expect(svg({ head: 'none', tail: 'none', dashed: false })).not.toContain('polygon');
+    // A filled diamond at the start: the line begins where the diamond ends.
+    expect(svg({ head: 'none', tail: 'filledDiamond', dashed: false })).toContain('x1="22"');
+    expect(svg({ label: 'eier', fromLabel: '1' })).toContain('>eier</tspan>');
+  });
+
+  it('are read back from files, bad values dropped', () => {
+    const d = normalizeDiagram({
+      nodes: [{ id: 'n1' }, { id: 'n2', double: true, dashed: 'yes' }],
+      edges: [{ id: 'e1', from: 'n1', to: 'n2', head: 'triangle', tail: 'bogus', label: '', toLabel: 'N' }],
+    })!;
+    expect(d.nodes[1]).toEqual({ id: 'n2', shape: 'box', x: 0, y: 0, w: 160, h: 80, text: '', double: true });
+    expect(d.edges[0]).toEqual({ id: 'e1', from: 'n1', to: 'n2', head: 'triangle', toLabel: 'N' });
+  });
+});
+
+describe('text markup', () => {
+  it('underlines and italicises whole lines', () => {
+    expect(styledLine('_personnr_')).toEqual({ text: 'personnr', underline: true, italic: false });
+    expect(styledLine('*Figur*')).toEqual({ text: 'Figur', underline: false, italic: true });
+    expect(styledLine('_*begge*_')).toEqual({ text: 'begge', underline: true, italic: true });
+    expect(styledLine('a_b_c')).toEqual({ text: 'a_b_c', underline: false, italic: false });
+  });
+});
+
+describe('UML class', () => {
+  it('splits the text into compartments at "--"', () => {
+    expect(classSections('Person\n--\n- navn: String\n- alder: int\n--\n+ hils()')).toEqual([
+      ['Person'],
+      ['- navn: String', '- alder: int'],
+      ['+ hils()'],
+    ]);
+    expect(classSections('Person')).toEqual([['Person'], [], []]);
+    expect(classSections('«interface»\nForm\n---\n\n+ areal(): double\n')).toEqual([
+      ['«interface»', 'Form'],
+      ['+ areal(): double'],
+      [],
+    ]);
+  });
+
+  it('grows to fit its compartments', () => {
+    const measure = (line: string) => line.length * 8;
+    const size = shapeFor('class').fit!('Person\n--\n- navn: String\n--\n+ hils()', measure);
+    // Three compartments of one line: 3 × (20.8 + 12).
+    expect(size.h).toBeCloseTo(98.4);
+    expect(size.w).toBe('- navn: String'.length * 8 + 20);
+  });
+});
+
+describe('freehand', () => {
+  const clicked = [
+    { x: 100, y: 100 },
+    { x: 200, y: 140 },
+    { x: 300, y: 100 },
+  ];
+
+  it('stores points relative to its box, so it can move and resize', () => {
+    const node = { id: 'n1', ...pathNodeFrom(clicked, false) };
+    expect(node).toMatchObject({ shape: 'path', x: 100, y: 100, w: 200, h: 40 });
+    expect(absolutePoints(node)).toEqual(clicked);
+    expect(absolutePoints({ ...node, x: 0, w: 400 })[1]).toEqual({ x: 200, y: 140 });
+  });
+
+  it('draws a smooth curve or straight lines', () => {
+    expect(curveData(clicked, false, false)).toBe('M100,100 L200,140 L300,100');
+    expect(curveData(clicked, true, true)).toMatch(/^M100,100 C.* Z$/);
+  });
+
+  it('is hit near the line, not anywhere in its box', () => {
+    const open = { id: 'n1', ...pathNodeFrom(clicked, false) };
+    const shape = shapeFor('path');
+    expect(shape.distance!(open, { x: 200, y: 132 })).toBeLessThan(10);
+    expect(shape.distance!(open, { x: 200, y: 100 })).toBeGreaterThan(20);
+    const closed = { ...open, closed: true };
+    expect(shape.distance!(closed, { x: 200, y: 110 })).toBe(0);
   });
 });

@@ -8,22 +8,27 @@ import { History } from './history';
 import {
   addNeighbor,
   bounds,
+  distanceToRect,
   distanceToSegment,
   findNode,
   nodeAt,
   removeEdges,
   removeNodes,
+  reverseEdge,
   snap,
+  updateEdge,
   updateNode,
   type Diagram,
   type DiagramEdge,
+  type DiagramNode,
   type Direction,
   type Point,
 } from './model';
 import { edgeEnds, renderDiagram } from './render';
-import { drawingStyle } from './shapes/common';
+import { shapeFor, type Measure } from './shapes';
+import { drawingStyle, lineHeight, styledLine } from './shapes/common';
 import { h, toDom, type SvgNode } from './svg';
-import { arrowSource } from './tools/arrow';
+import { arrowSource, newEdgeStyle } from './tools/arrow';
 import { selectTool } from './tools/select';
 import { toolFor, tools, type Selection, type Tool, type ToolContext } from './tools';
 
@@ -52,7 +57,12 @@ export class DiagramCanvas {
   private gridRect: SVGRectElement;
   private content: SVGGElement;
   private overlay: SVGGElement;
-  private editing: { textarea: HTMLTextAreaElement; nodeId: string; finish: (save: boolean) => void } | null = null;
+  private editing: {
+    textarea: HTMLTextAreaElement;
+    place: () => { x: number; y: number; w: number; h: number } | null;
+    multiline: boolean;
+    finish: (save: boolean) => void;
+  } | null = null;
   private frame = 0;
   private measure = document.createElement('canvas').getContext('2d')!;
 
@@ -94,9 +104,7 @@ export class DiagramCanvas {
     });
     this.svg.addEventListener('pointerdown', (e) => this.pointerDown(e));
     this.svg.addEventListener('contextmenu', (e) => e.preventDefault());
-    this.svg.addEventListener('dblclick', () => {
-      if (this.selection?.kind === 'node') this.editText(this.selection.id);
-    });
+    this.svg.addEventListener('dblclick', () => this.editSelection());
     this.svg.addEventListener('wheel', (e) => this.wheel(e), { passive: false });
     window.addEventListener('keydown', (e) => this.keyDown(e));
     new ResizeObserver(() => this.updateViewBox()).observe(root);
@@ -127,14 +135,15 @@ export class DiagramCanvas {
       select: (selection) => canvas.select(selection),
       editText: (id) => canvas.editText(id),
       setTool: (id) => canvas.setTool(id),
-      nodeAt: (p) => nodeAt(canvas.diagram, p, getSettings().diagram.hitTolerance / canvas.zoom),
+      nodeAt: (p) => canvas.nodeAt(canvas.diagram, p),
       edgeAt: (p) => canvas.edgeAt(p),
       refresh: () => canvas.refresh(),
     };
   })();
 
   get hint(): string {
-    if (this.editing) return 'Skriv teksten · Enter: ferdig · Shift+Enter: ny linje · Esc: avbryt';
+    if (this.editing?.multiline) return 'Skriv teksten · Enter: ny linje · «--» på egen linje: ny del · Ctrl+Enter eller Esc: ferdig';
+    if (this.editing) return 'Skriv teksten · Enter eller Esc: ferdig · Shift+Enter: ny linje';
     return this.tool.hint(this.context);
   }
 
@@ -196,7 +205,7 @@ export class DiagramCanvas {
   /** Ctrl+arrow: a new connected figure in that direction, ready for typing. */
   addNeighbor(dir: Direction): void {
     if (this.selection?.kind !== 'node') return;
-    const added = addNeighbor(this.diagram, this.selection.id, dir, getSettings().diagram.grid);
+    const added = addNeighbor(this.diagram, this.selection.id, dir, getSettings().diagram.grid, newEdgeStyle());
     if (!added) return;
     this.commit(added.diagram);
     this.select({ kind: 'node', id: added.id });
@@ -226,43 +235,119 @@ export class DiagramCanvas {
     return best;
   }
 
+  /** The figure at p, with each shape's own idea of "near" (freehand: near the line). */
+  nodeAt(d: Diagram, p: Point): DiagramNode | null {
+    const tolerance = getSettings().diagram.hitTolerance / this.zoom;
+    return nodeAt(d, p, tolerance, (n, q) => shapeFor(n.shape).distance?.(n, q) ?? distanceToRect(q, n));
+  }
+
+  /** Enter / double click / «Skriv tekst»: edit the selected figure's or line's text. */
+  editSelection(): void {
+    if (this.selection?.kind === 'node') this.editText(this.selection.id);
+    else if (this.selection?.kind === 'edge') this.editEdgeLabel(this.selection.id);
+  }
+
+  get selectedNode(): DiagramNode | null {
+    return this.selection?.kind === 'node' ? (findNode(this.diagram, this.selection.id) ?? null) : null;
+  }
+
+  get selectedEdge(): DiagramEdge | null {
+    const sel = this.selection;
+    return sel?.kind === 'edge' ? (this.diagram.edges.find((e) => e.id === sel.id) ?? null) : null;
+  }
+
+  updateSelectedNode(patch: Partial<Omit<DiagramNode, 'id'>>): void {
+    const node = this.selectedNode;
+    if (node) this.commit(updateNode(this.diagram, node.id, patch));
+  }
+
+  updateSelectedEdge(patch: Partial<Omit<DiagramEdge, 'id' | 'from' | 'to'>>): void {
+    const edge = this.selectedEdge;
+    if (edge) this.commit(updateEdge(this.diagram, edge.id, patch));
+  }
+
+  reverseSelectedEdge(): void {
+    const edge = this.selectedEdge;
+    if (edge) this.commit(reverseEdge(this.diagram, edge.id));
+  }
+
   // --- Text ---------------------------------------------------------------
 
+  /** Type the text of a figure. */
   editText(nodeId: string): void {
-    this.finishEditing(true);
     const node = findNode(this.diagram, nodeId);
     if (!node) return;
+    const shape = shapeFor(node.shape);
+    this.openTextField({
+      value: node.text,
+      multiline: !!shape.multiline,
+      placeholder: shape.placeholder ?? '',
+      align: shape.multiline ? 'left' : 'center',
+      place: () => findNode(this.diagram, nodeId) ?? null,
+      save: (text) => {
+        const current = findNode(this.diagram, nodeId);
+        if (current) this.commit(updateNode(this.diagram, nodeId, { text, ...this.fitText(current, text) }));
+      },
+    });
+  }
+
+  /** Type the text in the middle of a line. */
+  editEdgeLabel(edgeId: string): void {
+    const edge = this.diagram.edges.find((e) => e.id === edgeId);
+    if (!edge) return;
+    this.openTextField({
+      value: edge.label ?? '',
+      multiline: false,
+      placeholder: 'Tekst på linja',
+      align: 'center',
+      place: () => {
+        const current = this.diagram.edges.find((e) => e.id === edgeId);
+        const ends = current && edgeEnds(this.diagram, current);
+        if (!ends) return null;
+        const mid = { x: (ends.a.x + ends.b.x) / 2, y: (ends.a.y + ends.b.y) / 2 };
+        return { x: mid.x - 90, y: mid.y - 20, w: 180, h: 40 };
+      },
+      save: (label) => this.commit(updateEdge(this.diagram, edgeId, { label: label.trim() || undefined })),
+    });
+  }
+
+  private openTextField(field: {
+    value: string;
+    multiline: boolean;
+    placeholder: string;
+    align: 'left' | 'center';
+    place: () => { x: number; y: number; w: number; h: number } | null;
+    save: (text: string) => void;
+  }): void {
+    this.finishEditing(true);
     const textarea = document.createElement('textarea');
     textarea.className = 'dg-text-input';
-    textarea.value = node.text;
+    textarea.value = field.value;
+    textarea.placeholder = field.placeholder;
     textarea.spellcheck = true;
     textarea.lang = 'nb';
+    textarea.style.textAlign = field.align;
     this.root.append(textarea);
-    this.positionTextarea(textarea, node.id);
 
+    // Esc keeps what was typed too (an accidental Esc shouldn't lose work; Ctrl+Z undoes).
     const finish = (save: boolean) => {
       if (this.editing?.textarea !== textarea) return;
       this.editing = null;
       textarea.remove();
-      const current = findNode(this.diagram, nodeId);
-      if (save && current && textarea.value !== current.text) {
-        this.commit(updateNode(this.diagram, nodeId, { text: textarea.value, ...this.fitText(current, textarea.value) }));
-      } else {
-        this.refresh();
-      }
+      if (save && textarea.value !== field.value) field.save(textarea.value);
+      else this.refresh();
     };
     textarea.addEventListener('keydown', (e) => {
       e.stopPropagation();
-      if (e.key === 'Enter' && !e.shiftKey) {
+      const done = e.key === 'Escape' || (e.key === 'Enter' && (field.multiline ? e.ctrlKey || e.metaKey : !e.shiftKey));
+      if (done) {
         e.preventDefault();
         finish(true);
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        finish(false);
       }
     });
     textarea.addEventListener('blur', () => finish(true));
-    this.editing = { textarea, nodeId, finish };
+    this.editing = { textarea, place: field.place, multiline: field.multiline, finish };
+    this.positionTextarea();
     textarea.focus();
     textarea.select();
     this.refresh();
@@ -272,27 +357,36 @@ export class DiagramCanvas {
     this.editing?.finish(save);
   }
 
-  private positionTextarea(textarea: HTMLTextAreaElement, nodeId: string): void {
-    const node = findNode(this.diagram, nodeId);
-    if (!node) return;
-    Object.assign(textarea.style, {
-      left: `${(node.x - this.pan.x) * this.zoom}px`,
-      top: `${(node.y - this.pan.y) * this.zoom}px`,
-      width: `${node.w * this.zoom}px`,
-      height: `${node.h * this.zoom}px`,
+  private positionTextarea(): void {
+    if (!this.editing) return;
+    const rect = this.editing.place();
+    if (!rect) return;
+    Object.assign(this.editing.textarea.style, {
+      left: `${(rect.x - this.pan.x) * this.zoom}px`,
+      top: `${(rect.y - this.pan.y) * this.zoom}px`,
+      width: `${rect.w * this.zoom}px`,
+      // Room to type more lines in a class.
+      height: `${Math.max(rect.h, this.editing.multiline ? 160 : 0) * this.zoom}px`,
       fontSize: `${drawingStyle.fontSize * this.zoom}px`,
     });
   }
 
   /** Grow the figure (never shrink it) so the text fits, in whole grid steps. */
-  private fitText(node: { w: number; h: number }, text: string): { w: number; h: number } {
+  private fitText(node: DiagramNode, text: string): { w: number; h: number } {
     const grid = getSettings().diagram.grid;
-    this.measure.font = `${drawingStyle.fontSize}px ${drawingStyle.font}`;
-    const lines = text.split('\n');
-    const widest = Math.max(0, ...lines.map((line) => this.measure.measureText(line).width));
-    const tall = lines.length * drawingStyle.fontSize * drawingStyle.lineHeight;
+    const measure: Measure = (line, bold) => {
+      this.measure.font = `${bold ? '600 ' : ''}${drawingStyle.fontSize}px ${drawingStyle.font}`;
+      return this.measure.measureText(line).width;
+    };
+    const shape = shapeFor(node.shape);
+    const needed = shape.fit
+      ? shape.fit(text, measure)
+      : {
+          w: Math.max(0, ...text.split('\n').map((line) => measure(styledLine(line).text))) + 32,
+          h: text.split('\n').length * lineHeight + 24,
+        };
     const up = (v: number) => Math.ceil(v / grid) * grid;
-    return { w: Math.max(node.w, up(widest + 32)), h: Math.max(node.h, up(tall + 24)) };
+    return { w: Math.max(node.w, up(needed.w)), h: Math.max(node.h, up(needed.h)) };
   }
 
   // --- View ---------------------------------------------------------------
@@ -339,7 +433,7 @@ export class DiagramCanvas {
     for (const [k, v] of Object.entries({ x: this.pan.x, y: this.pan.y, width: w, height: hgt })) {
       this.gridRect.setAttribute(k, String(v));
     }
-    if (this.editing) this.positionTextarea(this.editing.textarea, this.editing.nodeId);
+    this.positionTextarea();
     this.refresh();
   }
 
@@ -393,7 +487,8 @@ export class DiagramCanvas {
     let handled = true;
     if (key === 'Escape') this.escape();
     else if (key === 'Delete' || key === 'Backspace') this.deleteSelection();
-    else if ((key === 'Enter' || key === 'F2') && this.selection?.kind === 'node') this.editText(this.selection.id);
+    else if (key === 'Enter' && this.tool.finish?.(this.context)) return e.preventDefault();
+    else if (key === 'Enter' || key === 'F2') this.editSelection();
     else if (mod && key.toLowerCase() === 'z' && !e.shiftKey) this.undo();
     else if (mod && (key.toLowerCase() === 'y' || (key.toLowerCase() === 'z' && e.shiftKey))) this.redo();
     else if (mod && key.toLowerCase() === 's') this.options.onSave();
@@ -446,7 +541,7 @@ export class DiagramCanvas {
     };
 
     if (!preview.noHover && this.pointer && !this.editing) {
-      const node = nodeAt(d, this.pointer, getSettings().diagram.hitTolerance / this.zoom);
+      const node = this.nodeAt(d, this.pointer);
       if (node) outline(node.id, 'dg-hover');
       else if (this.tool === selectTool) {
         const edge = this.edgeAt(this.pointer);

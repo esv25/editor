@@ -1,8 +1,9 @@
 import { center } from '../model';
 import { h } from '../svg';
-import { label, outline, shapeIcon } from './common';
+import { DOUBLE_GAP, innerOutline, label, outline, shapeIcon } from './common';
 import type { ShapeType } from './types';
 
+/** Ellipse: an attribute in ER models (_key_ underlined, double: multivalued, dashed: derived). */
 export const ellipse: ShapeType = {
   id: 'ellipse',
   name: 'Ellipse',
@@ -12,7 +13,12 @@ export const ellipse: ShapeType = {
   defaultSize: { w: 160, h: 80 },
   render: (node) => {
     const c = center(node);
-    return h('g', {}, [h('ellipse', { cx: c.x, cy: c.y, rx: node.w / 2, ry: node.h / 2, ...outline }), ...label(node)]);
+    const g = DOUBLE_GAP;
+    return h('g', {}, [
+      h('ellipse', { cx: c.x, cy: c.y, rx: node.w / 2, ry: node.h / 2, ...outline(node) }),
+      ...(node.double ? [h('ellipse', { cx: c.x, cy: c.y, rx: node.w / 2 - g, ry: node.h / 2 - g, ...innerOutline(node) })] : []),
+      ...label(node),
+    ]);
   },
   boundary: (node, p) => {
     const c = center(node);

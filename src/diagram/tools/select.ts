@@ -45,7 +45,7 @@ export const selectTool: Tool = {
     if (ctx.selection?.kind === 'node') {
       return 'Klikk figuren igjen for å flytte den · hjørnet: endre størrelse · Enter: skriv tekst · Ctrl+pil: ny figur ved siden av · Delete: slett';
     }
-    if (ctx.selection?.kind === 'edge') return 'Delete: slett pila';
+    if (ctx.selection?.kind === 'edge') return 'Velg type linje til høyre · Enter: tekst midt på · Delete: slett linja';
     return 'Klikk på en figur for å velge den, eller velg et verktøy for å tegne';
   },
 

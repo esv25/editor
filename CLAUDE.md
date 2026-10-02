@@ -164,20 +164,37 @@ dra** med knappen nede. Store knapper med tekst, raus treffmargin
   `<metadata id="editor-diagram">`. SVG uten den metadataen er ikke vår og skal **aldri**
   overskrives – vinduet nekter å åpne den. Lagret bilde har faste farger (papir), ikke tema.
 - `model.ts`: ren data (`Diagram` = nodes + edges) og rene funksjoner som gir ny `Diagram`
-  (addNode, connect, addNeighbor, nodeAt med toleranse …). `history.ts` angrer med
-  øyeblikksbilder. `svg.ts`: `SvgNode`-tre → DOM (lerretet) eller tekst (fila), så det man
-  ser er det som lagres. `render.ts`: diagram → SvgNode (piler ender på figurenes omriss).
-- Figurtyper (`shapes/`, én fil per type: box, ellipse, diamond, text): `render` +
-  `boundary` (hvor en pil treffer omrisset). Ny type = ny fil + linje i `shapes/index.ts`;
-  den får verktøyknapp automatisk.
+  (addNode, connect, updateEdge, reverseEdge, addNeighbor, nodeAt med toleranse …). Noder kan
+  ha `double`/`dashed` kant; frihånd har `points` som brøkdeler av boksen (så flytting og
+  størrelse virker som for andre figurer). Linjer har `head`/`tail` (`EndKind`), `dashed`
+  og tekst `label`/`fromLabel`/`toLabel`. `normalizeDiagram` tar bare med gyldige felt.
+  `history.ts` angrer med øyeblikksbilder. `svg.ts`: `SvgNode`-tre → DOM (lerretet) eller
+  tekst (fila), så det man ser er det som lagres. `render.ts`: diagram → SvgNode.
+- `edges.ts`: tegning av linjer (pilspiss, åpen pil, tom trekant, rute/fylt rute, stiplet,
+  tekst ved endene og midt på) og `edgePresets` – ettklikksvalgene Pil, Linje, Arv,
+  Implementerer, Avhengighet, Aggregering, Komposisjon.
+- Figurtyper (`shapes/`, én fil per type: box, ellipse, diamond, umlClass, text, path):
+  `render` + `boundary` (hvor en linje treffer omrisset), valgfritt `fit` (størrelsen teksten
+  trenger), `distance` (klikk nær figuren; frihånd: nær streken), `multiline`/`placeholder`
+  for tekstfeltet, `ownTool` (frihånd har eget verktøy). Ny type = ny fil + linje i
+  `shapes/index.ts`; den får verktøyknapp automatisk. Tekstmarkering per linje
+  (`styledLine`): `_tekst_` understreket (ER-nøkkel, static), `*tekst*` kursiv.
+  UML-klasse: én tekst der linjer med `--` deler i navn/felt/metoder (`classSections`).
+  ER (Chen): entitet = boks, attributt = ellipse, relasjon = rombe, Linje + kardinalitet.
 - Verktøy (`tools/`, én fil per verktøy, `Tool`-grensesnittet i `tools/types.ts`): Velg
   (klikk = velg, klikk igjen = løft opp, klikk = sett ned; hjørnehåndtaket likt for
   størrelse), ett plasseringsverktøy per figurtype (gjennomsiktig «spøkelse» følger pekeren),
-  Pil (klikk fra, klikk til; pilene kjedes, klikk på tomt sted lager ny boks). Høyreklikk =
-  Esc.
+  Frihånd (klikk punkter → glatt kurve; klikk første punkt = lukket; Enter/Esc = ferdig),
+  Pil (klikk fra, klikk til; linjene kjedes, klikk på tomt sted lager ny figur; nye linjer
+  får typen valgt i panelet). Høyreklikk = Esc.
+- `properties.ts`: panelet til høyre (fast bredde, så lerretet aldri flytter seg): linjetype,
+  Snu og tekst ved start/midt/slutt for en valgt linje; Skriv tekst, Dobbel/Stiplet kant
+  (og Glatt/Lukket for frihånd) for en figur; type for nye linjer når Pil er på.
 - `canvas.ts` (`DiagramCanvas`): tegner, zoom/panorering (viewBox), tastatur (Ctrl+pil = ny
   tilkoblet figur, piltaster flytter, Enter skriver tekst, Delete, Ctrl+Z/Y), tekstfelt
-  over figuren (figuren vokser så teksten får plass).
+  over figuren eller midt på linja (figuren vokser så teksten får plass). I tekstfeltet
+  beholder Esc det som er skrevet (Ctrl+Z angrer); i klasser er Enter ny linje og
+  Ctrl+Enter/Esc ferdig.
 - `main.ts`: åpner `?file=`-stien, autolagrer (`settings.diagram.autosaveDelayMs`), og sier
   fra med `platform.notify('file-saved', { path })`. Uten fil (nettleseren): «Lagre som».
 - Editoren: `diagram.new` («Ny tegning») lager `figurer/tegning.diagram.svg` ved notatet,

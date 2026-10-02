@@ -1,6 +1,9 @@
 import type { DiagramNode, Point } from '../model';
 import type { SvgNode } from '../svg';
 
+/** Width of a line of text in drawing units (bold: as in a UML class name). */
+export type Measure = (line: string, bold?: boolean) => number;
+
 /**
  * A kind of figure. To add one: create shapes/<name>.ts exporting a ShapeType
  * and list it in shapes/index.ts – it gets a tool button automatically.
@@ -20,4 +23,14 @@ export interface ShapeType {
   render(node: DiagramNode): SvgNode;
   /** Where a line from the figure's centre toward `p` crosses its outline (arrows start/end here). */
   boundary(node: DiagramNode, p: Point): Point;
+  /** Enter makes a new line while typing (Ctrl+Enter or Esc finishes). Default: Enter finishes. */
+  multiline?: boolean;
+  /** Grey example text in the empty text field. */
+  placeholder?: string;
+  /** The size the text needs (default: centred lines plus padding). */
+  fit?(text: string, measure: Measure): { w: number; h: number };
+  /** Distance from `p` to the figure, for clicking (default: to its bounding box). */
+  distance?(node: DiagramNode, p: Point): number;
+  /** Made with its own tool rather than placed with a click (freehand). */
+  ownTool?: boolean;
 }
