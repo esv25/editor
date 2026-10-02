@@ -1,4 +1,6 @@
+mod debug;
 mod runner;
+mod terminal;
 
 use tauri::{Emitter, Manager};
 
@@ -11,6 +13,13 @@ fn file_arg(args: &[String]) -> Option<String> {
 #[tauri::command]
 fn startup_file() -> Option<String> {
     file_arg(&std::env::args().collect::<Vec<_>>())
+}
+
+/// Stop terminals and debug adapters left over from before the page (re)loaded.
+#[tauri::command]
+fn processes_reset(terminals: tauri::State<'_, terminal::Terminals>, adapters: tauri::State<'_, debug::Adapters>) {
+    terminal::kill_all(&terminals);
+    debug::kill_all(&adapters);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -32,7 +41,22 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![startup_file, runner::run_program])
+        .manage(terminal::Terminals::default())
+        .manage(debug::Adapters::default())
+        .invoke_handler(tauri::generate_handler![
+            startup_file,
+            processes_reset,
+            runner::run_program,
+            terminal::terminal_spawn,
+            terminal::terminal_write,
+            terminal::terminal_resize,
+            terminal::terminal_kill,
+            debug::adapter_start,
+            debug::adapter_send,
+            debug::adapter_kill,
+            debug::free_port,
+            debug::inspector_url,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

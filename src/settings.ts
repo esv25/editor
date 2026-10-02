@@ -9,6 +9,7 @@ import {
   type HeadingSuggestionConfig,
 } from './features/headingSuggestion/rules';
 import type { RunnerConfig } from './features/codeBlockTools/runners';
+import type { DebuggerConfig } from './debug/debuggers';
 
 export type ThemeSetting = 'light' | 'dark' | 'system';
 
@@ -33,6 +34,16 @@ export interface Settings {
   codeRunners: Record<string, Partial<RunnerConfig>>;
   /** Max run time for a code block before it's stopped. */
   codeRunTimeoutMs: number;
+  /** Per-language debugger overrides (see debug/debuggers.ts). */
+  debuggers: Record<string, Partial<DebuggerConfig>>;
+  terminal: {
+    /** Program for new terminals (on PATH or a full path). */
+    shell: string;
+    shellArgs: string[];
+    /** Height of the terminal panel in pixels. */
+    height: number;
+    fontSize: number;
+  };
   /** Opening characters that get their closing partner inserted automatically. [] = off. */
   closeBrackets: string[];
   headingSuggestion: HeadingSuggestionConfig;
@@ -54,6 +65,8 @@ export const defaultSettings: Settings = {
   autosave: { enabled: true, delayMs: 1500, folder: '' },
   codeRunners: {},
   codeRunTimeoutMs: 30000,
+  debuggers: {},
+  terminal: { shell: 'powershell.exe', shellArgs: ['-NoLogo'], height: 260, fontSize: 13 },
   closeBrackets: ['(', '[', '{', '«'],
   headingSuggestion: defaultHeadingSuggestionConfig,
   keybindings: {},

@@ -17,7 +17,9 @@ import { bracketMatching, foldGutter, indentOnInput } from '@codemirror/language
 import { indentLess } from '@codemirror/commands';
 import { insertIndent } from './indentation';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import type { EditorCommand } from '../commands/registry';
+import { runCommand, type EditorCommand } from '../commands/registry';
+import { platform } from '../platform';
+import { breakpointGutter } from '../debug/breakpoints';
 import { renderOutput } from '../features/codeBlockTools/output';
 import { runCode, runnability, type RunOutcome } from '../features/codeBlockTools/run';
 
@@ -54,6 +56,7 @@ function outputPanel(view: EditorView, run: RunState): Panel {
     outcome: run.outcome,
     onRerun: () => runFile(view),
     onClose: () => view.dispatch({ effects: setRun.of(null) }),
+    onRunInTerminal: platform.processes ? () => runCommand(view, 'code.runInTerminal') : undefined,
   });
   dom.classList.add('cm-run-panel');
   return { dom };
@@ -77,10 +80,13 @@ export const codeCommands: EditorCommand[] = [
   { id: 'code.run', name: 'Kjør filen', key: 'Mod-Shift-Enter', scope: 'code', run: runFile },
 ];
 
-/** Extensions for a code-mode editor state (language support is added separately). */
-export function codeModeExtensions(): Extension {
+/**
+ * Extensions for a code-mode editor state (language support is added separately).
+ * `debuggable`: the language has a debugger, so the gutter takes breakpoints.
+ */
+export function codeModeExtensions(debuggable: boolean): Extension {
   return [
-    lineNumbers(),
+    debuggable ? breakpointGutter() : lineNumbers(),
     foldGutter(),
     highlightActiveLine(),
     highlightActiveLineGutter(),

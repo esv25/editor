@@ -2,13 +2,19 @@
  * Wires the editor, workspace (groups + tabs), storage and UI together.
  */
 import type { EditorView, ViewUpdate } from '@codemirror/view';
+import { installGlobalKeys } from '../commands/keys';
 import { registerCommands } from '../commands/registry';
+import { breakpointsChanged, toggleBreakpoint } from '../debug/breakpoints';
+import { DebugController } from '../debug/controller';
 import { createMarkdownState, createView } from '../editor/createEditor';
 import { runContext } from '../features/codeBlockTools';
+import { runnerFor } from '../features/codeBlockTools/runners';
 import { platform } from '../platform';
 import { getSettings, onSettingsChange, updateSettings } from '../settings';
 import { drafts, storage } from '../storage';
+import { TerminalPanel } from '../terminal/terminalPanel';
 import { CodeBar } from '../ui/codeBar';
+import { DebugPanel } from '../ui/debugPanel';
 import { FileTree } from '../ui/fileTree';
 import { OutlinePanel } from '../ui/outline';
 import { renderCount, renderSaveStatus, renderTitle } from '../ui/statusbar';
@@ -34,8 +40,38 @@ export async function startApp(): Promise<void> {
   // keymaps) are created, but they act on the workspace created below.
   let ws!: Workspace;
   let view!: EditorView;
+  let debug!: DebugController;
   const getView = () => view;
   const active = () => ws.activeDoc;
+  const folderOf = (path: string) => path.replace(/[\\/][^\\/]*$/, '');
+
+  // Terminal panel below the editor (desktop only). New terminals open in the active document's folder.
+  const terminal = new TerminalPanel(el('panel'), {
+    cwd: () => {
+      const path = ws.activeDoc?.file?.path;
+      return path ? folderOf(path) : ws.activeGroup.folder || getSettings().autosave.folder || undefined;
+    },
+    onVisibilityChange: () => viewBar.update(view.state),
+    focusEditor: () => view.focus(),
+  });
+  const desktopOnly = () => {
+    ws.showError('Terminal og feilsøking finnes bare i skrivebordsappen');
+    return true;
+  };
+
+  /** Ctrl+F5: run the file in the terminal, where the program can read input. */
+  const runInTerminal = async (doc: EditorDocument) => {
+    const runner = runnerFor(doc.lang);
+    if (!runner) return ws.showError('Dette språket kan ikke kjøres i terminalen');
+    if (!(await doc.ensureSaved()) || !doc.file?.path) return ws.showError('Filen må lagres før den kan kjøres');
+    const path = doc.file.path;
+    await terminal.runProgram('run', 'run', {
+      title: doc.name,
+      program: runner.command,
+      args: runner.args.map((a) => a.replaceAll('{file}', path)),
+      cwd: folderOf(path),
+    });
+  };
 
   registerCommands([
     {
@@ -107,6 +143,44 @@ export async function startApp(): Promise<void> {
       isActive: () => getSettings().outlineVisible,
     },
     {
+      id: 'view.toggleTerminal',
+      name: 'Vis/skjul terminalen',
+      icon: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/>'),
+      key: 'Mod-j',
+      scope: 'any',
+      run: () => (terminal.available ? terminal.toggle() : desktopOnly(), true),
+      isActive: () => terminal.visible,
+    },
+    {
+      id: 'terminal.new',
+      name: 'Ny terminal',
+      scope: 'any',
+      run: () => (terminal.available ? void terminal.newShell() : desktopOnly(), true),
+    },
+    {
+      id: 'code.runInTerminal',
+      name: 'Kjør i terminalen',
+      key: 'Mod-F5',
+      scope: 'code',
+      run: () => {
+        const doc = active();
+        if (!doc) return false;
+        if (!terminal.available) return desktopOnly();
+        void runInTerminal(doc);
+        return true;
+      },
+    },
+    // F5 starts debugging, or continues when paused; the two never apply at the same time.
+    { id: 'debug.continue', name: 'Fortsett', key: 'F5', scope: 'any', run: () => debug.resume() },
+    { id: 'debug.start', name: 'Feilsøk', key: 'F5', scope: 'any', run: () => debug.start() },
+    { id: 'debug.pause', name: 'Pause', key: 'F6', scope: 'any', run: () => debug.pause() },
+    { id: 'debug.stepOver', name: 'Neste linje (hopp over funksjonskall)', key: 'F10', scope: 'any', run: () => debug.stepOver() },
+    { id: 'debug.stepInto', name: 'Gå inn i funksjonen', key: 'F11', scope: 'any', run: () => debug.stepInto() },
+    { id: 'debug.stepOut', name: 'Gå ut av funksjonen', key: 'Shift-F11', scope: 'any', run: () => debug.stepOut() },
+    { id: 'debug.restart', name: 'Start feilsøkingen på nytt', key: 'Mod-Shift-F5', scope: 'any', run: () => debug.restart() },
+    { id: 'debug.stop', name: 'Stopp feilsøkingen', key: 'Shift-F5', scope: 'any', run: () => debug.stopSession() },
+    { id: 'debug.toggleBreakpoint', name: 'Stoppunkt av/på', key: 'F9', scope: 'code', run: toggleBreakpoint },
+    {
       id: 'view.toggleTheme',
       name: 'Bytt mellom lyst og mørkt tema',
       icon: svg('<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>'),
@@ -120,6 +194,10 @@ export async function startApp(): Promise<void> {
     ws?.handleUpdate(u);
     const doc = ws?.activeDoc;
     if (!doc) return;
+    if (breakpointsChanged(u)) {
+      ws.scheduleSave();
+      debug?.breakpointsChanged(doc);
+    }
     if (u.docChanged) outline.scheduleRefresh();
     if (u.docChanged || u.selectionSet) {
       clearTimeout(countTimer);
@@ -131,13 +209,28 @@ export async function startApp(): Promise<void> {
 
   view = createView(el('editor'), onUpdate);
   ws = new Workspace(view);
+  debug = new DebugController(ws, getView, terminal);
   // Handy for debugging in the browser console during development.
-  if (import.meta.env.DEV) Object.assign(window, { editorView: view, workspace: ws });
-
+  if (import.meta.env.DEV) Object.assign(window, { editorView: view, workspace: ws, debug, terminal });
   const mdToolbar = renderButtons(el('md-tools'), getSettings().toolbar, getView);
-  const codeBar = new CodeBar(el('code-tools'), getView, (doc, lang) => void ws.setLanguage(doc, lang));
+  const codeBar = new CodeBar(el('code-tools'), getView, debug, (doc, lang) => void ws.setLanguage(doc, lang));
   const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save'], getView);
-  const viewBar = renderButtons(el('view-actions'), ['view.toggleOutline', 'view.toggleTheme'], getView);
+  const viewBar = renderButtons(
+    el('view-actions'),
+    ['view.toggleOutline', ...(terminal.available ? ['view.toggleTerminal'] : []), 'view.toggleTheme'],
+    getView,
+  );
+  new DebugPanel(el('debug'), debug, getView);
+  // The sidebar holds the debug view, so it shows while debugging even if it's otherwise hidden.
+  const updateSidebar = () => {
+    el('sidebar').hidden = !(getSettings().outlineVisible || debug.active);
+    el('sidebar').classList.toggle('debugging', debug.active);
+  };
+  debug.onChange(updateSidebar);
+  installGlobalKeys(getView, platform.isDesktop && import.meta.env.PROD);
+  // Terminals and debuggers from before a reload would otherwise keep running unseen.
+  void platform.processes?.reset();
+
   const outline = new OutlinePanel(el('outline'), getView);
   const linkFolder = async (group: Group) => {
     const folder = await storage.pickFolder?.();
@@ -192,14 +285,16 @@ export async function startApp(): Promise<void> {
   });
 
   onSettingsChange((next, prev) => {
-    el('sidebar').hidden = !next.outlineVisible;
+    updateSidebar();
     outline.visible = next.outlineVisible;
     viewBar.update(view.state);
     if (next.keybindings !== prev.keybindings) {
       for (const bar of [mdToolbar, fileBar, viewBar]) bar.refreshTooltips();
+      const doc = ws.activeDoc;
+      if (doc?.kind === 'code') codeBar.update(doc);
     }
   });
-  el('sidebar').hidden = !getSettings().outlineVisible;
+  updateSidebar();
   outline.visible = getSettings().outlineVisible;
 
   // Restore the last session, or start with one group ("Notater").
