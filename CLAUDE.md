@@ -62,7 +62,7 @@ src/
     types.ts              StorageBackend-grensesnittet + FileRef
     fsAccess.ts           File System Access API (Chrome/Edge)
     download.ts           reserve for andre nettlesere (input + nedlasting)
-    tauri.ts              skrivebordsappen: native dialoger + plugin-fs
+    tauri.ts              skrivebordsappen: native dialoger + plugin-fs (også bilder: readBinary)
     drafts.ts             gammelt enkeltdokument-utkast (leses bare for migrering)
     index.ts              velger backend
   platform/               det som ellers skiller nettleser og skrivebord
@@ -106,8 +106,25 @@ den til i `src/features/index.ts`. Les innstillinger i `extension(settings)`, ik
 modul-lasting, ellers fanges ikke endringer opp.
 
 Dagens features: `livePreview` (overskriftsstørrelser, skjuling av markeringstegn, inline
-kode), `codeBlocks`, `codeBlockTools`, `headings`, `inlineFormat`, `lists`, `taskList`,
-`smartLists`, `headingSuggestion`, `closeBrackets`.
+kode), `codeBlocks`, `codeBlockTools`, `images`, `headings`, `inlineFormat`, `lists`,
+`taskList`, `smartLists`, `headingSuggestion`, `closeBrackets`.
+
+### Bilder (`features/images/`)
+
+- `![alt](sti)` vises som bilde i en blokk-widget *under* linja. Som kodeblokker vises
+  Markdown-teksten aldri: et hode erstatter den alltid (bildetekst = alt-tekst, klikk for å
+  redigere; uten alt-tekst vises filnavnet; knappene «Bytt bilde» og «Fjern»), og markøren
+  hopper over hodet som én enhet (`atomicRanges`). Alt kommer fra én StateField
+  (blokkdekorasjoner kan ikke komme fra en ViewPlugin). Med `hideMarkup: false` vises rå
+  tekst. Bilder i kode tegnes ikke. Tekstendringene (`commands.ts`) er testet.
+- Stier (`features/util/imagePath.ts`, testet i `tests/imagePath.test.ts`): relative stier
+  regnes fra dokumentets mappe (`imageContext.baseDir`, satt i `app.ts`), `<…>` og `%20`
+  forstås, `http(s):`/`data:` brukes direkte. Nye lenker skrives relativt med `/`.
+- Filer leses via `storage.readBinary` (bare skrivebord; `fs:allow-read-file`) og caches
+  som blob-URL-er i `loader.ts`. `reloadImages(view, stier)` leser filer på nytt (f.eks.
+  når en tegning er lagret); `redrawImages(view)` når dokumentet har flyttet mappe.
+- `image.insert` («Sett inn bilde», i verktøylinja) velger fil med `storage.pickFile`; i
+  nettleseren settes `![]()` inn i stedet.
 
 ### Faner og dokumenter (`app/workspace.ts`, `app/document.ts`)
 

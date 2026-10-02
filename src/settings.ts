@@ -61,7 +61,7 @@ export const defaultSettings: Settings = {
     'heading.1', 'heading.2', 'heading.3', '|',
     'format.bold', 'format.italic', 'format.code', '|',
     'list.bullet', 'list.ordered', 'list.task', '|',
-    'codeblock.toggle',
+    'codeblock.toggle', 'image.insert',
   ],
 };
 

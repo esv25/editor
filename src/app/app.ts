@@ -5,6 +5,8 @@ import type { EditorView, ViewUpdate } from '@codemirror/view';
 import { registerCommands } from '../commands/registry';
 import { createMarkdownState, createView } from '../editor/createEditor';
 import { runContext } from '../features/codeBlockTools';
+import { imageContext, redrawImages } from '../features/images';
+import { dirOf } from '../features/util/imagePath';
 import { platform } from '../platform';
 import { getSettings, onSettingsChange, updateSettings } from '../settings';
 import { drafts, storage } from '../storage';
@@ -166,11 +168,17 @@ export async function startApp(): Promise<void> {
 
   // Code blocks and code files run in the document's folder, so they can use files next to it.
   runContext.cwd = () => ws.activeDoc?.file?.path?.replace(/[\\/][^\\/]*$/, '');
+  // Relative image paths are relative to the document; redraw them if it moves (autosave, Lagre som).
+  imageContext.baseDir = () => dirOf(ws.activeDoc?.file?.path);
+  let imageDoc = { id: '', dir: undefined as string | undefined };
 
   // Tabs, names and save states.
   ws.onChange(() => {
     const doc = ws.activeDoc;
     if (!doc) return;
+    const dir = dirOf(doc.file?.path);
+    if (doc.id === imageDoc.id && dir !== imageDoc.dir && doc.kind === 'markdown') queueMicrotask(() => redrawImages(view));
+    imageDoc = { id: doc.id, dir };
     tabs.render();
     refreshTree();
     renderTitle(doc);
