@@ -21,6 +21,14 @@
       ]
     },
     {
+      "identifier": "fs:allow-read-file",
+      "allow": [
+        {
+          "path": "**"
+        }
+      ]
+    },
+    {
       "identifier": "fs:allow-write-text-file",
       "allow": [
         {

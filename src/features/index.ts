@@ -14,11 +14,13 @@ import { taskList } from './taskList';
 import { smartLists } from './smartLists';
 import { headingSuggestion } from './headingSuggestion';
 import { closeBrackets } from './closeBrackets';
+import { images } from './images';
 
 export const features: Feature[] = [
   livePreview,
   codeBlocks,
   codeBlockTools,
+  images,
   headings,
   inlineFormat,
   lists,
