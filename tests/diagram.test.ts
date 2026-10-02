@@ -234,3 +234,12 @@ describe('freehand', () => {
     expect(shape.distance!(closed, { x: 200, y: 110 })).toBe(0);
   });
 });
+
+describe('straight line', () => {
+  it('is a two-point freehand figure, also when level', () => {
+    const node = { id: 'n1', ...pathNodeFrom([{ x: 0, y: 100 }, { x: 200, y: 100 }], false) };
+    expect(node).toMatchObject({ x: 0, y: 100, w: 200, h: 1 });
+    expect(absolutePoints(node)).toEqual([{ x: 0, y: 100 }, { x: 200, y: 100 }]);
+    expect(shapeFor('path').distance!(node, { x: 100, y: 108 })).toBe(8);
+  });
+});
