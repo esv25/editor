@@ -46,6 +46,8 @@ export interface Settings {
     grid: number;
     /** How far (screen px) from a figure or arrow a click still hits it. */
     hitTolerance: number;
+    /** How far (screen px) the pointer must move with the button down before it's a drag, not a click. */
+    dragThreshold: number;
     /** Wait this long after a change before saving. */
     autosaveDelayMs: number;
   };
@@ -72,7 +74,7 @@ export const defaultSettings: Settings = {
     'list.bullet', 'list.ordered', 'list.task', '|',
     'codeblock.toggle', 'image.insert', 'diagram.new',
   ],
-  diagram: { grid: 20, hitTolerance: 16, autosaveDelayMs: 500 },
+  diagram: { grid: 20, hitTolerance: 16, dragThreshold: 6, autosaveDelayMs: 500 },
 };
 
 export type DeepPartial<T> = {

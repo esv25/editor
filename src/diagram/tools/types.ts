@@ -13,6 +13,8 @@ export interface ToolContext {
   readonly grid: number;
   /** How far from a figure a click still counts as hitting it (drawing units). */
   readonly tolerance: number;
+  /** How far (drawing units) a press must move before it counts as a drag. */
+  readonly dragThreshold: number;
   /** Size of on-screen handles in drawing units (so they stay the same size when zooming). */
   readonly handleSize: number;
   /** Replace the drawing (undoable, saved). */
@@ -42,9 +44,8 @@ export interface Preview {
 }
 
 /**
- * A tool decides what clicks do. Everything is click–click (pick up, then put
- * down) – nothing needs dragging with the button held, which is hard with a
- * joystick. To add one: create tools/<name>.ts and list it in tools/index.ts.
+ * A tool decides what clicks and drags do. Velg moves and resizes by drag and
+ * drop; line tools are click–click (start, end). To add one: create tools/<name>.ts and list it in tools/index.ts.
  */
 export interface Tool {
   id: string;
@@ -54,6 +55,10 @@ export interface Tool {
   /** What to do next, shown in the hint bar. */
   hint(ctx: ToolContext): string;
   pointerDown(ctx: ToolContext, p: Point): void;
+  /** The pointer moved with the button held (after pointerDown). */
+  pointerMove?(ctx: ToolContext, p: Point): void;
+  /** The button was released (drag and drop ends here). */
+  pointerUp?(ctx: ToolContext, p: Point): void;
   preview?(ctx: ToolContext, pointer: Point | null): Preview;
   /** Enter. Return true if the tool finished something of its own (else: edit the selection's text). */
   finish?(ctx: ToolContext): boolean;

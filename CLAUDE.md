@@ -154,8 +154,10 @@ kode), `codeBlocks`, `codeBlockTools`, `images`, `headings`, `inlineFormat`, `li
 
 Et eget program i samme app, for diagrammer (UML, ER, datastrukturer). Det deler bare
 `settings`, `storage`, `platform`, `appearance`/`theme.css` med editoren – ingen
-CodeMirror. Brukeren styrer med joystick-mus: **alt er klikk–klikk, ingenting krever å
-dra** med knappen nede. Store knapper med tekst, raus treffmargin
+CodeMirror. Brukeren styrer med joystick-mus. Flytting og størrelse er vanlig **dra og
+slipp** (brukeren ville ha det slik – ikke erstatt vanlige grep med alternativer uten å
+spørre), med terskel (`settings.diagram.dragThreshold`, skjerm-px) så et skjelvende klikk
+ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tekst, raus treffmargin
 (`settings.diagram.hitTolerance`, skjerm-px), alt snapper til rutenettet
 (`settings.diagram.grid`), og hint-linja nederst sier alltid hva neste klikk gjør.
 
@@ -181,9 +183,9 @@ dra** med knappen nede. Store knapper med tekst, raus treffmargin
   (`styledLine`): `_tekst_` understreket (ER-nøkkel, static), `*tekst*` kursiv.
   UML-klasse: én tekst der linjer med `--` deler i navn/felt/metoder (`classSections`).
   ER (Chen): entitet = boks, attributt = ellipse, relasjon = rombe, Linje + kardinalitet.
-- Verktøy (`tools/`, én fil per verktøy, `Tool`-grensesnittet i `tools/types.ts`): Velg
-  (klikk = velg, klikk igjen = løft opp, klikk = sett ned; hjørnehåndtaket likt for
-  størrelse), ett plasseringsverktøy per figurtype (gjennomsiktig «spøkelse» følger pekeren),
+- Verktøy (`tools/`, én fil per verktøy, `Tool`-grensesnittet i `tools/types.ts`;
+  `pointerDown`/`pointerMove`/`pointerUp`, lerretet fanger pekeren mens knappen er nede):
+  Velg (klikk = velg, dra = flytt, dra hjørnehåndtaket = størrelse, Esc under dra = avbryt), ett plasseringsverktøy per figurtype (gjennomsiktig «spøkelse» følger pekeren),
   Strek (klikk start, klikk slutt → rett strek/pil hvor som helst; en frihåndsfigur med to
   punkter og `head`/`tail`; endene hekter seg på figurers hjørner/midtpunkter og andre
   streker via `ctx.snapPoint` og `ShapeType.anchors`, ellers et halvt rutenett), Frihånd (klikk punkter → glatt kurve; klikk første punkt = lukket; Enter/Esc = ferdig),

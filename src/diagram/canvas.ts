@@ -96,7 +96,14 @@ export class DiagramCanvas {
 
     this.svg.addEventListener('pointermove', (e) => {
       this.pointer = this.toDrawing(e);
+      if (e.buttons & 1) this.tool.pointerMove?.(this.context, this.pointer);
       this.schedule();
+    });
+    this.svg.addEventListener('pointerup', (e) => {
+      if (e.button !== 0) return;
+      this.pointer = this.toDrawing(e);
+      this.tool.pointerUp?.(this.context, this.pointer);
+      this.refresh();
     });
     this.svg.addEventListener('pointerleave', () => {
       this.pointer = null;
@@ -127,6 +134,9 @@ export class DiagramCanvas {
       },
       get tolerance() {
         return getSettings().diagram.hitTolerance / canvas.zoom;
+      },
+      get dragThreshold() {
+        return getSettings().diagram.dragThreshold / canvas.zoom;
       },
       get handleSize() {
         return 14 / canvas.zoom;
@@ -474,6 +484,12 @@ export class DiagramCanvas {
     if (e.button !== 0) return;
     e.preventDefault();
     this.finishEditing(true);
+    // Keep getting moves and the release even if the pointer leaves the canvas while dragging.
+    try {
+      this.svg.setPointerCapture(e.pointerId);
+    } catch {
+      // Not a real pointer (synthetic event): nothing to capture.
+    }
     const p = this.toDrawing(e);
     this.pointer = p;
     this.tool.pointerDown(this.context, p);

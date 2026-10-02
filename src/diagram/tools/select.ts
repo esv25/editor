@@ -1,13 +1,17 @@
 /**
- * Velg: click a figure to select it. Click it again to pick it up – it follows
- * the pointer – and click where it should go. The corner handle works the
- * same way for resizing. No dragging needed.
+ * Velg: click a figure to select it; drag it to move it, drag its corner
+ * handle to resize it (both snap to the grid). A press only becomes a drag
+ * after the pointer has moved a little (`settings.diagram.dragThreshold`), so
+ * a shaky click never moves anything. Esc while dragging puts it back.
  */
 import { findNode, snap, updateNode, type Point } from '../model';
 import { shapeIcon } from '../shapes/common';
 import type { Tool, ToolContext } from './types';
 
-type Mode = { kind: 'idle' } | { kind: 'moving'; id: string; dx: number; dy: number } | { kind: 'resizing'; id: string };
+type Mode =
+  | { kind: 'idle' }
+  /** Button down on a figure (or its corner); `dragging` once it has moved far enough. */
+  | { kind: 'move' | 'resize'; id: string; start: Point; dx: number; dy: number; dragging: boolean };
 
 let mode: Mode = { kind: 'idle' };
 
@@ -20,13 +24,10 @@ function onHandle(ctx: ToolContext, p: Point): string | null {
   return Math.abs(p.x - (node.x + node.w)) <= reach && Math.abs(p.y - (node.y + node.h)) <= reach ? node.id : null;
 }
 
-function moved(ctx: ToolContext, p: Point) {
-  if (mode.kind !== 'moving') return null;
-  return { x: snap(p.x - mode.dx, ctx.grid), y: snap(p.y - mode.dy, ctx.grid) };
-}
-
-function resized(ctx: ToolContext, p: Point) {
-  if (mode.kind !== 'resizing') return null;
+/** The figure's position or size with the pointer at `p`. */
+function change(ctx: ToolContext, p: Point) {
+  if (mode.kind === 'idle' || !mode.dragging) return null;
+  if (mode.kind === 'move') return { x: snap(p.x - mode.dx, ctx.grid), y: snap(p.y - mode.dy, ctx.grid) };
   const node = findNode(ctx.diagram, mode.id);
   if (!node) return null;
   const min = ctx.grid * 2;
@@ -40,62 +41,55 @@ export const selectTool: Tool = {
   icon: shapeIcon('<path d="m5 3 14 8-6 1.5L10 19z"/>'),
 
   hint(ctx) {
-    if (mode.kind === 'moving') return 'Klikk der figuren skal stå · Esc: avbryt';
-    if (mode.kind === 'resizing') return 'Klikk der hjørnet skal være · Esc: avbryt';
+    if (mode.kind === 'move' && mode.dragging) return 'Slipp der figuren skal stå · Esc: avbryt';
+    if (mode.kind === 'resize' && mode.dragging) return 'Slipp der hjørnet skal være · Esc: avbryt';
     if (ctx.selection?.kind === 'node') {
-      return 'Klikk figuren igjen for å flytte den · hjørnet: endre størrelse · Enter: skriv tekst · Ctrl+pil: ny figur ved siden av · Delete: slett';
+      return 'Dra figuren for å flytte den · dra hjørnet: endre størrelse · Enter: skriv tekst · Ctrl+pil: ny figur ved siden av · Delete: slett';
     }
     if (ctx.selection?.kind === 'edge') return 'Velg type linje til høyre · Enter: tekst midt på · Delete: slett linja';
-    return 'Klikk på en figur for å velge den, eller velg et verktøy for å tegne';
+    return 'Klikk på en figur for å velge den, dra for å flytte den – eller velg et verktøy for å tegne';
   },
 
   pointerDown(ctx, p) {
-    if (mode.kind === 'moving') {
-      const pos = moved(ctx, p)!;
-      const id = mode.id;
-      mode = { kind: 'idle' };
-      ctx.commit(updateNode(ctx.diagram, id, pos));
-      return;
-    }
-    if (mode.kind === 'resizing') {
-      const size = resized(ctx, p);
-      const id = mode.id;
-      mode = { kind: 'idle' };
-      if (size) ctx.commit(updateNode(ctx.diagram, id, size));
-      return;
-    }
     const handle = onHandle(ctx, p);
     if (handle) {
-      mode = { kind: 'resizing', id: handle };
-      ctx.refresh();
+      mode = { kind: 'resize', id: handle, start: p, dx: 0, dy: 0, dragging: false };
       return;
     }
     const node = ctx.nodeAt(p);
     if (node) {
-      if (ctx.selection?.kind === 'node' && ctx.selection.id === node.id) {
-        mode = { kind: 'moving', id: node.id, dx: p.x - node.x, dy: p.y - node.y };
-        ctx.refresh();
-      } else {
-        ctx.select({ kind: 'node', id: node.id });
-      }
+      ctx.select({ kind: 'node', id: node.id });
+      mode = { kind: 'move', id: node.id, start: p, dx: p.x - node.x, dy: p.y - node.y, dragging: false };
       return;
     }
     const edge = ctx.edgeAt(p);
     ctx.select(edge ? { kind: 'edge', id: edge.id } : null);
   },
 
-  preview(ctx, pointer) {
-    if (!pointer) return {};
-    if (mode.kind === 'moving') return { diagram: updateNode(ctx.diagram, mode.id, moved(ctx, pointer)!), noHover: true };
-    if (mode.kind === 'resizing') {
-      const size = resized(ctx, pointer);
-      return size ? { diagram: updateNode(ctx.diagram, mode.id, size), noHover: true } : {};
+  pointerMove(ctx, p) {
+    if (mode.kind === 'idle' || mode.dragging) return;
+    if (Math.hypot(p.x - mode.start.x, p.y - mode.start.y) >= ctx.dragThreshold) {
+      mode.dragging = true;
+      ctx.refresh();
     }
-    return {};
+  },
+
+  pointerUp(ctx, p) {
+    const done = change(ctx, p);
+    const id = mode.kind === 'idle' ? null : mode.id;
+    mode = { kind: 'idle' };
+    if (done && id) ctx.commit(updateNode(ctx.diagram, id, done));
+    else ctx.refresh();
+  },
+
+  preview(ctx, pointer) {
+    if (!pointer || mode.kind === 'idle') return {};
+    const done = change(ctx, pointer);
+    return done ? { diagram: updateNode(ctx.diagram, mode.id, done), noHover: true } : {};
   },
 
   cancel(ctx) {
-    if (mode.kind === 'idle') return false;
+    if (mode.kind === 'idle' || !mode.dragging) return false;
     mode = { kind: 'idle' };
     ctx.refresh();
     return true;
