@@ -31,6 +31,8 @@ export interface ShapeType {
   fit?(text: string, measure: Measure): { w: number; h: number };
   /** Distance from `p` to the figure, for clicking (default: to its bounding box). */
   distance?(node: DiagramNode, p: Point): number;
+  /** Points that lines snap to (default: corners and side middles of the box). */
+  anchors?(node: DiagramNode): Point[];
   /** Made with its own tool rather than placed with a click (freehand). */
   ownTool?: boolean;
 }

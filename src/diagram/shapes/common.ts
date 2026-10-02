@@ -107,6 +107,27 @@ export function innerOutline(node: DiagramNode): SvgNode['attrs'] {
 /** Gap between the two lines of a double outline. */
 export const DOUBLE_GAP = 5;
 
+/** Corners and side middles of the node's box: where lines snap to. */
+export function rectAnchors(n: DiagramNode): Point[] {
+  const [x0, x1, x2] = [n.x, n.x + n.w / 2, n.x + n.w];
+  const [y0, y1, y2] = [n.y, n.y + n.h / 2, n.y + n.h];
+  return [
+    { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x2, y: y0 },
+    { x: x0, y: y1 }, { x: x2, y: y1 },
+    { x: x0, y: y2 }, { x: x1, y: y2 }, { x: x2, y: y2 },
+  ];
+}
+
+/** The four points where the outline meets the box's middle lines (ellipse, rhombus). */
+export function sideAnchors(n: DiagramNode): Point[] {
+  return [
+    { x: n.x + n.w / 2, y: n.y },
+    { x: n.x + n.w, y: n.y + n.h / 2 },
+    { x: n.x + n.w / 2, y: n.y + n.h },
+    { x: n.x, y: n.y + n.h / 2 },
+  ];
+}
+
 /** Boundary point on the node's bounding rectangle, toward `p`. */
 export function rectBoundary(node: DiagramNode, p: Point): Point {
   const c = center(node);

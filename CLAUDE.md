@@ -184,8 +184,9 @@ dra** med knappen nede. Store knapper med tekst, raus treffmargin
 - Verktøy (`tools/`, én fil per verktøy, `Tool`-grensesnittet i `tools/types.ts`): Velg
   (klikk = velg, klikk igjen = løft opp, klikk = sett ned; hjørnehåndtaket likt for
   størrelse), ett plasseringsverktøy per figurtype (gjennomsiktig «spøkelse» følger pekeren),
-  Strek (klikk start, klikk slutt → rett strek hvor som helst; en frihåndsfigur med to
-  punkter), Frihånd (klikk punkter → glatt kurve; klikk første punkt = lukket; Enter/Esc = ferdig),
+  Strek (klikk start, klikk slutt → rett strek/pil hvor som helst; en frihåndsfigur med to
+  punkter og `head`/`tail`; endene hekter seg på figurers hjørner/midtpunkter og andre
+  streker via `ctx.snapPoint` og `ShapeType.anchors`, ellers et halvt rutenett), Frihånd (klikk punkter → glatt kurve; klikk første punkt = lukket; Enter/Esc = ferdig),
   Pil (klikk fra, klikk til; linjene kjedes, klikk på tomt sted lager ny figur; nye linjer
   får typen valgt i panelet). Høyreklikk = Esc.
 - `properties.ts`: panelet til høyre (fast bredde, så lerretet aldri flytter seg): linjetype,

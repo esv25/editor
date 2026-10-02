@@ -26,7 +26,7 @@ import {
 } from './model';
 import { edgeEnds, renderDiagram } from './render';
 import { shapeFor, type Measure } from './shapes';
-import { drawingStyle, lineHeight, styledLine } from './shapes/common';
+import { drawingStyle, lineHeight, rectAnchors, styledLine } from './shapes/common';
 import { h, toDom, type SvgNode } from './svg';
 import { arrowSource, newEdgeStyle } from './tools/arrow';
 import { selectTool } from './tools/select';
@@ -136,6 +136,7 @@ export class DiagramCanvas {
       editText: (id) => canvas.editText(id),
       setTool: (id) => canvas.setTool(id),
       nodeAt: (p) => canvas.nodeAt(canvas.diagram, p),
+      snapPoint: (p) => canvas.snapPoint(p),
       edgeAt: (p) => canvas.edgeAt(p),
       refresh: () => canvas.refresh(),
     };
@@ -239,6 +240,25 @@ export class DiagramCanvas {
   nodeAt(d: Diagram, p: Point): DiagramNode | null {
     const tolerance = getSettings().diagram.hitTolerance / this.zoom;
     return nodeAt(d, p, tolerance, (n, q) => shapeFor(n.shape).distance?.(n, q) ?? distanceToRect(q, n));
+  }
+
+  /** A line point near `p`: the closest figure corner/side middle within reach, else half the grid. */
+  snapPoint(p: Point): { point: Point; anchored: boolean } {
+    const reach = getSettings().diagram.hitTolerance / this.zoom;
+    let best: Point | null = null;
+    let bestDistance = Infinity;
+    for (const n of this.diagram.nodes) {
+      for (const a of shapeFor(n.shape).anchors?.(n) ?? rectAnchors(n)) {
+        const distance = Math.hypot(a.x - p.x, a.y - p.y);
+        if (distance <= reach && distance < bestDistance) {
+          best = a;
+          bestDistance = distance;
+        }
+      }
+    }
+    if (best) return { point: best, anchored: true };
+    const half = getSettings().diagram.grid / 2;
+    return { point: { x: snap(p.x, half), y: snap(p.y, half) }, anchored: false };
   }
 
   /** Enter / double click / «Skriv tekst»: edit the selected figure's or line's text. */

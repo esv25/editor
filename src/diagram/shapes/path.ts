@@ -5,7 +5,8 @@
  */
 import { distanceToSegment, type DiagramNode, type Point } from '../model';
 import { h } from '../svg';
-import { label, outline, rectBoundary, shapeIcon } from './common';
+import { endMark } from '../edges';
+import { drawingStyle, label, outline, rectBoundary, shapeIcon } from './common';
 import type { ShapeType } from './types';
 
 /** The node's points in drawing coordinates. */
@@ -98,17 +99,30 @@ export const path: ShapeType = {
   key: 'f',
   defaultSize: { w: 120, h: 80 },
   ownTool: true,
-  render: (node) =>
-    h('g', {}, [
+  render: (node) => {
+    const points = absolutePoints(node);
+    const marks = [];
+    if (!node.closed && points.length >= 2) {
+      // Ends point along the last piece of the line.
+      const [a, b] = [points[points.length - 2], points[points.length - 1]];
+      const [c, d] = [points[1], points[0]];
+      if (node.head && node.head !== 'none') marks.push(...endMark(node.head, b, Math.atan2(b.y - a.y, b.x - a.x), drawingStyle.stroke).marks);
+      if (node.tail && node.tail !== 'none') marks.push(...endMark(node.tail, d, Math.atan2(d.y - c.y, d.x - c.x), drawingStyle.stroke).marks);
+    }
+    return h('g', {}, [
       h('path', {
-        d: curveData(absolutePoints(node), !!node.closed, node.smooth !== false),
+        d: curveData(points, !!node.closed, node.smooth !== false),
         ...outline(node),
         fill: node.closed ? outline(node)!.fill : 'none',
         'stroke-linecap': 'round',
         'stroke-linejoin': 'round',
       }),
+      ...marks,
       ...label(node),
-    ]),
+    ]);
+  },
+  // A line's own points: other lines can start where this one ends.
+  anchors: absolutePoints,
   boundary: rectBoundary,
   distance(node, p) {
     const points = sample(node);

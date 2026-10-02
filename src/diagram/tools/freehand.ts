@@ -4,7 +4,8 @@
  * the shape; Enter, Esc or right click finishes an open line. Points snap to
  * half the grid, so small shakes don't show.
  */
-import { addNode, snap, type Point } from '../model';
+import { addNode, type Point } from '../model';
+import { anchorMark } from './line';
 import { curveData, path, pathNodeFrom } from '../shapes/path';
 import { h } from '../svg';
 import type { Tool, ToolContext } from './types';
@@ -23,7 +24,8 @@ function finish(ctx: ToolContext, closed: boolean): void {
   ctx.select({ kind: 'node', id: added.id });
 }
 
-const snapped = (ctx: ToolContext, p: Point) => ({ x: snap(p.x, ctx.grid / 2), y: snap(p.y, ctx.grid / 2) });
+// Corners of figures pull the point to them; otherwise half the grid.
+const snapped = (ctx: ToolContext, p: Point) => ctx.snapPoint(p).point;
 const near = (ctx: ToolContext, a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y) <= Math.max(ctx.tolerance, ctx.grid / 2);
 
 export const freehandTool: Tool = {
@@ -66,6 +68,7 @@ export const freehandTool: Tool = {
       noHover: true,
       overlay: [
         h('path', { d: curveData(all, closing, true), class: 'dg-freehand' }),
+        ...(pointer && ctx.snapPoint(pointer).anchored && !closing ? [anchorMark(ctx, ctx.snapPoint(pointer).point)] : []),
         ...points.map((p, i) => h('circle', { cx: p.x, cy: p.y, r: i === 0 && points.length >= 3 ? r * 1.8 : r, class: i === 0 ? 'dg-point-first' : 'dg-point' })),
       ],
     };

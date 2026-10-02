@@ -29,6 +29,9 @@ export interface DiagramNode {
   closed?: boolean;
   /** Freehand: a smooth curve through the points (false: straight lines). */
   smooth?: boolean;
+  /** Freehand/Strek, when open: marks at the last and first point (arrow heads …). */
+  head?: EndKind;
+  tail?: EndKind;
 }
 
 /** What's drawn at an end of a line. */
@@ -263,6 +266,8 @@ export function normalizeDiagram(value: unknown): Diagram | null {
           : undefined,
         closed: flag(n.closed),
         smooth: n.smooth === false ? false : undefined,
+        head: end(n.head),
+        tail: end(n.tail),
       }),
     );
   const ids = new Set(nodes.map((n) => n.id));

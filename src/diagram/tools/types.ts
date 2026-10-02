@@ -22,6 +22,11 @@ export interface ToolContext {
   editText(nodeId: string): void;
   setTool(id: string): void;
   nodeAt(p: Point): DiagramNode | null;
+  /**
+   * Where a line point clicked at `p` goes: a nearby corner or side middle of a
+   * figure (`anchored`), else half the grid.
+   */
+  snapPoint(p: Point): { point: Point; anchored: boolean };
   edgeAt(p: Point): DiagramEdge | null;
   /** Something in the tool's own state changed: redraw and update the hint. */
   refresh(): void;

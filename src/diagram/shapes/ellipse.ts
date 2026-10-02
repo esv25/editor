@@ -1,6 +1,6 @@
 import { center } from '../model';
 import { h } from '../svg';
-import { DOUBLE_GAP, innerOutline, label, outline, shapeIcon } from './common';
+import { DOUBLE_GAP, innerOutline, label, outline, shapeIcon, sideAnchors } from './common';
 import type { ShapeType } from './types';
 
 /** Ellipse: an attribute in ER models (_key_ underlined, double: multivalued, dashed: derived). */
@@ -20,6 +20,7 @@ export const ellipse: ShapeType = {
       ...label(node),
     ]);
   },
+  anchors: sideAnchors,
   boundary: (node, p) => {
     const c = center(node);
     const dx = p.x - c.x;

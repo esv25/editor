@@ -243,3 +243,26 @@ describe('straight line', () => {
     expect(shapeFor('path').distance!(node, { x: 100, y: 108 })).toBe(8);
   });
 });
+
+describe('snap points and line ends', () => {
+  const node = { id: 'n1', shape: 'box', x: 0, y: 0, w: 160, h: 80, text: '' };
+
+  it('offers corners and side middles of a box', async () => {
+    const { rectAnchors } = await import('../src/diagram/shapes/common');
+    expect(rectAnchors(node)).toContainEqual({ x: 160, y: 80 });
+    expect(rectAnchors(node)).toContainEqual({ x: 80, y: 0 });
+    expect(rectAnchors(node)).toHaveLength(8);
+    expect(shapeFor('diamond').anchors!(node)).toContainEqual({ x: 160, y: 40 });
+  });
+
+  it('lets a line end where another starts', () => {
+    const line = { id: 'n2', ...pathNodeFrom([{ x: 0, y: 0 }, { x: 100, y: 50 }], false) };
+    expect(shapeFor('path').anchors!(line)).toEqual([{ x: 0, y: 0 }, { x: 100, y: 50 }]);
+  });
+
+  it('draws arrow heads on open lines only', () => {
+    const line = { id: 'n2', ...pathNodeFrom([{ x: 0, y: 0 }, { x: 100, y: 0 }], false), head: 'arrow' as const };
+    expect(toSvgString(shapeFor('path').render(line))).toContain('polygon');
+    expect(toSvgString(shapeFor('path').render({ ...line, closed: true }))).not.toContain('polygon');
+  });
+});

@@ -1,17 +1,30 @@
 /**
- * Strek: a straight line anywhere, not tied to figures. Click where it starts,
- * click where it ends (both snap to half the grid). It's a freehand figure
- * with two points, so it moves, resizes and gets deleted like any figure.
+ * Strek: a straight line (or arrow) anywhere, not tied to figures. Click where
+ * it starts, click where it ends. Near a figure's corner or side middle (or
+ * another line's end) the point jumps there – shown by a ring – otherwise it
+ * snaps to half the grid. The ends get the type chosen in the panel (Linje,
+ * Pil, Arv …). It's a freehand figure with two points, so it moves, resizes
+ * and is deleted like any figure.
  */
-import { addNode, snap, type Point } from '../model';
+import { edgePresets, renderEdge } from '../edges';
+import { addNode, type EdgeStyle, type Point } from '../model';
 import { pathNodeFrom } from '../shapes/path';
 import { shapeIcon } from '../shapes/common';
-import { h } from '../svg';
+import { h, type SvgNode } from '../svg';
 import type { Tool, ToolContext } from './types';
 
-let start: Point | null = null;
+let start: { point: Point; anchored: boolean } | null = null;
+let style: EdgeStyle = edgePresets.find((p) => p.id === 'line')!.style;
 
-const snapped = (ctx: ToolContext, p: Point) => ({ x: snap(p.x, ctx.grid / 2), y: snap(p.y, ctx.grid / 2) });
+export const newLineStyle = () => style;
+export function setNewLineStyle(next: EdgeStyle): void {
+  style = next;
+}
+
+/** A ring around a point a line end has jumped to. */
+export function anchorMark(ctx: ToolContext, p: Point): SvgNode {
+  return h('circle', { cx: p.x, cy: p.y, r: (7 * ctx.handleSize) / 14, class: 'dg-anchor' });
+}
 
 export const lineTool: Tool = {
   id: 'line',
@@ -19,26 +32,40 @@ export const lineTool: Tool = {
   key: 'l',
   icon: shapeIcon('<path d="M4 20 20 4"/>'),
 
-  hint: () => (start ? 'Klikk der streken skal slutte · Esc: avbryt' : 'Klikk der streken skal begynne'),
+  hint: () =>
+    start
+      ? 'Klikk der streken skal slutte (den hekter seg på hjørner og midtpunkter) · Esc: avbryt'
+      : 'Klikk der streken skal begynne – nær et hjørne hekter den seg fast der · velg pil eller strek til høyre',
 
   pointerDown(ctx, p) {
-    const q = snapped(ctx, p);
+    const q = ctx.snapPoint(p);
     if (!start) {
       start = q;
       ctx.refresh();
       return;
     }
-    if (q.x === start.x && q.y === start.y) return;
-    const added = addNode(ctx.diagram, pathNodeFrom([start, q], false));
+    if (q.point.x === start.point.x && q.point.y === start.point.y) return;
+    const ends = {
+      ...(style.head !== 'none' ? { head: style.head } : {}),
+      ...(style.tail !== 'none' ? { tail: style.tail } : {}),
+      ...(style.dashed ? { dashed: true } : {}),
+    };
+    const added = addNode(ctx.diagram, { ...pathNodeFrom([start.point, q.point], false), smooth: false, ...ends });
     start = null;
     ctx.commit(added.diagram);
     ctx.select({ kind: 'node', id: added.id });
   },
 
   preview(ctx, pointer) {
-    if (!start || !pointer) return {};
-    const end = snapped(ctx, pointer);
-    return { noHover: true, overlay: [h('line', { x1: start.x, y1: start.y, x2: end.x, y2: end.y, class: 'dg-freehand' })] };
+    if (!pointer) return { noHover: true };
+    const end = ctx.snapPoint(pointer);
+    const overlay: SvgNode[] = [];
+    if (start) {
+      overlay.push(h('g', { class: 'dg-ghost' }, [renderEdge(style, start.point, end.point)]));
+      if (start.anchored) overlay.push(anchorMark(ctx, start.point));
+    }
+    if (end.anchored) overlay.push(anchorMark(ctx, end.point));
+    return { noHover: true, overlay };
   },
 
   cancel(ctx) {

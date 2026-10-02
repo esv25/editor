@@ -9,6 +9,7 @@ import { edgePresets, presetIcon, sameStyle } from './edges';
 import { styleOf, type EdgeStyle } from './model';
 import { toSvgString } from './svg';
 import { newEdgeStyle, setNewEdgeStyle } from './tools/arrow';
+import { newLineStyle, setNewLineStyle } from './tools/line';
 
 export interface PropertiesBar {
   update(): void;
@@ -101,6 +102,16 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
     }
 
     // With Pil on, choosing the type of the next line matters more than the figure it selected.
+    if (canvas.tool.id === 'line') {
+      heading('Nye streker');
+      presetButtons(newLineStyle, (style) => {
+        setNewLineStyle(style);
+        refresh();
+      });
+      tip('Nær et hjørne eller et midtpunkt på en figur hekter streken seg fast der (en ring viser det).');
+      return;
+    }
+
     if (canvas.tool.id === 'arrow') {
       heading('Nye linjer');
       presetButtons(newEdgeStyle, (style) => {
@@ -116,6 +127,20 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
       heading('Kant');
       button('Dobbel kant', 'To streker rundt (svak entitet, flerverdi-attributt …)', () => canvas.updateSelectedNode({ double: canvas.selectedNode?.double ? undefined : true }), () => !!canvas.selectedNode?.double);
       button('Stiplet kant', 'Stiplet strek (avledet attributt …)', () => canvas.updateSelectedNode({ dashed: canvas.selectedNode?.dashed ? undefined : true }), () => !!canvas.selectedNode?.dashed);
+      if (node.shape === 'path' && !node.closed) {
+        heading('Ender');
+        const ends = (): EdgeStyle => {
+          const n = canvas.selectedNode;
+          return { head: n?.head ?? 'none', tail: n?.tail ?? 'none', dashed: !!n?.dashed };
+        };
+        presetButtons(ends, (style) =>
+          canvas.updateSelectedNode({
+            head: style.head === 'none' ? undefined : style.head,
+            tail: style.tail === 'none' ? undefined : style.tail,
+            dashed: style.dashed || undefined,
+          }),
+        );
+      }
       if (node.shape === 'path') {
         heading('Strek');
         button('Glatt', 'Myk kurve gjennom punktene (av: rette streker)', () => canvas.updateSelectedNode({ smooth: canvas.selectedNode?.smooth === false ? undefined : false }), () => canvas.selectedNode?.smooth !== false);

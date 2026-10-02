@@ -1,6 +1,6 @@
 import { center, type DiagramNode } from '../model';
 import { h } from '../svg';
-import { DOUBLE_GAP, innerOutline, label, outline, shapeIcon } from './common';
+import { DOUBLE_GAP, innerOutline, label, outline, shapeIcon, sideAnchors } from './common';
 import type { ShapeType } from './types';
 
 const corners = (node: DiagramNode, inset = 0) => {
@@ -25,6 +25,7 @@ export const diamond: ShapeType = {
       ...(node.double ? [h('polygon', { points: corners(node, DOUBLE_GAP), 'stroke-linejoin': 'round', ...innerOutline(node) })] : []),
       ...label(node),
     ]),
+  anchors: sideAnchors,
   boundary: (node, p) => {
     const c = center(node);
     const dx = p.x - c.x;

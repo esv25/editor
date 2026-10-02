@@ -115,6 +115,7 @@ html, body {
 .dg-freehand { fill: none; stroke: var(--dg-ink); stroke-opacity: 0.55; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .dg-point { fill: var(--dg-mark); }
 .dg-point-first { fill: var(--dg-white); stroke: var(--dg-mark); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dg-anchor { fill: var(--dg-mark); fill-opacity: 0.15; stroke: var(--dg-mark); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 .dg-handle { fill: var(--dg-white); stroke: var(--dg-mark); stroke-width: 2; vector-effect: non-scaling-stroke; }
 
 .dg-text-input {

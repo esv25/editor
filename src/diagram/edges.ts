@@ -32,7 +32,7 @@ export const sameStyle = (a: EdgeStyle, b: EdgeStyle) => a.head === b.head && a.
  * the line's direction arriving there. Returns the drawing and how far back
  * from the tip the line itself should stop.
  */
-function endMark(kind: EndKind, tip: Point, angle: number, color: string): { marks: SvgNode[]; inset: number } {
+export function endMark(kind: EndKind, tip: Point, angle: number, color: string): { marks: SvgNode[]; inset: number } {
   const at = (back: number, side: number) => ({
     x: tip.x - back * Math.cos(angle) + side * Math.sin(angle),
     y: tip.y - back * Math.sin(angle) - side * Math.cos(angle),
