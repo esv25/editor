@@ -16,6 +16,12 @@ export interface OpenedFile {
   content: string;
 }
 
+export interface FileFilter {
+  name: string;
+  /** Extensions without dot. */
+  extensions: string[];
+}
+
 export interface FolderEntry {
   name: string;
   path: string;
@@ -41,6 +47,10 @@ export interface StorageBackend {
   pickFolder?(): Promise<string | null>;
   /** List a folder: subfolders first, then files, each sorted by name. Desktop only. */
   listFolder?(path: string): Promise<FolderEntry[]>;
+  /** Ask the user for a file of the given types. Resolves to its path, or null if cancelled. Desktop only. */
+  pickFile?(options: { title: string; filters: FileFilter[] }): Promise<string | null>;
+  /** Read a file's raw bytes by path (e.g. an image). Desktop only. */
+  readBinary?(path: string): Promise<Uint8Array>;
   /** Write to an already-known file. */
   save(file: FileRef, content: string): Promise<void>;
   /** Ask the user where to save. Resolves to null if cancelled. */

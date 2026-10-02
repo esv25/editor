@@ -9,6 +9,8 @@ import { DebugController } from '../debug/controller';
 import { createMarkdownState, createView } from '../editor/createEditor';
 import { runContext } from '../features/codeBlockTools';
 import { runnerFor } from '../features/codeBlockTools/runners';
+import { imageContext, redrawImages } from '../features/images';
+import { dirOf } from '../features/util/imagePath';
 import { platform } from '../platform';
 import { getSettings, onSettingsChange, updateSettings } from '../settings';
 import { drafts, storage } from '../storage';
@@ -43,14 +45,10 @@ export async function startApp(): Promise<void> {
   let debug!: DebugController;
   const getView = () => view;
   const active = () => ws.activeDoc;
-  const folderOf = (path: string) => path.replace(/[\\/][^\\/]*$/, '');
 
   // Terminal panel below the editor (desktop only). New terminals open in the active document's folder.
   const terminal = new TerminalPanel(el('panel'), {
-    cwd: () => {
-      const path = ws.activeDoc?.file?.path;
-      return path ? folderOf(path) : ws.activeGroup.folder || getSettings().autosave.folder || undefined;
-    },
+    cwd: () => dirOf(ws.activeDoc?.file?.path) ?? (ws.activeGroup.folder || getSettings().autosave.folder || undefined),
     onVisibilityChange: () => viewBar.update(view.state),
     focusEditor: () => view.focus(),
   });
@@ -69,7 +67,7 @@ export async function startApp(): Promise<void> {
       title: doc.name,
       program: runner.command,
       args: runner.args.map((a) => a.replaceAll('{file}', path)),
-      cwd: folderOf(path),
+      cwd: dirOf(path),
     });
   };
 
@@ -259,11 +257,17 @@ export async function startApp(): Promise<void> {
 
   // Code blocks and code files run in the document's folder, so they can use files next to it.
   runContext.cwd = () => ws.activeDoc?.file?.path?.replace(/[\\/][^\\/]*$/, '');
+  // Relative image paths are relative to the document; redraw them if it moves (autosave, Lagre som).
+  imageContext.baseDir = () => dirOf(ws.activeDoc?.file?.path);
+  let imageDoc = { id: '', dir: undefined as string | undefined };
 
   // Tabs, names and save states.
   ws.onChange(() => {
     const doc = ws.activeDoc;
     if (!doc) return;
+    const dir = dirOf(doc.file?.path);
+    if (doc.id === imageDoc.id && dir !== imageDoc.dir && doc.kind === 'markdown') queueMicrotask(() => redrawImages(view));
+    imageDoc = { id: doc.id, dir };
     tabs.render();
     refreshTree();
     renderTitle(doc);

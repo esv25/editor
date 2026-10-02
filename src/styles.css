@@ -281,6 +281,52 @@ html, body {
 .cm-codeblock-begin.cm-codeblock-end { border-radius: 6px; }
 .cm-codeblock-fence { color: var(--faint); }
 
+/* Images: a header (caption + buttons) replaces the Markdown, the picture is below */
+.cm-image-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  font: 13px var(--font-ui);
+  color: var(--muted);
+  vertical-align: middle;
+}
+.cm-image-caption {
+  cursor: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cm-image-caption.placeholder { color: var(--faint); font-style: italic; }
+.cm-editor .cm-image-caption-input { flex: 0 1 20em; font: 13px var(--font-ui); }
+/* Roomier than the code block buttons: easier to hit. */
+.cm-editor .cm-image-header button { font-size: 13px; padding: 3px 10px; }
+.cm-image-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 4px 0 12px;
+}
+.cm-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 80vh;
+  width: auto;
+  height: auto;
+  border-radius: 4px;
+}
+.cm-image-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: 13px var(--font-ui);
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+.cm-image-notice-path { font-family: var(--font-mono); font-size: 12px; color: var(--faint); }
+
 /* Task lists */
 .cm-task-checkbox {
   width: 1em;
@@ -333,7 +379,8 @@ html, body {
   white-space: nowrap;
 }
 .cm-codeblock-title.placeholder { font-weight: 400; color: var(--faint); font-style: italic; }
-.cm-codeblock-title-input {
+.cm-codeblock-title-input,
+.cm-image-caption-input {
   flex: 1;
   min-width: 0;
   font: 600 12px var(--font-ui);
@@ -346,6 +393,7 @@ html, body {
 }
 .cm-codeblock-lang,
 .cm-codeblock-run,
+.cm-image-header button,
 .cm-code-output-head button {
   font: 12px var(--font-ui);
   color: var(--fg);
@@ -359,6 +407,7 @@ html, body {
 .cm-codeblock-run:disabled { color: var(--faint); cursor: default; }
 .cm-codeblock-lang:hover,
 .cm-codeblock-run:not(:disabled):hover,
+.cm-image-header button:hover,
 .cm-code-output-head button:hover { background: var(--button-hover); }
 
 /* Run output below a code block */

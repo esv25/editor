@@ -16,6 +16,7 @@ import {
 } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { describeCommand } from '../../commands/registry';
+import { editInPlace } from '../util/editInPlace';
 import { isClosingFence, parseFence, rewriteFence } from '../util/fence';
 import { languageChoices, normalizeLang } from './runners';
 import { runnability } from './run';
@@ -59,32 +60,13 @@ class HeaderWidget extends WidgetType {
     title.title = 'Klikk for å gi blokken et navn';
     title.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      const input = document.createElement('input');
-      input.className = 'cm-codeblock-title-input';
-      input.value = this.title ?? '';
-      input.placeholder = 'Navn, f.eks. beregning.py';
-      let done = false;
-      const finish = (save: boolean) => {
-        if (done) return;
-        done = true;
-        if (save) updateFence(view, lineFrom(), { title: input.value });
-        input.replaceWith(title);
-        view.focus();
-      };
-      input.addEventListener('keydown', (ev) => {
-        ev.stopPropagation();
-        if (ev.key === 'Enter') {
-          ev.preventDefault();
-          finish(true);
-        } else if (ev.key === 'Escape') {
-          ev.preventDefault();
-          finish(false);
-        }
+      editInPlace(title, {
+        value: this.title ?? '',
+        placeholder: 'Navn, f.eks. beregning.py',
+        className: 'cm-codeblock-title-input',
+        onSave: (value) => updateFence(view, lineFrom(), { title: value }),
+        onDone: () => view.focus(),
       });
-      input.addEventListener('blur', () => finish(true));
-      title.replaceWith(input);
-      input.focus();
-      input.select();
     });
     root.append(title);
 

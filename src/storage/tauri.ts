@@ -4,7 +4,7 @@
  */
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { documentDir, join } from '@tauri-apps/api/path';
-import { exists, mkdir, readDir, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { exists, mkdir, readDir, readFile, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
 import { codeFileExtensions } from '../code/languages';
 import type { FileRef, FolderEntry, OpenedFile, StorageBackend } from './types';
 
@@ -70,6 +70,15 @@ export const tauriStorage: StorageBackend = {
           .map(async (e) => ({ name: e.name, path: await join(path, e.name), isDirectory: e.isDirectory })),
       )
     ).sort((a, b) => Number(b.isDirectory) - Number(a.isDirectory) || collator.compare(a.name, b.name));
+  },
+
+  async pickFile({ title, filters }): Promise<string | null> {
+    const path = await open({ multiple: false, directory: false, title, filters });
+    return typeof path === 'string' ? path : null;
+  },
+
+  readBinary(path: string): Promise<Uint8Array> {
+    return readFile(path);
   },
 
   async save(file: FileRef, content: string): Promise<void> {
