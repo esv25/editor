@@ -16,15 +16,18 @@ class BreakpointMarker extends GutterMarker {
 const breakpointMarker = new BreakpointMarker();
 
 class ExecutionMarker extends GutterMarker {
-  constructor(readonly top: boolean) {
+  constructor(
+    readonly top: boolean,
+    readonly past: boolean,
+  ) {
     super();
   }
   eq(other: ExecutionMarker) {
-    return other.top === this.top;
+    return other.top === this.top && other.past === this.past;
   }
   toDOM() {
     const arrow = document.createElement('span');
-    arrow.className = `cm-exec-arrow${this.top ? '' : ' cm-exec-arrow-frame'}`;
+    arrow.className = `cm-exec-arrow${this.past ? ' cm-exec-arrow-past' : this.top ? '' : ' cm-exec-arrow-frame'}`;
     return arrow;
   }
 }
@@ -101,6 +104,19 @@ export interface ExecutionLine {
   line: number;
   /** The innermost frame (where the program actually is), not a caller picked in the call stack. */
   top: boolean;
+  /** An earlier stop, shown by stepping back – not where the program is now. */
+  past?: boolean;
+  /** Highlighted variables: shown at the end of the line, and marked where they occur (inlineValues.ts). */
+  pins?: InlineValue[];
+}
+
+export interface InlineValue {
+  expression: string;
+  /** 1–5 (`--pin-1` …). */
+  color: number;
+  /** undefined: doesn't exist here. */
+  value?: string;
+  changed: boolean;
 }
 
 export const setExecutionLine = StateEffect.define<ExecutionLine | null>();
@@ -119,7 +135,7 @@ export const executionField = StateField.define<ExecutionLine | null>({
     EditorView.decorations.compute([field], (state) => {
       const exec = state.field(field);
       if (!exec || exec.line > state.doc.lines) return Decoration.none;
-      const cls = exec.top ? 'cm-exec-line' : 'cm-exec-line cm-exec-line-frame';
+      const cls = exec.past ? 'cm-exec-line cm-exec-line-past' : exec.top ? 'cm-exec-line' : 'cm-exec-line cm-exec-line-frame';
       return Decoration.set([Decoration.line({ class: cls }).range(state.doc.line(exec.line).from)]);
     }),
 });
@@ -127,7 +143,7 @@ export const executionField = StateField.define<ExecutionLine | null>({
 const executionMarkers = (state: EditorState) => {
   const exec = state.field(executionField);
   if (!exec || exec.line > state.doc.lines) return RangeSet.empty;
-  return RangeSet.of([new ExecutionMarker(exec.top).range(state.doc.line(exec.line).from)]);
+  return RangeSet.of([new ExecutionMarker(exec.top, !!exec.past).range(state.doc.line(exec.line).from)]);
 };
 
 /** Clicking a line number or the space before it toggles a breakpoint (a big target on purpose). */

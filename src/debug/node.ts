@@ -144,6 +144,14 @@ export function describeValue(o: RemoteObject): string {
   }
 }
 
+/** How to reach a property in JavaScript: "punkt.x", "liste[0]", 'obj["a b"]'. No parent = a variable in a scope. */
+export function jsChildExpression(parent: string | undefined, name: string): string {
+  if (parent === undefined) return name;
+  if (/^\d+$/.test(name)) return `${parent}[${name}]`;
+  if (/^[\p{L}_$][\p{L}\p{N}_$]*$/u.test(name)) return `${parent}.${name}`;
+  return `${parent}[${JSON.stringify(name)}]`;
+}
+
 /** Objects can be expanded (except null). */
 const expandable = (o: RemoteObject | undefined) => !!o?.objectId && (o.type === 'object' || o.type === 'function') && o.subtype !== 'null';
 
@@ -156,9 +164,12 @@ export class NodeBackend implements DebugBackend {
   private scripts = new Map<string, string>(); // scriptId -> url
   private breakpointIds = new Map<string, string[]>(); // lower-case path -> breakpoint ids
   private frames: CallFrame[] = [];
-  private refs = new Map<number, string>(); // variables handle -> objectId
+  /** Variables handle -> the object, and an expression for it (none for scopes). */
+  private refs = new Map<number, { objectId: string; expression?: string }>();
   private nextRef = 1;
   private firstPause = true;
+  /** A step was asked for (so a pause in Node's own code is passed through, not shown). */
+  private stepping = false;
   private ended = false;
 
   constructor(
@@ -245,9 +256,25 @@ export class NodeBackend implements DebugBackend {
         return;
       }
     }
+    const stepping = this.stepping;
+    this.stepping = false;
+    // A step that ends in Node's own code (stepping out of the main program, or past its last
+    // line) would show Node's internals. Carry on instead: out to the user's code, or to the end.
+    if (stepping && !hit && !exception && !this.isUserCode(params.callFrames[0])) {
+      const userCaller = params.callFrames.slice(1).some((f) => this.isUserCode(f));
+      this.stepping = userCaller;
+      void this.send(userCaller ? 'Debugger.stepOut' : 'Debugger.resume');
+      return;
+    }
     const reason = exception ? 'exception' : hit ? 'breakpoint' : params.reason === 'other' ? 'step' : params.reason;
     const text = exception && params.data ? (params.data.description ?? describeValue(params.data)).split('\n')[0] : undefined;
     this.events.stopped({ reason, threadId: 1, text });
+  }
+
+  /** A frame in the user's own files (not Node's code or installed packages). */
+  private isUserCode(frame: CallFrame | undefined): boolean {
+    const path = frame && fileUrlToPath(frame.url || this.scripts.get(frame.location.scriptId) || '');
+    return !!path && !/[\\/]node_modules[\\/]/.test(path);
   }
 
   private end(): void {
@@ -278,18 +305,23 @@ export class NodeBackend implements DebugBackend {
   }
 
   async resume() {
+    this.stepping = false;
     await this.send('Debugger.resume');
   }
   async stepOver() {
+    this.stepping = true;
     await this.send('Debugger.stepOver');
   }
   async stepInto() {
+    this.stepping = true;
     await this.send('Debugger.stepInto');
   }
   async stepOut() {
+    this.stepping = true;
     await this.send('Debugger.stepOut');
   }
   async pause() {
+    this.stepping = false;
     await this.send('Debugger.pause');
   }
 
@@ -308,34 +340,42 @@ export class NodeBackend implements DebugBackend {
     if (!frame) return [];
     return frame.scopeChain.map((s) => ({
       name: SCOPE_NAMES[s.type] ?? s.type,
-      ref: this.handle(s.object.objectId!),
+      ref: this.handle(s.object.objectId!, undefined),
       expensive: s.type === 'global',
       collapsed: s.type === 'global',
     }));
   }
 
-  private handle(objectId: string): number {
+  private handle(objectId: string, expression: string | undefined): number {
     const ref = this.nextRef++;
-    this.refs.set(ref, objectId);
+    this.refs.set(ref, { objectId, expression });
     return ref;
   }
 
+  private variable(name: string, value: RemoteObject, evaluateName?: string): Variable {
+    return {
+      name,
+      value: describeValue(value),
+      type: value.subtype ?? value.type,
+      ref: expandable(value) ? this.handle(value.objectId!, evaluateName) : 0,
+      evaluateName,
+    };
+  }
+
   async variables(ref: number): Promise<Variable[]> {
-    const objectId = this.refs.get(ref);
-    if (!objectId) return [];
-    const result = await this.send('Runtime.getProperties', { objectId, ownProperties: true, generatePreview: true });
+    const parent = this.refs.get(ref);
+    if (!parent) return [];
+    const result = await this.send('Runtime.getProperties', { objectId: parent.objectId, ownProperties: true, generatePreview: true });
     const vars: Variable[] = [];
     for (const p of result.result ?? []) {
       // Own enumerable properties (plus an array's length); getters aren't run.
       if (!p.value || (p.enumerable === false && p.name !== 'length') || p.name === '__proto__') continue;
-      const value: RemoteObject = p.value;
-      vars.push({ name: p.name, value: describeValue(value), type: value.subtype ?? value.type, ref: expandable(value) ? this.handle(value.objectId!) : 0 });
+      vars.push(this.variable(p.name, p.value, jsChildExpression(parent.expression, p.name)));
     }
     for (const p of result.internalProperties ?? []) {
       // Map/Set contents, wrapped primitives.
       if (p.name !== '[[Entries]]' && p.name !== '[[PrimitiveValue]]') continue;
-      const value: RemoteObject = p.value;
-      vars.push({ name: p.name, value: describeValue(value), type: value.subtype ?? value.type, ref: expandable(value) ? this.handle(value.objectId!) : 0 });
+      vars.push(this.variable(p.name, p.value));
     }
     return vars;
   }
@@ -349,8 +389,9 @@ export class NodeBackend implements DebugBackend {
       const e = result.exceptionDetails;
       throw new Error((e.exception?.description ?? e.text ?? 'Feil').split('\n')[0]);
     }
-    const value: RemoteObject = result.result;
-    return { name: expression, value: describeValue(value), type: value.subtype ?? value.type, ref: expandable(value) ? this.handle(value.objectId!) : 0 };
+    // Children of e.g. "a + b" need parentheses: "(a + b).length".
+    const simple = /^[\p{L}_$][\p{L}\p{N}_$.]*$/u.test(expression);
+    return this.variable(expression, result.result, simple ? expression : `(${expression})`);
   }
 
   async stop(): Promise<void> {

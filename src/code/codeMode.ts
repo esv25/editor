@@ -20,6 +20,7 @@ import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { runCommand, type EditorCommand } from '../commands/registry';
 import { platform } from '../platform';
 import { breakpointGutter } from '../debug/breakpoints';
+import { inlineValues } from '../debug/inlineValues';
 import { renderOutput } from '../features/codeBlockTools/output';
 import { runCode, runnability, type RunOutcome } from '../features/codeBlockTools/run';
 import { assistPhrases } from './assist';
@@ -87,7 +88,7 @@ export const codeCommands: EditorCommand[] = [
  */
 export function codeModeExtensions(debuggable: boolean): Extension {
   return [
-    debuggable ? breakpointGutter() : lineNumbers(),
+    debuggable ? [breakpointGutter(), inlineValues] : lineNumbers(),
     foldGutter(),
     highlightActiveLine(),
     highlightActiveLineGutter(),

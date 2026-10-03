@@ -31,6 +31,8 @@ export interface Variable {
   type?: string;
   /** Handle for the children (0 = none). */
   ref: number;
+  /** An expression that gives this value ("liste[0]", "punkt.x"), so it can be highlighted. */
+  evaluateName?: string;
 }
 
 export interface StopInfo {

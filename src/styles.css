@@ -1043,21 +1043,43 @@ html, body {
 .debug-status { margin: 0 6px 8px; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .debug-status.paused { color: var(--fg); font-weight: 600; }
 .debug-status.running::before, .debug-status.starting::before { content: "● "; color: var(--accent); animation: pulse 1s infinite alternate; }
-.debug-controls { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin: 0 4px 10px; }
+.debug-status.past { color: var(--exec-past); }
+.debug-controls { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; margin: 0 4px 10px; }
+/* Two rows: three wide buttons (back, next line, continue), then four. */
+.debug-controls .debug-button { grid-column: span 3; }
+.debug-controls .debug-button.wide { grid-column: span 4; }
 .debug-button {
-  display: inline-flex; align-items: center; justify-content: center; height: 36px;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-width: 0; height: 50px; padding: 0 2px;
   border: 1px solid var(--border); border-radius: 6px; background: var(--button-bg); color: var(--fg); cursor: pointer;
 }
+.debug-button-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px/1.15 var(--font-ui); }
+.debug-button.wide .debug-button-label { font-weight: 600; }
 .debug-button:hover:not(:disabled) { background: var(--button-hover); }
 .debug-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .debug-button:disabled { color: var(--faint); cursor: default; opacity: 0.6; }
 .debug-button.primary:not(:disabled) { color: var(--syn-string); }
 .debug-button.danger { color: var(--syn-invalid); }
+.debug-button.back:not(:disabled) { color: var(--exec-past); }
+.debug-status.finished { color: var(--fg); font-weight: 600; }
 .debug-exception {
   margin: 0 4px 10px; padding: 6px 8px; border-radius: 5px;
   background: rgb(224 50 31 / 0.1); color: var(--syn-invalid);
   font: 12px var(--font-mono); white-space: pre-wrap; word-break: break-word;
 }
+/* Stepping back: how things were at an earlier stop. */
+.debug-past {
+  margin: 0 4px 10px; padding: 8px 10px; border-radius: 6px;
+  border: 1px solid var(--exec-past); background: var(--exec-line-past);
+}
+.debug-past-title { margin-bottom: 4px; color: var(--exec-past); font-weight: 600; }
+.debug-past p { margin: 0 0 8px; color: var(--fg); font-size: 12px; line-height: 1.4; }
+.debug-past-button {
+  width: 100%; height: 34px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--button-bg); color: var(--fg); font: 13px var(--font-ui); cursor: pointer;
+}
+.debug-past-button:hover { background: var(--button-hover); }
+.debug-past-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .debug-heading {
   margin: 12px 0 4px 6px; font-size: 11px; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint);
@@ -1102,6 +1124,50 @@ html, body {
 }
 .debug-var:hover .debug-watch-remove { visibility: visible; }
 .debug-watch-remove:hover { background: var(--button-hover); color: var(--fg); }
+.debug-var.changed { background: var(--debug-changed); }
+.debug-var.changed .debug-var-value { font-weight: 700; }
+
+/* Highlighted variables: each has a colour, used here and in the code. */
+.pin-c1 { --pin: var(--pin-1); }
+.pin-c2 { --pin: var(--pin-2); }
+.pin-c3 { --pin: var(--pin-3); }
+.pin-c4 { --pin: var(--pin-4); }
+.pin-c5 { --pin: var(--pin-5); }
+.debug-pin-button {
+  display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center;
+  width: 26px; height: 24px; margin-left: auto; padding: 0;
+  border: none; border-radius: 4px; background: none; color: var(--faint); cursor: pointer; opacity: 0.6;
+}
+.debug-pin-button svg { width: 15px; height: 15px; }
+.debug-var:hover .debug-pin-button, .debug-pin-button:focus-visible { opacity: 1; }
+.debug-pin-button:hover { background: var(--button-hover); color: var(--fg); opacity: 1; }
+.debug-pin-button.on { color: var(--pin); opacity: 1; }
+.debug-pin-button + .debug-watch-remove { margin-left: 0; }
+.debug-var.pinned { box-shadow: inset 3px 0 var(--pin); }
+.debug-var.pinned .debug-var-name { color: var(--pin); font-weight: 600; }
+.debug-pinned { display: flex; flex-direction: column; gap: 6px; margin: 0 4px 6px; }
+.debug-pin-card {
+  padding: 5px 4px 8px 10px; border-left: 4px solid var(--pin); border-radius: 6px;
+  background: color-mix(in srgb, var(--pin) 8%, var(--bg));
+}
+.debug-pin-card.changed { background: color-mix(in srgb, var(--pin) 18%, var(--bg)); }
+.debug-pin-head { display: flex; align-items: center; gap: 6px; }
+.debug-pin-name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--pin); font: 600 13px var(--font-mono);
+}
+.debug-pin-badge {
+  padding: 1px 7px; border-radius: 9px; background: var(--pin); color: var(--bg);
+  font: 600 10px var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase;
+}
+.debug-pin-value {
+  display: block; max-height: 9.5em; margin-top: 2px; overflow: auto;
+  color: var(--fg); font: 16px/1.35 var(--font-mono); white-space: pre-wrap; word-break: break-word;
+}
+.debug-pin-value.str { color: var(--syn-string); }
+.debug-pin-value.num { color: var(--syn-number); }
+.debug-pin-value.missing { color: var(--muted); font: italic 13px var(--font-ui); }
+.debug-pin-value.error { color: var(--syn-invalid); font: 12px var(--font-ui); }
 
 .code-bar-debug { gap: 6px; }
 .code-bar-debug svg { width: 16px; height: 16px; }
@@ -1124,5 +1190,17 @@ html, body {
   border-left: 10px solid var(--exec-arrow); margin-left: 2px;
 }
 .cm-exec-arrow-frame::before { border-left-color: var(--exec-frame); }
+.cm-exec-arrow-past::before { border-left-color: var(--exec-past); }
 .cm-code-mode .cm-line.cm-exec-line { background: var(--exec-line); }
 .cm-code-mode .cm-line.cm-exec-line-frame { background: var(--exec-line-frame); }
+.cm-code-mode .cm-line.cm-exec-line-past { background: var(--exec-line-past); }
+/* Highlighted variables in the code: their values after the paused line, and where they occur. */
+.cm-debug-values { margin-left: 2.5em; }
+.cm-debug-value {
+  display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--pin) 45%, transparent);
+  background: color-mix(in srgb, var(--pin) 14%, transparent); color: var(--fg); font-size: 0.9em;
+}
+.cm-debug-value.changed { border-color: var(--pin); box-shadow: 0 0 0 1px var(--pin); font-weight: 600; }
+.cm-debug-value-name { color: var(--pin); font-weight: 600; }
+.cm-debug-ref { border-radius: 2px; background: color-mix(in srgb, var(--pin) 15%, transparent); box-shadow: inset 0 -2px var(--pin); }

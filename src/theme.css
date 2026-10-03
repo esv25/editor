@@ -41,6 +41,17 @@
   --exec-line: rgb(255 196 0 / 0.2);
   --exec-frame: #4f9a5a;
   --exec-line-frame: rgb(80 160 90 / 0.15);
+  /* Stepping back: an earlier stop. */
+  --exec-past: #7a5cc4;
+  --exec-line-past: rgb(122 92 196 / 0.14);
+  /* A variable that just changed. */
+  --debug-changed: rgb(56 103 166 / 0.12);
+  /* Highlighted variables, one colour each (translucent mixes of these are used in the code). */
+  --pin-1: #c26a00;
+  --pin-2: #2563c9;
+  --pin-3: #2a8a45;
+  --pin-4: #b02f9a;
+  --pin-5: #0f7f8c;
 
   /* Code help: squiggles, the message on the line, the same variable, bracket pairs, indent guides. */
   --diag-error: #e0321f;
@@ -113,6 +124,14 @@
   --exec-line: rgb(255 200 60 / 0.14);
   --exec-frame: #7cc489;
   --exec-line-frame: rgb(120 200 130 / 0.12);
+  --exec-past: #b39af0;
+  --exec-line-past: rgb(160 130 240 / 0.14);
+  --debug-changed: rgb(127 169 227 / 0.14);
+  --pin-1: #f0a24a;
+  --pin-2: #6ea8f5;
+  --pin-3: #6cc786;
+  --pin-4: #e47bd2;
+  --pin-5: #4cc3cf;
 
   --diag-error: #ff6b5b;
   --diag-warning: #e8b84a;
