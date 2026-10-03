@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
+import { configDefaults } from 'vitest/config';
 
 export default defineConfig({
   // Relative asset paths so the build works when loaded by Tauri.
@@ -23,5 +24,11 @@ export default defineConfig({
       },
     },
   },
-  test: { environment: 'node' },
+  test: {
+    environment: 'node',
+    // Only this checkout's tests: other git worktrees (parallel sessions) live
+    // under .claude/worktrees/ and would otherwise be picked up as well.
+    include: ['tests/**/*.test.ts'],
+    exclude: [...configDefaults.exclude, '**/.claude/**'],
+  },
 } as any);
