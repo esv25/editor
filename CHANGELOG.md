@@ -6,6 +6,12 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- **Kodehjelp** i Python- og JavaScript-filer, som i VS Code: rød bølgestrek under feilstavede navn med forslag til hva du mente («mente du count?» – klikk for å rette), ubrukte variabler, funksjoner og importer tones ned, og kode som aldri kjøres blir grå. Python får egne meldinger for manglende kolon, feil innrykk, `=` i stedet for `==` og glemte importer.
+- Fargede parentespar, innrykkslinjer, og alle stedene samme variabel brukes markeres når markøren står på den. Forslag dukker opp mens du skriver.
+- Velg hvor mye hjelp du vil ha under **Kodehjelp** i innstillingsmenyen: Av, Litt, Som VS Code eller Mye (da står feilmeldingen på linja, med forklaring). Hver ting kan også slås av og på for seg.
+- **Innstillinger** (tannhjulet øverst til høyre): en meny med hva som vises (sidefelt, terminal), lyst/mørkt tema, Kodehjelp, Hurtigtaster og Hva er nytt. Tema- og tastaturknappene øverst er flyttet dit.
+- Nye taster i kodefiler: `F8` neste feil, `Ctrl+Shift+M` listen over problemer, `F2` gi nytt navn overalt, `F12` gå til der navnet er definert. Antall feil står nederst til høyre.
+
 ## 0.6.0 – 2026-10-03
 
 - **Sikkerhet**: kode fra en mappe du ikke har kjørt kode fra før, kjøres først når du har sagt ja. Bilder fra nettet vises først når du klikker «Vis bildet». Før en fil overskrives, legges en sikkerhetskopi til side (høyreklikk en fil i filtreet → «Vis sikkerhetskopier»).

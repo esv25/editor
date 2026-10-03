@@ -42,6 +42,21 @@
   --exec-frame: #4f9a5a;
   --exec-line-frame: rgb(80 160 90 / 0.15);
 
+  /* Code help: squiggles, the message on the line, the same variable, bracket pairs, indent guides. */
+  --diag-error: #e0321f;
+  --diag-warning: #c98500;
+  --diag-info: #3a6fd8;
+  --diag-error-line: rgb(224 50 31 / 0.07);
+  --diag-warning-line: rgb(201 133 0 / 0.08);
+  --diag-info-line: rgb(58 111 216 / 0.06);
+  --occurrence: rgb(56 103 166 / 0.14);
+  --occurrence-write: rgb(56 103 166 / 0.26);
+  --bracket-1: #0431fa;
+  --bracket-2: #2f8a2f;
+  --bracket-3: #a0522d;
+  --indent-guide: rgb(0 0 0 / 0.11);
+  --trailing-space: rgb(224 50 31 / 0.16);
+
   /* Terminal colours (ANSI). */
   --term-black: #2b2a28;
   --term-red: #c8312b;
@@ -98,6 +113,20 @@
   --exec-line: rgb(255 200 60 / 0.14);
   --exec-frame: #7cc489;
   --exec-line-frame: rgb(120 200 130 / 0.12);
+
+  --diag-error: #ff6b5b;
+  --diag-warning: #e8b84a;
+  --diag-info: #6cb2f0;
+  --diag-error-line: rgb(255 107 91 / 0.08);
+  --diag-warning-line: rgb(232 184 74 / 0.08);
+  --diag-info-line: rgb(108 178 240 / 0.06);
+  --occurrence: rgb(127 169 227 / 0.16);
+  --occurrence-write: rgb(127 169 227 / 0.3);
+  --bracket-1: #ffd700;
+  --bracket-2: #da70d6;
+  --bracket-3: #179fff;
+  --indent-guide: rgb(255 255 255 / 0.1);
+  --trailing-space: rgb(255 107 91 / 0.22);
 
   --term-black: #3b3d42;
   --term-red: #e06c75;

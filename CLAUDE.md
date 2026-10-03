@@ -14,7 +14,8 @@ UI-tekst er på norsk (bokmål). Kode, identifikatorer og kodekommentarer er på
 
 - Vite + TypeScript (strict), ingen UI-rammeverk – vanlig DOM i `src/ui/`
 - CodeMirror 6 som editorkjerne, `@codemirror/lang-markdown` (GFM) +
-  `@codemirror/language-data` for språk i kodeblokker (lastes ved behov)
+  `@codemirror/language-data` for språk i kodeblokker (lastes ved behov), `@codemirror/lint` for
+  Kodehjelp-strekene (analysen er egen kode i `src/code/assist/`)
 - KaTeX (+ mhchem) tegner formler – det eneste biblioteket i matte-delen; selve
   formelredigeringen er egen kode (`src/features/math/`)
 - Vitest for tester av kommandoer og regler (kjører i Node, uten DOM)
@@ -61,6 +62,7 @@ src/
     languages.ts          filtyper: Markdown vs. kode, språk fra filendelse, språklasting
     fileTypes.ts          filendelsene som ren data (uten CodeMirror; brukes av storage)
     codeMode.ts           kode-modus: linjenumre, kjør hele filen, utdatapanel
+    assist/               «Kodehjelp»: feil, ubrukt kode, forslag, visuelle hjelpere (se under)
   terminal/
     terminalPanel.ts      terminalpanelet under editoren (xterm.js, faner, kjør program i fane)
   debug/                  feilsøker (se «Terminal og feilsøking» under)
@@ -101,7 +103,8 @@ src/
                           «Hva er nytt» (whatsNew.ts),
                           feilsøkingsvisningen i sidefeltet (debugPanel.ts), mattepanelet
                           (mathPanel.ts), hurtigtast-dialogene (keybindings.ts for alle
-                          kommandoer, mathShortcuts.ts for matte) og modal.ts
+                          kommandoer, mathShortcuts.ts for matte), Kodehjelp-dialogen
+                          (codeHelp.ts) og modal.ts
   styles.css              editorens layout og klasser (fargene ligger i theme.css)
   diagram/                tegnevinduet – et eget lite program (se «Tegnevinduet» under)
 diagram.html              inngangen til tegnevinduet (Vite bygger to sider: index + diagram)
@@ -282,6 +285,36 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   Tab i kodeblokk = `insertIndent`, i vanlig tekst flyttes linja 2 mellomrom, og
   listekommandoene gjelder ikke inni kodeblokker. Testet i `tests/indentation.test.ts`.
 
+### Kodehjelp (`code/assist/`)
+
+VS Code-lignende skrivestøtte i kodefiler, uten språkserver: egen analyse av Lezer-syntakstreet.
+Alt unntatt `index.ts` er ren logikk uten CodeMirror (testet i `tests/codeAssist.test.ts`).
+
+- `levels.ts`: nivåene (Av / Litt / Som VS Code / Mye) og funksjonene (`CodeHelpFeature`).
+  `settings.codeHelp = { level, overrides }`; en override (`true`/`false`) går foran nivået,
+  `null` = følg nivået. `activeFeatures()` gir det som er på. Ny funksjon = linje i `featureInfo`.
+- `python.ts` / `javascript.ts`: scopes, bindinger og referanser (pyflakes / ESLint-aktig).
+  Python: tilordning gjør navnet lokalt, `global`/`nonlocal`, klassekropper er usynlige for
+  metoder, comprehensions har eget scope. JS: `var` → funksjonen, let/const/class → blokka,
+  hoisting, TS-typer i eget navnerom (teller bare som bruk). Begge finner også kode etter
+  return/break (`unreachable`).
+- `pythonLines.ts`: Pythons linjestruktur direkte fra teksten – innrykk (som tokenizeren),
+  manglende kolon, `else if`, `=` i betingelse. Presise meldinger der parseren bare sier «feil».
+- `syntax.ts`: feilnoder, parenteser som aldri lukkes, tekst uten slutt-anførselstegn (alle
+  Lezer-språk). `diagnose.ts` samler alt med norske meldinger, `explanation` (vises med
+  «Forklaringer»), `fixes` (knapper i tooltipen) og «mente du …?» (`suggest`, redigeringsavstand).
+  Kjente hull i parserne (TS `x is T` i pilfunksjoner, `let x!:`; Python `4.`, `yield` alene)
+  filtreres bort der. `globals.ts`: innebygde navn, modulinnhold (math, random, turtle …),
+  importforslag og ord fra andre språk (`true` → `True`).
+- `index.ts`: CodeMirror-koblingen via `@codemirror/lint` (streker, margmerker, tooltip,
+  problempanel), meldingen på linja, samme variabel (`occurrencesAt`), fargede parentespar,
+  innrykkslinjer, autofullføring (språkenes egne kilder + modulinnhold for `math.`) og
+  kommandoene F2 (alle forekomster blir markører), F12, F8 og Ctrl+Shift+M. Bygges i
+  `dynamicExtensions` i `createEditor.ts`, så innstillingsendringer slår gjennom med en gang.
+  Analysen caches per syntakstre (`analysisOf`).
+- Farger: `--diag-*`, `--bracket-1..3`, `--indent-guide`, `--occurrence*` i `theme.css`;
+  tooltip/strek-stiler i `editor/theme.ts`.
+
 ### Kodeblokker: navn, språk og kjøring (`features/codeBlockTools/`)
 
 - Navn og språk står i fence-linja: ` ```python title="navn.py" `. Parsing i
@@ -356,7 +389,8 @@ overskrift, Ctrl+N nytt dokument, Ctrl+O/S/Shift+S fil, Ctrl+W lukk fane, Ctrl+T
 Ctrl+PageDown neste fane, Ctrl+Shift+N ny gruppe, Ctrl+Shift+O disposisjon, Ctrl+J
 terminal, Ctrl+F5 kjør i terminal, F5 feilsøk/fortsett, F9 stoppunkt, F10/F11/Shift+F11
 steg, F6 pause, Shift+F5 stopp, Ctrl+Shift+F5 start på nytt, Ctrl+M formel, Ctrl+Shift+M
-formelblokk (inne i formler: Ctrl+↑/↓ potens/indeks).
+formelblokk (inne i formler: Ctrl+↑/↓ potens/indeks). I kodefiler: F8/Shift+F8 neste/forrige
+problem, Ctrl+Shift+M problemlisten, F2 nytt navn overalt, F12 gå til definisjon, Ctrl+Mellomrom forslag.
 **Unngå Ctrl+Alt-kombinasjoner**: på norsk tastatur er Ctrl+Alt = AltGr (@, {, [ osv.).
 
 ### Kommandoer som `StateCommand`
@@ -411,8 +445,10 @@ direkte. Nye Tauri-API-kall krever ofte en tillatelse i `capabilities/default.js
 `settings.ts`: `getSettings()`, `updateSettings(patch)` (dyp fletting), `onSettingsChange`.
 Kun overstyringer lagres, så endrede standardverdier slår gjennom. Editor-extensions
 bygges på nytt via en Compartment når innstillinger endres. Endres de i et annet vindu
-(tegnevinduet), følger de andre etter via `storage`-hendelsen. Det finnes ennå ingen samlet
-innstillings-UI (bare hurtigtast-dialogene); ellers endres de via konsollen eller standardverdiene.
+(tegnevinduet), følger de andre etter via `storage`-hendelsen. Tannhjulet øverst (`app.settings`) åpner
+en nedtrekksmeny (`showMenuUnder` i `ui/contextMenu.ts`) med visning, tema og dialogene
+(Kodehjelp, Hurtigtaster); nye innstillinger hører hjemme der (`settingsMenu` i `app.ts`); ellers endres de via konsollen eller
+standardverdiene.
 
 ## Sikkerhet (`SECURITY.md`)
 

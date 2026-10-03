@@ -10,6 +10,7 @@ import {
 } from './features/headingSuggestion/rules';
 import type { RunnerConfig } from './features/codeBlockTools/runners';
 import type { DebuggerConfig } from './debug/debuggers';
+import { defaultCodeHelp, type CodeHelpSettings } from './code/assist/levels';
 
 export type ThemeSetting = 'light' | 'dark' | 'system';
 
@@ -44,6 +45,8 @@ export interface Settings {
     height: number;
     fontSize: number;
   };
+  /** How much help code files get: underlined errors, faded unused code, suggestions … */
+  codeHelp: CodeHelpSettings;
   /** Opening characters that get their closing partner inserted automatically. [] = off. */
   closeBrackets: string[];
   headingSuggestion: HeadingSuggestionConfig;
@@ -104,6 +107,7 @@ export const defaultSettings: Settings = {
   codeRunTimeoutMs: 30000,
   debuggers: {},
   terminal: { shell: 'powershell.exe', shellArgs: ['-NoLogo'], height: 260, fontSize: 13 },
+  codeHelp: defaultCodeHelp,
   closeBrackets: ['(', '[', '{', '«'],
   headingSuggestion: defaultHeadingSuggestionConfig,
   keybindings: {},

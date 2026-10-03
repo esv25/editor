@@ -3,7 +3,7 @@
  */
 import type { EditorView, ViewUpdate } from '@codemirror/view';
 import { installGlobalKeys } from '../commands/keys';
-import { registerCommands } from '../commands/registry';
+import { registerCommands, runCommand } from '../commands/registry';
 import { breakpointsChanged, toggleBreakpoint } from '../debug/breakpoints';
 import { DebugController } from '../debug/controller';
 import { createMarkdownState, createView } from '../editor/createEditor';
@@ -16,13 +16,16 @@ import { platform } from '../platform';
 import { getSettings, onSettingsChange, updateSettings } from '../settings';
 import { drafts, storage } from '../storage';
 import { TerminalPanel } from '../terminal/terminalPanel';
+import { diagnosticsChanged } from '../code/assist';
 import { CodeBar } from '../ui/codeBar';
+import { codeHelpLevelName, openCodeHelp } from '../ui/codeHelp';
+import { showMenuUnder, type MenuItem } from '../ui/contextMenu';
 import { DebugPanel } from '../ui/debugPanel';
 import { FileTree } from '../ui/fileTree';
 import { openKeybindings } from '../ui/keybindings';
 import { MathPanel } from '../ui/mathPanel';
 import { OutlinePanel } from '../ui/outline';
-import { renderCount, renderSaveStatus, renderTitle } from '../ui/statusbar';
+import { renderCount, renderProblems, renderSaveStatus, renderTitle } from '../ui/statusbar';
 import { TabsUI } from '../ui/tabs';
 import { checkForUpdates } from '../ui/updates';
 import { openWhatsNew, showWhatsNewOnStart } from '../ui/whatsNew';
@@ -205,7 +208,44 @@ export async function startApp(): Promise<void> {
       run: () => (openKeybindings(getView), true),
     },
     { id: 'app.whatsNew', name: 'Hva er nytt', scope: 'any', run: () => (void openWhatsNew(), true) },
+    { id: 'app.codeHelp', name: 'Kodehjelp (hvor mye hjelp du får i kodefiler)', scope: 'any', run: () => (openCodeHelp(), true) },
+    {
+      id: 'app.settings',
+      name: 'Innstillinger',
+      icon: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+      scope: 'any',
+      run: () => {
+        const button = document.querySelector<HTMLElement>('#view-actions [data-command="app.settings"]');
+        if (button) showMenuUnder(button, settingsMenu());
+        return true;
+      },
+    },
   ]);
+
+  /** The gear menu: what's shown, and the settings dialogs. */
+  const settingsMenu = (): MenuItem[] => {
+    const s = getSettings();
+    const run = (id: string) => () => {
+      runCommand(view, id);
+      view.focus();
+    };
+    const theme = (value: typeof s.theme) => () => updateSettings({ theme: value });
+    return [
+      { heading: 'Vis' },
+      { label: 'Sidefeltet (filer og disposisjon)', checked: s.outlineVisible, action: run('view.toggleOutline') },
+      ...(terminal.available ? [{ label: 'Terminalen', checked: terminal.visible, action: run('view.toggleTerminal') }] : []),
+      'separator',
+      { heading: 'Tema' },
+      { label: 'Lyst', checked: s.theme === 'light', action: theme('light') },
+      { label: 'Mørkt', checked: s.theme === 'dark', action: theme('dark') },
+      { label: 'Som Windows', checked: s.theme === 'system', action: theme('system') },
+      'separator',
+      { label: `Kodehjelp (${codeHelpLevelName()}) …`, action: run('app.codeHelp') },
+      { label: 'Hurtigtaster …', action: run('app.keybindings') },
+      'separator',
+      { label: 'Hva er nytt', action: run('app.whatsNew') },
+    ];
+  };
 
   let countTimer: ReturnType<typeof setTimeout> | undefined;
   const onUpdate = (u: ViewUpdate) => {
@@ -217,6 +257,7 @@ export async function startApp(): Promise<void> {
       debug?.breakpointsChanged(doc);
     }
     if (u.docChanged) outline.scheduleRefresh();
+    if (diagnosticsChanged(u)) renderProblems(doc);
     if (u.docChanged || u.selectionSet) {
       clearTimeout(countTimer);
       countTimer = setTimeout(() => renderCount(doc), u.docChanged ? 300 : 50);
@@ -235,7 +276,7 @@ export async function startApp(): Promise<void> {
   const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save'], getView);
   const viewBar = renderButtons(
     el('view-actions'),
-    ['view.toggleOutline', ...(terminal.available ? ['view.toggleTerminal'] : []), 'view.toggleTheme', 'app.keybindings'],
+    ['view.toggleOutline', ...(terminal.available ? ['view.toggleTerminal'] : []), 'app.settings'],
     getView,
   );
   new DebugPanel(el('debug'), debug, getView);
@@ -319,10 +360,16 @@ export async function startApp(): Promise<void> {
     viewBar.update(doc.state);
     outline.refresh(doc.state);
     renderCount(doc);
+    renderProblems(doc);
+  });
+  el('status-problems').addEventListener('click', () => {
+    runCommand(view, 'code.problems');
+    view.focus();
   });
 
   onSettingsChange((next, prev) => {
     updateSidebar();
+    if (next.codeHelp !== prev.codeHelp && ws.activeDoc) renderProblems(ws.activeDoc);
     outline.visible = next.outlineVisible;
     viewBar.update(view.state);
     mdToolbar.update(view.state);
