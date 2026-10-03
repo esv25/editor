@@ -112,7 +112,11 @@ describe('highlighted variables', () => {
 });
 
 describe('the variable at the cursor', () => {
-  const at = (text: string) => expressionAt(text.replace('|', ''), text.indexOf('|'));
+  /** "|" marks the cursor. */
+  const at = (text: string) => {
+    const cursor = text.indexOf('|');
+    return expressionAt(text.slice(0, cursor) + text.slice(cursor + 1), cursor);
+  };
 
   it('finds the name around the cursor', () => {
     expect(at('total = tot|al + 1')).toBe('total');

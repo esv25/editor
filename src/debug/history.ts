@@ -147,7 +147,7 @@ export interface Occurrence {
 export function findOccurrences(text: string, names: string[]): Occurrence[] {
   const wanted = names.filter(isNameChain).sort((a, b) => b.length - a.length);
   if (!wanted.length) return [];
-  const alternatives = wanted.map((n) => n.replace(/[$.]/g, '\\$&')).join('|');
+  const alternatives = wanted.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
   const re = new RegExp(`(?<![\\p{L}\\p{N}_$.])(?:${alternatives})(?![\\p{L}\\p{N}_$])`, 'gu');
   return [...text.matchAll(re)].map((m) => ({ from: m.index, to: m.index + m[0].length, name: m[0] }));
 }
