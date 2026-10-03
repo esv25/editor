@@ -24,6 +24,7 @@ import { OutlinePanel } from '../ui/outline';
 import { renderCount, renderSaveStatus, renderTitle } from '../ui/statusbar';
 import { TabsUI } from '../ui/tabs';
 import { checkForUpdates } from '../ui/updates';
+import { openWhatsNew, showWhatsNewOnStart } from '../ui/whatsNew';
 import { renderButtons } from '../ui/toolbar';
 import { initAppearance, resolvedTheme } from '../appearance';
 import { EditorDocument } from './document';
@@ -201,6 +202,7 @@ export async function startApp(): Promise<void> {
       scope: 'any',
       run: () => (openKeybindings(getView), true),
     },
+    { id: 'app.whatsNew', name: 'Hva er nytt', scope: 'any', run: () => (void openWhatsNew(), true) },
   ]);
 
   let countTimer: ReturnType<typeof setTimeout> | undefined;
@@ -332,10 +334,10 @@ export async function startApp(): Promise<void> {
 
   // Restore the last session, or start with one group ("Notater").
   const session = loadSession();
+  let firstRun = false;
   if (session) {
     await ws.restore(session);
   } else {
-    let firstRun = false;
     try {
       firstRun = localStorage.getItem(FIRST_RUN_KEY) === null;
       localStorage.setItem(FIRST_RUN_KEY, '1');
@@ -368,15 +370,17 @@ export async function startApp(): Promise<void> {
   });
   platform.onOpenFile?.((path) => void ws.openPath(path));
 
-  // Updates (installed desktop app only): check quietly shortly after start;
-  // clicking the version in the status bar checks on demand.
+  // Updates (installed desktop app only): say what's new after one, check
+  // quietly shortly after start; clicking the version in the status bar checks on demand.
   const beforeInstall = async () => {
     await Promise.all(ws.allDocs().filter((d) => d.dirty && d.file).map((d) => d.save({ silent: true })));
     ws.saveNow();
   };
   if (platform.appVersion) {
+    const version = await platform.appVersion();
+    if (import.meta.env.PROD) showWhatsNewOnStart(version, firstRun);
     const versionEl = el('status-version');
-    versionEl.textContent = `v${await platform.appVersion()}`;
+    versionEl.textContent = `v${version}`;
     versionEl.title = 'Se etter oppdateringer';
     versionEl.hidden = false;
     versionEl.addEventListener('click', () => void checkForUpdates(false, beforeInstall));

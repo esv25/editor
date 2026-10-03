@@ -3,6 +3,7 @@
  * published, with "Update now". Desktop only.
  */
 import { platform, type AvailableUpdate } from '../platform';
+import { openWhatsNew, renderNotes } from './whatsNew';
 
 let notice: HTMLElement | null = null;
 
@@ -36,7 +37,7 @@ function offerUpdate(update: AvailableUpdate, beforeInstall: () => Promise<void>
     if (update.notes) {
       const notes = document.createElement('div');
       notes.className = 'update-notes';
-      notes.textContent = update.notes;
+      notes.append(renderNotes(update.notes));
       text.append(notes);
     }
     const actions = document.createElement('div');
@@ -75,7 +76,17 @@ export async function checkForUpdates(quiet: boolean, beforeInstall: () => Promi
     if (update) offerUpdate(update, beforeInstall);
     else if (!quiet) {
       const version = (await platform.appVersion?.()) ?? '';
-      showNotice((el) => (el.textContent = `Du har nyeste versjon (${version}).`), 4000);
+      showNotice((el) => {
+        const actions = document.createElement('div');
+        actions.className = 'update-actions';
+        actions.append(
+          button('Hva er nytt', false, () => {
+            el.remove();
+            void openWhatsNew();
+          }),
+        );
+        el.append(`Du har nyeste versjon (${version}).`, actions);
+      }, 6000);
     }
   } catch (err) {
     if (!quiet) {
