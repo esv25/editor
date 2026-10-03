@@ -65,8 +65,11 @@ src/
     terminalPanel.ts      terminalpanelet under editoren (xterm.js, faner, kjør program i fane)
   debug/                  feilsøker (se «Terminal og feilsøking» under)
     types.ts              DebugBackend-grensesnittet (DAP-formet) + datatyper
-    controller.ts         DebugController: økt, stopp, kallstakk, variabler, uttrykk
+    controller.ts         DebugController: økt, stopp, kallstakk, variabler, uttrykk, fremhevede
+    history.ts            tilbakeblikk (Snapshot per stopp, hva som er endret) og fremhevede
+                          variabler – ren logikk
     breakpoints.ts        stoppunkter og pauselinje (StateField + gutter)
+    inlineValues.ts       fremhevede variabler i koden: verdier ved pauselinja, farget der de står
     debuggers.ts          språk → feilsøker (standard + settings.debuggers)
     dap.ts                DAP-klient + backend (debugpy for Python)
     node.ts               Node-backend over Chrome DevTools Protocol (JS/TS)
@@ -325,6 +328,22 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   skriver, men alltid før fortsett/steg). Gutteren finnes bare for språk med feilsøker.
 - Pauselinja (`executionField`) settes bare i den aktive tilstanden; ved fanebytte settes den
   på nytt (`onActiveChange`). Uttrykk evalueres på nytt ved hvert stopp.
+- **Steg tilbake** (`debug.stepBack`, Shift+F10): verken debugpy eller Node kan kjøre baklengs, så
+  hvert stopp lagres som et `Snapshot` (linje, kallstakk, variabler, uttrykk, åpnede barn) i
+  `controller.history`, og tilbakeblikket viser et tidligere (som Thonny/IntelliTrace). Programmet
+  står der det står: i tilbakeblikket går F10/F11/Shift+F11 ett stopp fram, F5 til nå. Bare det
+  nåværende stoppet kan spørre feilsøkeren (`isLive`); svar som kommer etter at programmet gikk
+  videre, kastes. Endrede variabler sammenlignes med forrige stopp i *samme funksjonskall*
+  (`previousInCall`: navn, fil og dybde i stakken). Avslutter programmet av seg selv, blir
+  visningen stående (`finished`, `visible`) så man kan se tilbake; Shift+F5 lukker, F5 starter på nytt.
+- Panelknappene har tekst under ikonet (pilene alene ble forvekslet). «Gå ut» er av når det ikke
+  finnes en kaller i brukerens kode (`canStepOut`), ellers ville den bare kjørt programmet ferdig.
+- Node: et steg som ender i Nodes egen kode (ut av hovedprogrammet) vises ikke – `NodeBackend`
+  går videre ut til brukerens kode eller kjører ferdig (`stepping` + `isUserCode`).
+- **Fremhevede variabler** (☆ i panelet, `debug.pin`/Shift+F9 = variabelen ved markøren): uttrykk
+  med hver sin farge (`--pin-1…5`), huskes per program i localStorage (`editor.debugPins.v1`).
+  Verdien tas fra variabellista når det er et navn (virker da også for gamle stopp), ellers
+  evalueres uttrykket. `ExecutionLine.pins` bærer verdiene til editoren (`inlineValues.ts`).
 - Feilsøking i dev: `window.debug` og `window.terminal`. Testes uten DOM:
   `tests/breakpoints.test.ts`, `tests/debugProtocols.test.ts`, `tests/keys.test.ts`.
 
@@ -355,7 +374,7 @@ Ctrl+Enter kryss av oppgave, Ctrl+Shift+Enter kjør kodeblokk/fil, Ctrl+Shift+H 
 overskrift, Ctrl+N nytt dokument, Ctrl+O/S/Shift+S fil, Ctrl+W lukk fane, Ctrl+Tab /
 Ctrl+PageDown neste fane, Ctrl+Shift+N ny gruppe, Ctrl+Shift+O disposisjon, Ctrl+J
 terminal, Ctrl+F5 kjør i terminal, F5 feilsøk/fortsett, F9 stoppunkt, F10/F11/Shift+F11
-steg, F6 pause, Shift+F5 stopp, Ctrl+Shift+F5 start på nytt, Ctrl+M formel, Ctrl+Shift+M
+steg, Shift+F10 steg tilbake, Shift+F9 fremhev variabel, F6 pause, Shift+F5 stopp, Ctrl+Shift+F5 start på nytt, Ctrl+M formel, Ctrl+Shift+M
 formelblokk (inne i formler: Ctrl+↑/↓ potens/indeks).
 **Unngå Ctrl+Alt-kombinasjoner**: på norsk tastatur er Ctrl+Alt = AltGr (@, {, [ osv.).
 

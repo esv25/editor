@@ -257,12 +257,18 @@ export class DapBackend implements DebugBackend {
 
   async variables(ref: number): Promise<Variable[]> {
     const body = await this.client.request('variables', { variablesReference: ref });
-    return (body.variables ?? []).map((v: any) => ({ name: v.name, value: v.value, type: v.type, ref: v.variablesReference ?? 0 }));
+    return (body.variables ?? []).map((v: any) => ({
+      name: v.name,
+      value: v.value,
+      type: v.type,
+      ref: v.variablesReference ?? 0,
+      evaluateName: v.evaluateName,
+    }));
   }
 
   async evaluate(expression: string, frameId: number | undefined): Promise<Variable> {
     const body = await this.client.request('evaluate', { expression, frameId, context: 'watch' });
-    return { name: expression, value: body.result, type: body.type, ref: body.variablesReference ?? 0 };
+    return { name: expression, value: body.result, type: body.type, ref: body.variablesReference ?? 0, evaluateName: expression };
   }
 
   async stop(): Promise<void> {

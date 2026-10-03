@@ -187,6 +187,8 @@ export async function startApp(): Promise<void> {
     { id: 'debug.stepOver', name: 'Neste linje (hopp over funksjonskall)', key: 'F10', scope: 'any', run: () => debug.stepOver() },
     { id: 'debug.stepInto', name: 'Gå inn i funksjonen', key: 'F11', scope: 'any', run: () => debug.stepInto() },
     { id: 'debug.stepOut', name: 'Gå ut av funksjonen', key: 'Shift-F11', scope: 'any', run: () => debug.stepOut() },
+    { id: 'debug.stepBack', name: 'Steg tilbake (se hvordan det var)', key: 'Shift-F10', scope: 'any', run: () => debug.stepBack() },
+    { id: 'debug.pin', name: 'Fremhev variabelen ved markøren', key: 'Shift-F9', scope: 'code', run: () => debug.pinAtCursor() },
     { id: 'debug.restart', name: 'Start feilsøkingen på nytt', key: 'Mod-Shift-F5', scope: 'any', run: () => debug.restart() },
     { id: 'debug.stop', name: 'Stopp feilsøkingen', key: 'Shift-F5', scope: 'any', run: () => debug.stopSession() },
     { id: 'debug.toggleBreakpoint', name: 'Stoppunkt av/på', key: 'F9', scope: 'code', run: toggleBreakpoint },
@@ -241,8 +243,8 @@ export async function startApp(): Promise<void> {
   new DebugPanel(el('debug'), debug, getView);
   // The sidebar holds the debug view, so it shows while debugging even if it's otherwise hidden.
   const updateSidebar = () => {
-    el('sidebar').hidden = !(getSettings().outlineVisible || debug.active);
-    el('sidebar').classList.toggle('debugging', debug.active);
+    el('sidebar').hidden = !(getSettings().outlineVisible || debug.visible);
+    el('sidebar').classList.toggle('debugging', debug.visible);
   };
   debug.onChange(updateSidebar);
   installGlobalKeys(getView, platform.isDesktop && import.meta.env.PROD);
