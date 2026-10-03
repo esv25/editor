@@ -55,7 +55,7 @@ const UNICODE_INPUT: Record<string, string> = {
   '°': '^{\\circ}', '√': '\\sqrt{#0}', '·': '\\cdot', '×': '\\times', '÷': '\\div', '−': '-', '±': '\\pm',
   '≤': '\\le', '≥': '\\ge', '≠': '\\ne', '≈': '\\approx', '∞': '\\infty', 'π': '\\pi', '∈': '\\in',
   '∉': '\\notin', '∫': '\\int', '∑': '\\sum', '→': '\\to', '⇒': '\\Rightarrow', '⇔': '\\Leftrightarrow',
-  'Δ': '\\Delta', 'α': '\\alpha', 'β': '\\beta', 'γ': '\\gamma', 'δ': '\\delta', 'θ': '\\theta',
+  '⇌': '\\rightleftharpoons', 'Δ': '\\Delta', 'α': '\\alpha', 'β': '\\beta', 'γ': '\\gamma', 'δ': '\\delta', 'θ': '\\theta',
   'λ': '\\lambda', 'μ': '\\mu', 'σ': '\\sigma', 'φ': '\\varphi', 'ω': '\\omega', '∠': '\\angle',
   '⊥': '\\perp', '∥': '\\parallel', '∪': '\\cup', '∩': '\\cap', '∅': '\\emptyset', '‰': '\\text{‰}',
   '§': '', '¨': '', '´': '', '`': '',
@@ -300,6 +300,12 @@ export class MathEditor {
       this.buffer = [];
       this.consumed = null;
     }
+  }
+
+  /** Inside \ce{…}, where mhchem's own syntax is typed (`->`, `<=>`). */
+  inChemistry(): boolean {
+    const p = this.pos.row.parent;
+    return p?.kind === 'text' && p.cmd === '\\ce';
   }
 
   private context(): 'math' | 'text' | 'cmd' {

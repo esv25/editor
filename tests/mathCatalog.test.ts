@@ -51,6 +51,25 @@ describe('math catalog', () => {
     expect(searchItems('alpha').some((it) => it.id === 'greek.alpha')).toBe(true);
   });
 
+  it('the equilibrium arrow is a relation in math and <=> inside \\ce', () => {
+    const arrow = itemsById.get('equilibrium')!;
+    const math = new MathEditor('', { display: false });
+    math.type('A');
+    expect(math.inChemistry()).toBe(false);
+    math.insert(arrow.latex);
+    math.type('B');
+    expect(math.latex).toBe('A \\rightleftharpoons B');
+
+    const chem = new MathEditor('', { display: false });
+    chem.insert(itemsById.get('ce')!.latex);
+    chem.type('N2 + 3H2 ');
+    expect(chem.inChemistry()).toBe(true);
+    chem.type(arrow.chem!);
+    chem.type(' 2NH3');
+    expect(chem.latex).toBe('\\ce{N2 + 3H2 <=> 2NH3}');
+    expect(new MathEditor('A ⇌ B', { display: false }).latex).toBe('A \\rightleftharpoons B');
+  });
+
   it('commands after a backslash', () => {
     expect(lookupCommand('sqrt')).toBe('\\sqrt{#0}');
     expect(lookupCommand('alpha')).toBe('\\alpha');

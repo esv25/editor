@@ -107,6 +107,7 @@ const UNICODE_NORMALIZE: Record<string, string> = {
   '→': '\\to',
   '⇒': '\\Rightarrow',
   '⇔': '\\Leftrightarrow',
+  '⇌': '\\rightleftharpoons',
   '°': '^\\circ',
 };
 

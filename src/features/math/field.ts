@@ -503,6 +503,8 @@ export class MathField {
       actions[item.action]();
     } else if (ed.pendingCommand() !== null) {
       ed.commitCommand(item.latex);
+    } else if (item.chem && ed.inChemistry()) {
+      ed.type(item.chem);
     } else {
       ed.insert(item.latex);
     }
