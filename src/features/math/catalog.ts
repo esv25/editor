@@ -24,6 +24,8 @@ export interface MathItem {
   keys?: string;
   /** Instead of inserting: an action on the formula (matrix rows …). */
   action?: 'addRow' | 'addRowAbove' | 'addColumn' | 'addColumnLeft' | 'deleteRow' | 'deleteColumn';
+  /** Typed instead inside \ce{…}, in mhchem's own syntax (`<=>` for ⇌). */
+  chem?: string;
 }
 
 export interface MathCategory {
@@ -443,6 +445,7 @@ export const categories: MathCategory[] = [
       item('ce', 'Kjemisk formel (skriv f.eks. H2O, Na+, ->)', '\\ce{}', 'kjemi molekyl stoff', '\\ce{H2O}'),
       item('ceReaction', 'Reaksjonslikning', '\\ce{2H2 + O2 -> 2H2O}', 'kjemi reaksjon pil'),
       item('ceEquilibrium', 'Likevekt', '\\ce{N2 + 3H2 <=> 2NH3}', 'kjemi likevekt'),
+      { ...item('equilibrium', 'Likevektspil', '\\rightleftharpoons', 'kjemi likevekt pil reversibel harpun'), chem: '<=>' },
       item('ceIons', 'Ioner', '\\ce{Na+ + Cl- -> NaCl}', 'kjemi ion ladning'),
       item('ceCharge', 'Ladning', '\\ce{SO4^2-}', 'kjemi ion ladning'),
       item('ceState', 'Tilstand', '\\ce{NaCl(aq)}', 'kjemi aq s l g'),

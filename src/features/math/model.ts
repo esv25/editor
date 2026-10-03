@@ -255,7 +255,7 @@ const REL = new Set([
   '\\longrightarrow', '\\Longrightarrow', '\\Longleftrightarrow', '\\mapsto', '\\in', '\\notin', '\\ni',
   '\\subset', '\\subseteq', '\\supset', '\\supseteq', '\\nsubseteq', '\\perp', '\\parallel', '\\mid', '\\nmid',
   '\\ll', '\\gg', '\\doteq', '\\coloneqq', '\\nearrow', '\\searrow', '\\uparrow', '\\downarrow', '\\models',
-  '\\vdash', '\\asymp', '\\not=', '\\nless', '\\ngtr', '\\lessgtr',
+  '\\vdash', '\\asymp', '\\not=', '\\nless', '\\ngtr', '\\lessgtr', '\\rightleftharpoons', '\\leftrightharpoons',
 ]);
 
 const OPEN = new Set(['(', '[', '\\{', '\\langle', '\\lfloor', '\\lceil', '\\lvert', '\\lVert']);
