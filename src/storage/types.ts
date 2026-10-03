@@ -41,6 +41,10 @@ export interface StorageBackend {
    * Only backends that can do this silently implement it (desktop).
    */
   createNew?(content: string, baseName: string, extension: string, folder?: string): Promise<FileRef>;
+  /** Where `createNew` puts files when no folder is given (desktop: Documents\Editor). */
+  defaultFolder?(): Promise<string>;
+  /** Where copies of files are kept before they're overwritten (desktop; see backupRules.ts). */
+  backupFolder?(): Promise<string>;
   /** Rename a file within its folder (keeping the extension). Desktop only. */
   rename?(file: FileRef, baseName: string): Promise<FileRef>;
   /** Ask the user for a folder. Resolves to its path, or null if cancelled. Desktop only. */

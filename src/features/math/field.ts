@@ -14,7 +14,7 @@ import { previewLatex, searchItems, type MathItem } from './catalog';
 import { MathEditor, type Exit, type Pos } from './editor';
 import { toLatex } from './latex';
 import * as M from './model';
-import { renderInto } from './render';
+import { renderInto, trust } from './render';
 import { symbolChoices, type SymbolChoice } from './templates';
 
 export interface FieldHost {
@@ -570,7 +570,7 @@ class CommandPopup {
         const preview = document.createElement('span');
         preview.className = 'mf-popup-preview';
         try {
-          preview.innerHTML = katex.renderToString(previewLatex(it), { throwOnError: true, strict: 'ignore', trust: true });
+          preview.innerHTML = katex.renderToString(previewLatex(it), { throwOnError: true, strict: 'ignore', trust });
         } catch {
           preview.textContent = it.latex;
         }

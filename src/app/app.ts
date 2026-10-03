@@ -8,6 +8,7 @@ import { breakpointsChanged, toggleBreakpoint } from '../debug/breakpoints';
 import { DebugController } from '../debug/controller';
 import { createMarkdownState, createView } from '../editor/createEditor';
 import { runContext } from '../features/codeBlockTools';
+import { allowRunning } from './trust';
 import { runnerFor } from '../features/codeBlockTools/runners';
 import { imageContext, redrawImages, reloadImages } from '../features/images';
 import { dirOf } from '../features/util/imagePath';
@@ -71,6 +72,7 @@ export async function startApp(): Promise<void> {
     if (!runner) return ws.showError('Dette språket kan ikke kjøres i terminalen');
     if (!(await doc.ensureSaved()) || !doc.file?.path) return ws.showError('Filen må lagres før den kan kjøres');
     const path = doc.file.path;
+    if (!(await allowRunning(path))) return;
     await terminal.runProgram('run', 'run', {
       title: doc.name,
       program: runner.command,
@@ -266,6 +268,8 @@ export async function startApp(): Promise<void> {
 
   // Code blocks and code files run in the document's folder, so they can use files next to it.
   runContext.cwd = () => ws.activeDoc?.file?.path?.replace(/[\\/][^\\/]*$/, '');
+  // …but only from folders the user trusts (asks once per folder).
+  runContext.allow = () => allowRunning(ws.activeDoc?.file?.path);
   // Relative image paths are relative to the document; redraw them if it moves (autosave, Lagre som).
   imageContext.baseDir = () => dirOf(ws.activeDoc?.file?.path);
   // Drawings open in their own window (one per file); when it saves, the picture in the note is redrawn.

@@ -161,6 +161,11 @@ export class FileTree {
         showContextMenu(e, [
           { label: 'Åpne', action: () => void this.ws.openPath(entry.path) },
           { label: 'Vis i Utforsker', action: () => void platform.revealPath?.(entry.path), disabled: !platform.revealPath },
+          {
+            label: 'Vis sikkerhetskopier',
+            action: () => void storage.backupFolder?.().then((dir) => platform.revealPath?.(dir)),
+            disabled: !storage.backupFolder || !platform.revealPath,
+          },
         ]);
     });
     return row;

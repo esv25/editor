@@ -5,6 +5,7 @@
  */
 import { EditorView } from '@codemirror/view';
 import type { EditorDocument } from '../app/document';
+import { allowRunning } from '../app/trust';
 import type { Workspace } from '../app/workspace';
 import { platform, type Pty } from '../platform';
 import type { TerminalPanel, TerminalTab } from '../terminal/terminalPanel';
@@ -130,6 +131,10 @@ export class DebugController {
     }
     this.name = doc.name;
     const program = doc.file.path;
+    if (!(await allowRunning(program))) {
+      this.end(session);
+      return;
+    }
     const backend = this.createBackend(config, session);
     this.backend = backend;
     try {

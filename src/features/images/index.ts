@@ -8,6 +8,7 @@
 import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
+import { getSettings, updateSettings } from '../../settings';
 import { storage } from '../../storage';
 import type { Feature } from '../types';
 import { editInPlace } from '../util/editInPlace';
@@ -15,7 +16,9 @@ import {
   baseNameOf,
   imageExtensions,
   imageMarkdown,
+  isHostAllowed,
   relativeImagePath,
+  remoteHost,
   resolveImageSource,
 } from '../util/imagePath';
 import { DIAGRAM_EXTENSION, isDiagramPath, newDiagramSvg } from '../../diagram/fileFormat';
@@ -150,6 +153,39 @@ function notice(message: string, dest?: string): HTMLElement {
   return el;
 }
 
+/** Web images the user chose to see this time (until the app restarts). */
+const shownRemote = new Set<string>();
+
+/**
+ * In place of a web image: fetching it would tell the host that (and when)
+ * the document was opened, so it waits for the user.
+ */
+function remoteNotice(view: EditorView, host: string, url: string): HTMLElement {
+  const el = notice(`Bildet ligger på ${host}. Henter du det, kan nettstedet se at du åpnet dokumentet.`, url);
+  el.classList.add('cm-image-remote');
+  const actions = document.createElement('span');
+  actions.className = 'cm-image-remote-actions';
+  const button = (label: string, title: string, onClick: () => void) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.title = title;
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', () => {
+      onClick();
+      redrawImages(view);
+    });
+    actions.append(b);
+  };
+  button('Vis bildet', 'Hent dette bildet nå', () => shownRemote.add(url));
+  button(`Alltid fra ${host}`, `Vis bilder fra ${host} uten å spørre`, () => {
+    const hosts = getSettings().security.imageHosts;
+    updateSettings({ security: { imageHosts: [...hosts, host] } });
+  });
+  el.append(actions);
+  return el;
+}
+
 function renderImage(view: EditorView, dest: string): HTMLElement {
   const box = document.createElement('div');
   box.className = 'cm-image';
@@ -162,8 +198,15 @@ function renderImage(view: EditorView, dest: string): HTMLElement {
     box.append(notice(source.reason));
     return box;
   }
+  const host = remoteHost(source);
+  if (host && !shownRemote.has(keyOf(source)) && !isHostAllowed(host, getSettings().security.imageHosts)) {
+    box.append(remoteNotice(view, host, keyOf(source)));
+    return box;
+  }
   const img = document.createElement('img');
   img.draggable = false;
+  // Don't tell the image's host which page asked for it.
+  if (host) img.referrerPolicy = 'no-referrer';
   img.title = dest;
   const key = keyOf(source);
   // Reserve the space at once when we've seen the picture before (no jumping).

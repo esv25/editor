@@ -8,8 +8,16 @@ import katex from 'katex';
 import 'katex/contrib/mhchem';
 import 'katex/dist/katex.min.css';
 
-/** Only the marker commands the formula field writes are trusted. */
-const trust = (context: { command: string }) => context.command === '\\htmlData' || context.command === '\\htmlClass';
+/**
+ * Only the marker commands the formula field writes are trusted. Everything
+ * that renders KaTeX uses this, never `trust: true` (which would allow
+ * \href{javascript:…}, \includegraphics and raw HTML attributes). \htmlClass
+ * only takes the field's own classes (mf-…, mp-…): a document must not be
+ * able to dress formula parts up as the app's UI (e.g. "cm-editor").
+ */
+export const trust = (context: { command: string; class?: string }) =>
+  context.command === '\\htmlData' ||
+  (context.command === '\\htmlClass' && /^(?:mf|mp)-[a-z-]+$/.test(context.class ?? ''));
 
 const cache = new Map<string, string>();
 const CACHE_LIMIT = 800;

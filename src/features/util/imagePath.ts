@@ -78,6 +78,28 @@ function decode(text: string): string {
 }
 
 /**
+ * The host an image would be fetched from over the network (http/https), or
+ * null for files, data: and blob: URLs. Fetching it tells that host the
+ * document was opened, so such images wait for the user (NSM 2.5).
+ */
+export function remoteHost(source: ImageSource): string | null {
+  if (source.kind !== 'url' || !/^https?:/i.test(source.url)) return null;
+  try {
+    return new URL(source.url).hostname.toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether images from `host` load without asking (`hosts` may hold "example.com" for its subdomains too). */
+export function isHostAllowed(host: string, hosts: string[]): boolean {
+  return hosts.some((h) => {
+    const allowed = h.trim().toLowerCase();
+    return allowed !== '' && (host === allowed || host.endsWith(`.${allowed}`));
+  });
+}
+
+/**
  * Where an image destination points. Relative paths are resolved against the
  * document's folder, so they need a saved document.
  */

@@ -3,9 +3,10 @@
  * direct file system access via @tauri-apps/plugin-dialog and plugin-fs.
  */
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { documentDir, join } from '@tauri-apps/api/path';
-import { exists, mkdir, readDir, readFile, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { appLocalDataDir, documentDir, join } from '@tauri-apps/api/path';
+import { exists, mkdir, readDir, readFile, readTextFile, remove, rename, writeTextFile } from '@tauri-apps/plugin-fs';
 import { codeFileExtensions } from '../code/fileTypes';
+import { backupDay, backupFileName, expiredBackupDays } from './backupRules';
 import type { FileRef, FolderEntry, OpenedFile, StorageBackend } from './types';
 
 interface PathRef extends FileRef {
@@ -20,6 +21,38 @@ const filters = [
 
 const refFor = (path: string): PathRef => ({ name: path.split(/[\\/]/).pop() ?? path, path });
 
+/** Files already backed up this session (compared like Windows paths). */
+const backedUp = new Set<string>();
+let pruned = false;
+
+const backupRoot = async () => join(await appLocalDataDir(), 'backups');
+
+/**
+ * Before a file is overwritten the first time this session, copy what's on
+ * disk to backups/<day>/ (see backupRules.ts). A failed backup never stops
+ * the save.
+ */
+async function backupBeforeOverwrite(path: string): Promise<void> {
+  const key = path.replace(/\\/g, '/').toLowerCase();
+  if (backedUp.has(key)) return;
+  backedUp.add(key);
+  try {
+    if (!(await exists(path))) return;
+    const now = new Date();
+    const root = await backupRoot();
+    const dir = await join(root, backupDay(now));
+    await mkdir(dir, { recursive: true });
+    await writeTextFile(await join(dir, backupFileName(now, refFor(path).name)), await readTextFile(path));
+    if (!pruned) {
+      pruned = true;
+      const days = (await readDir(root)).filter((e) => e.isDirectory).map((e) => e.name);
+      for (const day of expiredBackupDays(days, now)) await remove(await join(root, day), { recursive: true });
+    }
+  } catch (err) {
+    console.warn('Kunne ikke ta sikkerhetskopi av', path, err);
+  }
+}
+
 export const tauriStorage: StorageBackend = {
   canSaveInPlace: true,
 
@@ -32,8 +65,12 @@ export const tauriStorage: StorageBackend = {
     return { file: refFor(path), content: await readTextFile(path) };
   },
 
+  async defaultFolder(): Promise<string> {
+    return join(await documentDir(), 'Editor');
+  },
+
   async createNew(content: string, baseName: string, extension: string, folder?: string): Promise<FileRef> {
-    const dir = folder || (await join(await documentDir(), 'Editor'));
+    const dir = folder || (await this.defaultFolder!());
     await mkdir(dir, { recursive: true });
     let path = await join(dir, `${baseName}.${extension}`);
     for (let i = 2; await exists(path); i++) path = await join(dir, `${baseName} (${i}).${extension}`);
@@ -77,17 +114,22 @@ export const tauriStorage: StorageBackend = {
     return typeof path === 'string' ? path : null;
   },
 
+  backupFolder: backupRoot,
+
   readBinary(path: string): Promise<Uint8Array> {
     return readFile(path);
   },
 
   async save(file: FileRef, content: string): Promise<void> {
-    await writeTextFile((file as PathRef).path, content);
+    const path = (file as PathRef).path;
+    await backupBeforeOverwrite(path);
+    await writeTextFile(path, content);
   },
 
   async saveAs(content: string, suggestedName: string): Promise<FileRef | null> {
     const path = await save({ defaultPath: suggestedName, filters });
     if (!path) return null;
+    await backupBeforeOverwrite(path);
     await writeTextFile(path, content);
     return refFor(path);
   },

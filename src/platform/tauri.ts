@@ -105,6 +105,9 @@ export const tauriPlatform: Platform = {
     };
   },
 
+  // Served by the "preview" URI scheme in src-tauri/src/lib.rs.
+  htmlPreviewUrl: 'http://preview.localhost/',
+
   runProgram(request: RunRequest) {
     return invoke<RunResult>('run_program', { ...request });
   },
