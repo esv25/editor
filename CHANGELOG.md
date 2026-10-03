@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Appen sier fra om nye versjoner mens den er åpen (den ser etter hver halvtime), ikke bare når den starter. Trykker du «Senere», står den nye versjonen ved versjonsnummeret nederst – klikk der for å oppdatere.
+
 ## 0.6.0 – 2026-10-03
 
 - **Sikkerhet**: kode fra en mappe du ikke har kjørt kode fra før, kjøres først når du har sagt ja. Bilder fra nettet vises først når du klikker «Vis bildet». Før en fil overskrives, legges en sikkerhetskopi til side (høyreklikk en fil i filtreet → «Vis sikkerhetskopier»).

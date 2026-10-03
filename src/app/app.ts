@@ -24,7 +24,7 @@ import { MathPanel } from '../ui/mathPanel';
 import { OutlinePanel } from '../ui/outline';
 import { renderCount, renderSaveStatus, renderTitle } from '../ui/statusbar';
 import { TabsUI } from '../ui/tabs';
-import { checkForUpdates } from '../ui/updates';
+import { setupUpdates } from '../ui/updates';
 import { openWhatsNew, showWhatsNewOnStart } from '../ui/whatsNew';
 import { renderButtons } from '../ui/toolbar';
 import { initAppearance, resolvedTheme } from '../appearance';
@@ -375,7 +375,7 @@ export async function startApp(): Promise<void> {
   platform.onOpenFile?.((path) => void ws.openPath(path));
 
   // Updates (installed desktop app only): say what's new after one, check
-  // quietly shortly after start; clicking the version in the status bar checks on demand.
+  // quietly after start and while running; clicking the version in the status bar checks on demand.
   const beforeInstall = async () => {
     await Promise.all(ws.allDocs().filter((d) => d.dirty && d.file).map((d) => d.save({ silent: true })));
     ws.saveNow();
@@ -387,8 +387,7 @@ export async function startApp(): Promise<void> {
     versionEl.textContent = `v${version}`;
     versionEl.title = 'Se etter oppdateringer';
     versionEl.hidden = false;
-    versionEl.addEventListener('click', () => void checkForUpdates(false, beforeInstall));
-    if (import.meta.env.PROD) setTimeout(() => void checkForUpdates(true, beforeInstall), 4000);
+    setupUpdates(versionEl, beforeInstall, import.meta.env.PROD);
   }
 
   platform.onCloseRequested(() => {

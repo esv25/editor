@@ -386,8 +386,10 @@ direkte. Nye Tauri-API-kall krever ofte en tillatelse i `capabilities/default.js
 ### Oppdateringer (`ui/updates.ts`, `ui/whatsNew.ts`, `scripts/release.mjs`)
 
 - Repoet er offentlig på https://github.com/esv25/editor. Appen bruker Tauri-updateren
-  og sjekker `releases/latest/download/latest.json` ved oppstart (bare i bygget app),
-  og når man klikker versjonsnummeret i statuslinja.
+  og sjekker `releases/latest/download/latest.json` ved oppstart og deretter hvert
+  `settings.updates.checkMinutes` (standard 30; bare i bygget app), og når man klikker
+  versjonsnummeret i statuslinja. Bakgrunnssjekker viser ikke samme versjon på nytt etter
+  «Senere»; da står den nye versjonen ved versjonsnummeret (`.has-update`).
 - Oppdateringer er signert. Privatnøkkelen ligger i `~/.tauri/editor.key` (utenfor repoet,
   skal **aldri** committes); den offentlige nøkkelen står i `tauri.conf.json`. Mistes
   privatnøkkelen, kan ikke installerte apper oppdateres lenger – da må en ny versjon

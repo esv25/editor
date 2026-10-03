@@ -72,6 +72,8 @@ export interface AvailableUpdate {
   notes?: string;
   /** Download, install and restart. `onProgress` gets 0–1, or null if the size is unknown. */
   install(onProgress?: (fraction: number | null) => void): Promise<void>;
+  /** Let go of it without installing. */
+  dispose?(): void;
 }
 
 export interface Platform {
