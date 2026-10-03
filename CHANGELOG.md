@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+## 0.7.0 – 2026-10-03
+
 - **Kodehjelp** i Python- og JavaScript-filer, som i VS Code: rød bølgestrek under feilstavede navn med forslag til hva du mente («mente du count?» – klikk for å rette), ubrukte variabler, funksjoner og importer tones ned, og kode som aldri kjøres blir grå. Python får egne meldinger for manglende kolon, feil innrykk, `=` i stedet for `==` og glemte importer.
 - Fargede parentespar, innrykkslinjer, og alle stedene samme variabel brukes markeres når markøren står på den. Forslag dukker opp mens du skriver.
 - Velg hvor mye hjelp du vil ha under **Kodehjelp** i innstillingsmenyen: Av, Litt, Som VS Code eller Mye (da står feilmeldingen på linja, med forklaring). Hver ting kan også slås av og på for seg.
