@@ -97,7 +97,8 @@ src/
   ui/                     faner (tabs.ts), verktøylinjer (toolbar.ts, codeBar.ts), filtre
                           (fileTree.ts), høyreklikkmeny, disposisjon, statuslinje, updates,
                           feilsøkingsvisningen i sidefeltet (debugPanel.ts), mattepanelet
-                          (mathPanel.ts) og hurtigtast-dialogene (mathShortcuts.ts)
+                          (mathPanel.ts), hurtigtast-dialogene (keybindings.ts for alle
+                          kommandoer, mathShortcuts.ts for matte) og modal.ts
   styles.css              editorens layout og klasser (fargene ligger i theme.css)
   diagram/                tegnevinduet – et eget lite program (se «Tegnevinduet» under)
 diagram.html              inngangen til tegnevinduet (Vite bygger to sider: index + diagram)
@@ -160,7 +161,8 @@ Markdown (`$…$`, `$$` på egne linjer), så filene virker i Obsidian/Typora/Gi
   en StateField (`activeField`) og feltet skriver hver endring til dokumentet (angre,
   autolagring og ordtelling virker som ellers; `syncField` laster på nytt ved angre).
   Inn med klikk, piltaster, Backspace/Delete; Ctrl+M / Ctrl+Shift+M lager nye.
-- `catalog.ts`: alt i mattepanelet, ordnet etter tema (LK20). `shortcuts.ts`: innebygde
+- `catalog.ts`: alt i mattepanelet (`ui/mathPanel.ts`; vises mens en formel redigeres, eller
+  alltid med Σ – `math.paletteAuto`/`math.palette`), ordnet etter tema (LK20). `shortcuts.ts`: innebygde
   forkortelser. `render.ts`: KaTeX-tegning (cache).
 - Egne hurtigtaster (`settings.math.keys`: tast/sekvens → LaTeX-mal, `settings.math.shortcuts`:
   forkortelse → mal) lages i dialogen (høyreklikk i panelet / «Hurtigtaster»), der malen
@@ -334,7 +336,9 @@ Alle brukerhandlinger er kommandoer i `commands/registry.ts`. Knapper
 (`commandKeymap()`) slår opp i registeret, så en ny kommando legges til ett sted.
 
 - `key` er standard hurtigtast i CodeMirror-notasjon (`Mod-Shift-7`); brukeren kan
-  overstyre via `settings.keybindings[id]` (null = ingen hurtigtast).
+  overstyre via `settings.keybindings[id]` (null = ingen hurtigtast) – i dialogen
+  «Hurtigtaster» (`ui/keybindings.ts`: tastaturknappen øverst, eller høyreklikk på en knapp i
+  verktøylinja). Der ligger også tegnevinduets verktøytaster (`settings.diagram.toolKeys`).
 - `isActive(state)` gir aktiv-markering på knappen.
 - Hvilke knapper verktøylinja viser styres av `settings.toolbar` (`'|'` = skillelinje).
 - App-kommandoer (fil, visning) registreres i `app/app.ts` før editoren lages.
@@ -392,8 +396,9 @@ direkte. Nye Tauri-API-kall krever ofte en tillatelse i `capabilities/default.js
 
 `settings.ts`: `getSettings()`, `updateSettings(patch)` (dyp fletting), `onSettingsChange`.
 Kun overstyringer lagres, så endrede standardverdier slår gjennom. Editor-extensions
-bygges på nytt via en Compartment når innstillinger endres. Det finnes ennå ingen
-innstillings-UI; endre via konsollen eller standardverdiene.
+bygges på nytt via en Compartment når innstillinger endres. Endres de i et annet vindu
+(tegnevinduet), følger de andre etter via `storage`-hendelsen. Det finnes ennå ingen samlet
+innstillings-UI (bare hurtigtast-dialogene); ellers endres de via konsollen eller standardverdiene.
 
 ## Konvensjoner
 

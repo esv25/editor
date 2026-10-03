@@ -4,7 +4,7 @@
  */
 import type { DiagramCanvas } from './canvas';
 import { shapeIcon } from './shapes/common';
-import { tools } from './tools';
+import { toolKey, tools } from './tools';
 
 export interface Toolbar {
   update(): void;
@@ -48,7 +48,7 @@ export function renderToolbar(
   const toolGroup = group();
   const toolButtons = tools.map((tool) => ({
     tool,
-    el: button(toolGroup, tool.name, `${tool.name} (${tool.key.toUpperCase()})`, tool.icon, () => canvas.setTool(tool.id)),
+    el: button(toolGroup, tool.name, tool.name, tool.icon, () => canvas.setTool(tool.id)),
   }));
 
   const editGroup = group();
@@ -77,6 +77,9 @@ export function renderToolbar(
         const active = canvas.tool.id === tool.id;
         el.classList.toggle('active', active);
         el.setAttribute('aria-pressed', String(active));
+        // The key can be changed (in the editor's «Hurtigtaster»), so it's read each time.
+        const key = toolKey(tool);
+        el.title = key ? `${tool.name} (${key.toUpperCase()})` : tool.name;
       }
       deleteButton.disabled = !canvas.selection;
       zoomLabel.querySelector('span')!.textContent = `${canvas.zoomPercent} %`;
