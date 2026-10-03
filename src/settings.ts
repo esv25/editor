@@ -9,6 +9,7 @@ import {
   type HeadingSuggestionConfig,
 } from './features/headingSuggestion/rules';
 import type { RunnerConfig } from './features/codeBlockTools/runners';
+import type { DebuggerConfig } from './debug/debuggers';
 
 export type ThemeSetting = 'light' | 'dark' | 'system';
 
@@ -33,6 +34,16 @@ export interface Settings {
   codeRunners: Record<string, Partial<RunnerConfig>>;
   /** Max run time for a code block before it's stopped. */
   codeRunTimeoutMs: number;
+  /** Per-language debugger overrides (see debug/debuggers.ts). */
+  debuggers: Record<string, Partial<DebuggerConfig>>;
+  terminal: {
+    /** Program for new terminals (on PATH or a full path). */
+    shell: string;
+    shellArgs: string[];
+    /** Height of the terminal panel in pixels. */
+    height: number;
+    fontSize: number;
+  };
   /** Opening characters that get their closing partner inserted automatically. [] = off. */
   closeBrackets: string[];
   headingSuggestion: HeadingSuggestionConfig;
@@ -40,6 +51,17 @@ export interface Settings {
   keybindings: Record<string, string | string[] | null>;
   /** Command ids shown in the formatting toolbar; "|" is a separator. */
   toolbar: string[];
+  /** The drawing window. */
+  diagram: {
+    /** Grid step: everything snaps to it. */
+    grid: number;
+    /** How far (screen px) from a figure or arrow a click still hits it. */
+    hitTolerance: number;
+    /** How far (screen px) the pointer must move with the button down before it's a drag, not a click. */
+    dragThreshold: number;
+    /** Wait this long after a change before saving. */
+    autosaveDelayMs: number;
+  };
   math: MathSettings;
 }
 
@@ -70,6 +92,8 @@ export const defaultSettings: Settings = {
   autosave: { enabled: true, delayMs: 1500, folder: '' },
   codeRunners: {},
   codeRunTimeoutMs: 30000,
+  debuggers: {},
+  terminal: { shell: 'powershell.exe', shellArgs: ['-NoLogo'], height: 260, fontSize: 13 },
   closeBrackets: ['(', '[', '{', '«'],
   headingSuggestion: defaultHeadingSuggestionConfig,
   keybindings: {},
@@ -77,9 +101,10 @@ export const defaultSettings: Settings = {
     'heading.1', 'heading.2', 'heading.3', '|',
     'format.bold', 'format.italic', 'format.code', '|',
     'list.bullet', 'list.ordered', 'list.task', '|',
-    'codeblock.toggle', 'image.insert', '|',
+    'codeblock.toggle', 'image.insert', 'diagram.new', '|',
     'math.inline', 'math.block', 'math.palette',
   ],
+  diagram: { grid: 20, hitTolerance: 16, dragThreshold: 6, autosaveDelayMs: 500 },
   math: {
     palette: true,
     paletteTab: 'basic',

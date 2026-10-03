@@ -1,0 +1,120 @@
+/* Colour and font tokens shared by the editor and the drawing window (light + dark). */
+/* ---------- Theme tokens ---------- */
+:root {
+  --font-ui: system-ui, "Segoe UI", -apple-system, sans-serif;
+  /* Set from settings at runtime: --font-prose, --font-mono, --font-size, --line-height, --line-width */
+
+  --bg: #fbfaf7;
+  --fg: #2b2a28;
+  --muted: #6d6a64;
+  --faint: #aaa59c;
+  --accent: #3867a6;
+  --border: #e6e2da;
+  --panel-bg: #f4f2ed;
+  --button-bg: #ffffff;
+  --button-hover: #ebe8e1;
+  --button-active: #dfe7f3;
+  --selection: #cfe0f5;
+  /* Translucent so the selection layer (drawn behind the text) shows through. */
+  --code-bg: rgb(120 105 80 / 0.09);
+  --search-match: #f6e7a6;
+  --search-match-selected: #f1c65f;
+  /* A formula being edited. */
+  --math-edit-bg: rgb(56 103 166 / 0.07);
+  --math-hover-bg: rgb(56 103 166 / 0.06);
+
+  --syn-keyword: #a626a4;
+  --syn-string: #3f8f3e;
+  --syn-number: #986801;
+  --syn-comment: #9a9ba1;
+  --syn-function: #3a6fd8;
+  --syn-type: #b07600;
+  --syn-property: #c8453b;
+  --syn-tag: #c8453b;
+  --syn-variable: #383a42;
+  --syn-punct: #5c5f66;
+  --syn-invalid: #e0321f;
+
+  /* Debugging: breakpoint dot, paused line (translucent: the selection is drawn behind it). */
+  --breakpoint: #d93a2b;
+  --exec-arrow: #d99a00;
+  --exec-line: rgb(255 196 0 / 0.2);
+  --exec-frame: #4f9a5a;
+  --exec-line-frame: rgb(80 160 90 / 0.15);
+
+  /* Terminal colours (ANSI). */
+  --term-black: #2b2a28;
+  --term-red: #c8312b;
+  --term-green: #3b7d2c;
+  --term-yellow: #8a6100;
+  --term-blue: #2a5fb0;
+  --term-magenta: #a626a4;
+  --term-cyan: #137a87;
+  --term-white: #8c887f;
+  --term-bright-black: #6d6a64;
+  --term-bright-red: #e0321f;
+  --term-bright-green: #4c9a3a;
+  --term-bright-yellow: #a67600;
+  --term-bright-blue: #3a6fd8;
+  --term-bright-magenta: #bc3fbc;
+  --term-bright-cyan: #1c8fa3;
+  --term-bright-white: #b5b1a8;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #1d1e21;
+  --fg: #dcdad5;
+  --muted: #9b9891;
+  --faint: #5f6166;
+  --accent: #7fa9e3;
+  --border: #313338;
+  --panel-bg: #232428;
+  --button-bg: #2a2b30;
+  --button-hover: #34363c;
+  --button-active: #2f4263;
+  --selection: #2f4a6b;
+  --code-bg: rgb(255 255 255 / 0.05);
+  --search-match: #5a4e1c;
+  --search-match-selected: #85701f;
+  --math-edit-bg: rgb(127 169 227 / 0.1);
+  --math-hover-bg: rgb(127 169 227 / 0.08);
+
+  --syn-keyword: #c678dd;
+  --syn-string: #98c379;
+  --syn-number: #d19a66;
+  --syn-comment: #7f848e;
+  --syn-function: #61afef;
+  --syn-type: #e5c07b;
+  --syn-property: #e06c75;
+  --syn-tag: #e06c75;
+  --syn-variable: #dcdad5;
+  --syn-punct: #abb2bf;
+  --syn-invalid: #ff6b5b;
+
+  --breakpoint: #f0564a;
+  --exec-arrow: #f2c14e;
+  --exec-line: rgb(255 200 60 / 0.14);
+  --exec-frame: #7cc489;
+  --exec-line-frame: rgb(120 200 130 / 0.12);
+
+  --term-black: #3b3d42;
+  --term-red: #e06c75;
+  --term-green: #98c379;
+  --term-yellow: #e5c07b;
+  --term-blue: #61afef;
+  --term-magenta: #c678dd;
+  --term-cyan: #56b6c2;
+  --term-white: #dcdad5;
+  --term-bright-black: #7f848e;
+  --term-bright-red: #ff7b86;
+  --term-bright-green: #b5e890;
+  --term-bright-yellow: #f0d197;
+  --term-bright-blue: #7fc0ff;
+  --term-bright-magenta: #d99ae8;
+  --term-bright-cyan: #7fd0da;
+  --term-bright-white: #ffffff;
+
+  color-scheme: dark;
+}

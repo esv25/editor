@@ -22,6 +22,7 @@ import { codeCommands, codeLanguage, codeModeExtensions } from '../code/codeMode
 import { indentationFor } from '../code/indentation';
 import { loadLanguage, type DocKind } from '../code/languages';
 import { commandKeymap, registerCommands } from '../commands/registry';
+import { debuggerFor } from '../debug/debuggers';
 import { features } from '../features';
 import { mathSyntax } from '../features/math/syntax';
 import { getSettings, onSettingsChange, type Settings } from '../settings';
@@ -95,7 +96,7 @@ export async function createCodeState(text: string, lang: string): Promise<Edito
       codeLanguage.of(lang),
       support,
       indentationFor(text, lang),
-      codeModeExtensions(),
+      codeModeExtensions(debuggerFor(lang) !== null),
       dynamic.of(dynamicExtensions('code', getSettings())),
       sharedExtensions(),
     ],

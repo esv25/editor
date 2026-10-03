@@ -1,12 +1,22 @@
 /**
- * Keyboard events ⇄ CodeMirror key notation ("Mod-Shift-7"), for places
- * outside CodeMirror's own keymaps (the formula field, recording a new
- * shortcut). Matching works like CodeMirror's: Shift+7 on a Norwegian
- * keyboard is "/", but "Mod-Shift-7" still matches it.
+ * Keys outside CodeMirror's own keymaps.
+ *
+ * - Key events ⇄ CodeMirror notation ("Mod-Shift-7"), for the formula field
+ *   and for recording a new shortcut. Matching works like CodeMirror's:
+ *   Shift+7 on a Norwegian keyboard is "/", but "Mod-Shift-7" still matches it.
+ * - Key sequences (Ctrl+M, F).
+ * - App-wide commands (scope 'any') when focus is elsewhere – the terminal,
+ *   the sidebar, a button. CodeMirror runs command keys while the editor has
+ *   focus.
  */
+import type { EditorView } from '@codemirror/view';
 import { base, keyName } from 'w3c-keyname';
+import { allCommands, keysFor } from './registry';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+
+/** What matching needs from a key event (tests pass plain objects). */
+export type KeyEvent = Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey'> & { keyCode?: number };
 
 /** Canonical form of a key spec ("Mod-Shift-a" → "Shift-Ctrl-a" on Windows). */
 export function normalizeKey(spec: string): string {
@@ -34,7 +44,7 @@ export function normalizeKey(spec: string): string {
   return result;
 }
 
-function withModifiers(name: string, e: KeyboardEvent, shift: boolean): string {
+function withModifiers(name: string, e: KeyEvent, shift: boolean): string {
   if (e.altKey) name = 'Alt-' + name;
   if (e.ctrlKey) name = 'Ctrl-' + name;
   if (e.metaKey) name = 'Meta-' + name;
@@ -42,12 +52,19 @@ function withModifiers(name: string, e: KeyboardEvent, shift: boolean): string {
   return name;
 }
 
+/** The key without Shift/Alt ("/" → "7"), from the key code or else the physical key. */
+function baseKey(e: KeyEvent): string | undefined {
+  if (e.keyCode !== undefined && base[e.keyCode]) return base[e.keyCode];
+  const physical = /^(?:Key|Digit)(.)$/.exec(e.code)?.[1];
+  return physical?.toLowerCase();
+}
+
 /** The canonical names a key event can match. */
-export function eventKeyNames(e: KeyboardEvent): string[] {
-  const name = keyName(e);
+export function eventKeyNames(e: KeyEvent): string[] {
+  const name = keyName(e as KeyboardEvent);
   const isChar = name.length === 1 && name !== ' ';
   const names = [withModifiers(name, e, !isChar)];
-  const baseName = base[e.keyCode];
+  const baseName = baseKey(e);
   if (isChar && (e.shiftKey || e.altKey || e.metaKey) && baseName && baseName !== name) {
     names.push(withModifiers(baseName, e, true));
   } else if (isChar && e.shiftKey) {
@@ -56,13 +73,14 @@ export function eventKeyNames(e: KeyboardEvent): string[] {
   return names;
 }
 
-export function matchesKey(e: KeyboardEvent, spec: string): boolean {
+/** Whether a key event matches a binding in CodeMirror notation ("Mod-Shift-Enter", "F10"). */
+export function matchesKey(e: KeyEvent, spec: string): boolean {
   const target = normalizeKey(spec);
   return eventKeyNames(e).includes(target);
 }
 
 /** AltGr on Windows arrives as Ctrl+Alt: then the key is a character to type, not a shortcut. */
-export function isAltGraph(e: KeyboardEvent): boolean {
+export function isAltGraph(e: KeyEvent): boolean {
   return e.ctrlKey && e.altKey && !e.metaKey && e.key.length === 1;
 }
 
@@ -73,10 +91,10 @@ export const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'AltGra
  * recording a shortcut. Null for lone modifiers, and for plain typing keys
  * unless `plain` (later keys of a sequence may be plain: Ctrl+M, F).
  */
-export function keySpecFromEvent(e: KeyboardEvent, plain = false): string | null {
+export function keySpecFromEvent(e: KeyEvent, plain = false): string | null {
   if (MODIFIER_KEYS.has(e.key) || isAltGraph(e)) return null;
-  let name = keyName(e);
-  const baseName = base[e.keyCode];
+  let name = keyName(e as KeyboardEvent);
+  const baseName = baseKey(e);
   if (name.length === 1 && baseName && (e.shiftKey || e.altKey)) name = baseName;
   if (name === ' ') name = 'Space';
   const mod = isMac ? e.metaKey : e.ctrlKey;
@@ -129,7 +147,7 @@ export class ChordMatcher<T> {
    * continued a sequence (the key should be swallowed), or null.
    * `fallback` runs when a waiting sequence times out.
    */
-  feed(e: KeyboardEvent, bindings: ChordBinding<T>[], fallback: (keys: string[]) => void): { value: T } | 'pending' | null {
+  feed(e: KeyEvent, bindings: ChordBinding<T>[], fallback: (keys: string[]) => void): { value: T } | 'pending' | null {
     if (MODIFIER_KEYS.has(e.key)) return null;
     const names = eventKeyNames(e);
     const at = this.pending.length;
@@ -163,4 +181,41 @@ export class ChordMatcher<T> {
     if (this.pending.length) this.onPending(null);
     this.pending = [];
   }
+}
+
+/** App-wide commands bound to this key, in registration order. */
+export function commandsForKey(event: KeyboardEvent) {
+  return allCommands().filter((c) => c.scope === 'any' && keysFor(c.id).some((k) => matchesKey(event, k)));
+}
+
+/**
+ * Keys the terminal leaves to the app: function keys (debugging), switching
+ * tabs and showing/hiding the terminal. Everything else goes to the shell.
+ */
+export function isAppKeyInTerminal(event: KeyboardEvent): boolean {
+  return commandsForKey(event).some(
+    (c) =>
+      ['view.toggleTerminal', 'tab.next', 'tab.prev'].includes(c.id) ||
+      keysFor(c.id).some((k) => /(^|-)F\d+$/.test(k) && matchesKey(event, k)),
+  );
+}
+
+/** Keys that reload the page in the webview – never wanted in the installed app. */
+const RELOAD_KEYS = ['F5', 'Shift-F5', 'Mod-F5', 'Mod-r', 'Mod-Shift-r'];
+
+export function installGlobalKeys(getView: () => EditorView, blockReload: boolean): void {
+  window.addEventListener('keydown', (event) => {
+    if (event.defaultPrevented) return;
+    const target = event.target instanceof Element ? event.target : null;
+    // The editor runs its own keymap; anything it didn't handle falls through to here.
+    if (!target?.closest('.cm-editor')) {
+      for (const command of commandsForKey(event)) {
+        if (command.run(getView())) {
+          event.preventDefault();
+          return;
+        }
+      }
+    }
+    if (blockReload && RELOAD_KEYS.some((k) => matchesKey(event, k))) event.preventDefault();
+  });
 }

@@ -19,10 +19,14 @@
       </nav>
       <div id="workspace">
         <aside id="sidebar">
+          <section id="debug" aria-label="Feilsøking" hidden></section>
           <section id="files" aria-label="Filer"></section>
           <section id="outline" aria-label="Disposisjon"></section>
         </aside>
-        <main id="editor"></main>
+        <div id="main">
+          <main id="editor"></main>
+          <section id="panel" aria-label="Terminal" hidden></section>
+        </div>
       </div>
       <section id="math-panel" class="math-panel" aria-label="Mattepanel" hidden></section>
       <footer id="statusbar">

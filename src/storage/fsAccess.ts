@@ -2,7 +2,7 @@
  * Storage backend using the File System Access API (Chrome, Edge).
  * Files are opened and saved in place, so autosave works.
  */
-import { codeFileExtensions } from '../code/languages';
+import { codeFileExtensions } from '../code/fileTypes';
 import { NeedsPermissionError, type FileRef, type OpenedFile, type StorageBackend } from './types';
 
 interface HandleRef extends FileRef {

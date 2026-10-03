@@ -18,13 +18,23 @@ import {
   relativeImagePath,
   resolveImageSource,
 } from '../util/imagePath';
+import { DIAGRAM_EXTENSION, isDiagramPath, newDiagramSvg } from '../../diagram/fileFormat';
 import { insertOnOwnLine, readImage, removeImage, setImageAlt, setImageDest, type ImageRef } from './commands';
 import { forgetImages, imageUrl, keyOf, knownSize, rememberSize } from './loader';
 
-/** The folder relative image paths resolve against (the active document's). Set by the app. */
+/** Set by the app. */
 export const imageContext = {
+  /** The folder relative image paths resolve against (the active document's). */
   baseDir: (): string | undefined => undefined,
+  /** Open a drawing (a .diagram.svg file, or a new blank one) in the drawing window. */
+  openDrawing: null as ((path?: string) => void) | null,
 };
+
+/** The file behind a drawing's image link, if it is one we can open. */
+function drawingPath(dest: string): string | null {
+  const source = resolveImageSource(dest, imageContext.baseDir());
+  return source.kind === 'file' && isDiagramPath(source.path) && imageContext.openDrawing ? source.path : null;
+}
 
 const redraw = StateEffect.define<null>();
 
@@ -103,7 +113,10 @@ class ImageHeaderWidget extends WidgetType {
       el.addEventListener('click', onClick);
       root.append(el);
     };
-    if (storage.pickFile) {
+    const drawing = drawingPath(this.dest);
+    if (drawing) {
+      button('Rediger tegning', 'Åpne tegningen i tegnevinduet (eller dobbeltklikk på den)', () => imageContext.openDrawing?.(drawing));
+    } else if (storage.pickFile) {
       button('Bytt bilde', 'Velg en annen bildefil', async () => {
         const picked = await pickImage('Bytt bilde');
         if (picked) setImageDest(pos(), picked.dest)(view);
@@ -165,6 +178,12 @@ function renderImage(view: EditorView, dest: string): HTMLElement {
   });
   img.addEventListener('error', () => fail('Kunne ikke vise bildet'));
   box.append(img);
+  const drawing = drawingPath(dest);
+  if (drawing) {
+    box.classList.add('cm-image-drawing');
+    img.title = 'Dobbeltklikk for å redigere tegningen';
+    box.addEventListener('dblclick', () => imageContext.openDrawing?.(drawing));
+  }
   imageUrl(source).then(
     (url) => (img.src = url),
     (err: unknown) => fail(err instanceof Error ? err.message : String(err)),
@@ -269,6 +288,29 @@ async function pickAndInsert(view: EditorView): Promise<void> {
   view.focus();
 }
 
+/**
+ * New drawing: an empty .diagram.svg in a "figurer" folder next to the note,
+ * linked on its own line and opened in the drawing window. In the browser
+ * (no files by path) it just opens a blank drawing window.
+ */
+async function newDrawing(view: EditorView): Promise<void> {
+  const open = imageContext.openDrawing;
+  if (!open) return;
+  if (!storage.createNew) {
+    open();
+    return;
+  }
+  const base = imageContext.baseDir();
+  const folder = base ? `${base}${base.includes('\\') ? '\\' : '/'}figurer` : undefined;
+  const file = await storage.createNew(newDiagramSvg(), 'tegning', DIAGRAM_EXTENSION, folder);
+  if (!file.path) return;
+  insertOnOwnLine(imageMarkdown(relativeImagePath(base, file.path)))(view);
+  open(file.path);
+}
+
+const drawingIcon =
+  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="6" rx="1"/><circle cx="17" cy="17" r="4"/><path d="M7 9v4a4 4 0 0 0 4 4h2"/></svg>';
+
 const imageIcon =
   '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-9 9"/></svg>';
 
@@ -281,6 +323,12 @@ export const images: Feature = {
       name: 'Sett inn bilde',
       icon: imageIcon,
       run: (view) => (void pickAndInsert(view), true),
+    },
+    {
+      id: 'diagram.new',
+      name: 'Ny tegning',
+      icon: drawingIcon,
+      run: (view) => (void newDrawing(view), true),
     },
   ],
 };

@@ -1,14 +1,18 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Tillatelser for hovedvinduet",
+  "description": "Tillatelser for hovedvinduet og tegnevinduene",
   "windows": [
-    "main"
+    "main",
+    "diagram-*"
   ],
   "permissions": [
     "core:default",
     "core:window:allow-set-title",
     "core:window:allow-destroy",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize",
+    "core:webview:allow-create-webview-window",
     "dialog:allow-open",
     "dialog:allow-save",
     "dialog:allow-ask",

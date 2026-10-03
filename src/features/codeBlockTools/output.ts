@@ -90,6 +90,8 @@ export function renderOutput(opts: {
   outcome?: RunOutcome;
   onRerun?: () => void;
   onClose: () => void;
+  /** The program tried to read input (which "Run" can't give it): offer to run it in the terminal. */
+  onRunInTerminal?: () => void;
 }): HTMLElement {
   const root = document.createElement('div');
   root.className = 'cm-code-output';
@@ -111,6 +113,9 @@ export function renderOutput(opts: {
     b.addEventListener('click', onClick);
     head.append(b);
   };
+  if (opts.onRunInTerminal && wantedInput(opts.outcome)) {
+    button('▶ Kjør i terminalen', 'Programmet ville lese noe du skriver. Det går bare i terminalen.', opts.onRunInTerminal);
+  }
   if (!opts.running && opts.onRerun) button('⟳', 'Kjør igjen', opts.onRerun);
   button('✕', 'Skjul utdata', opts.onClose);
   root.append(head);
@@ -168,6 +173,14 @@ class OutputWidget extends WidgetType {
   ignoreEvent() {
     return true;
   }
+}
+
+/** Error output that means the program wanted input (Python, Java, PowerShell). */
+const NEEDS_INPUT = /EOFError: EOF when reading a line|java\.util\.NoSuchElementException|NonInteractive mode/;
+
+/** Whether a finished run failed because it tried to read input. */
+function wantedInput(outcome: RunOutcome | undefined): boolean {
+  return outcome?.kind === 'process' && NEEDS_INPUT.test(outcome.result.stderr);
 }
 
 function errorSpan(text: string): HTMLElement {
