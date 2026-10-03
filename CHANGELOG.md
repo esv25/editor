@@ -11,6 +11,7 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 - Velg hvor mye hjelp du vil ha under **Kodehjelp** i innstillingsmenyen: Av, Litt, Som VS Code eller Mye (da står feilmeldingen på linja, med forklaring). Hver ting kan også slås av og på for seg.
 - **Innstillinger** (tannhjulet øverst til høyre): en meny med hva som vises (sidefelt, terminal), lyst/mørkt tema, Kodehjelp, Hurtigtaster og Hva er nytt. Tema- og tastaturknappene øverst er flyttet dit.
 - Nye taster i kodefiler: `F8` neste feil, `Ctrl+Shift+M` listen over problemer, `F2` gi nytt navn overalt, `F12` gå til der navnet er definert. Antall feil står nederst til høyre.
+- Appen sier fra om nye versjoner mens den er åpen (den ser etter hver halvtime), ikke bare når den starter. Trykker du «Senere», står den nye versjonen ved versjonsnummeret nederst – klikk der for å oppdatere.
 
 ## 0.6.0 – 2026-10-03
 

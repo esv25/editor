@@ -506,6 +506,8 @@ html, body {
   border-radius: 3px;
 }
 #status-version:hover { color: var(--fg); background: var(--button-hover); }
+#status-version.has-update { color: var(--accent); }
+#status-version.has-update::after { content: ' → ' attr(data-update); }
 .update-notice {
   position: fixed;
   right: 16px;

@@ -102,6 +102,9 @@ export const tauriPlatform: Platform = {
         // On Windows the installer closes the app itself; elsewhere restart it.
         await relaunch();
       },
+      dispose() {
+        void update.close();
+      },
     };
   },
 
