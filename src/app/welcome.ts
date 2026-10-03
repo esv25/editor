@@ -23,7 +23,7 @@ Skriv **fet**, *kursiv* og \`inline kode\` – eller marker tekst og bruk knappe
 
 Trykk **Ctrl+M** for en formel i linja, eller **Ctrl+Shift+M** for en formelblokk på egen linje. Klikk på en formel for å endre den, eller gå inn i den med piltastene.
 
-Inne i en formel: \`/\` gir brøk, \`^\` (eller \`**\`) opphøyd, \`sqrt\` kvadratrot, \`pi\` gir π, \`<=\` gir ≤ og \`*\` gangetegn. Tab hopper til neste tomme felt, Enter gir ny linje i en formelblokk, og Esc går ut. Mattepanelet nederst (Σ-knappen) har symbolene fra 1. klasse til R2 – og under «Hurtigtaster» lager du dine egne.
+Inne i en formel: \`/\` gir brøk, \`^\` (eller \`**\`) opphøyd, \`sqrt\` kvadratrot, \`pi\` gir π, \`<=\` gir ≤ og \`*\` gangetegn. Tab hopper til neste tomme felt, Enter gir ny linje i en formelblokk, og Esc går ut. Mens du er i en formel, kommer mattepanelet fram nederst med symbolene fra 1. klasse til R2 – og under «Hurtigtaster» lager du dine egne. Σ-knappen viser panelet hele tiden.
 
 Løs likningen $2x + 3 = 7$:
 

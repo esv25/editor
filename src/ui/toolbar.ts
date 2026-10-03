@@ -5,6 +5,8 @@
 import type { EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import { describeCommand, getCommand, runCommand } from '../commands/registry';
+import { showContextMenu } from './contextMenu';
+import { openKeybindings } from './keybindings';
 
 export interface ButtonBar {
   /** Refresh active states (call on selection/doc changes). */
@@ -43,6 +45,13 @@ export function renderButtons(container: HTMLElement, ids: string[], getView: ()
       runCommand(view, id);
       view.focus();
     });
+    // Right click: change its key.
+    el.addEventListener('contextmenu', (e) =>
+      showContextMenu(e, [
+        { label: `Endre hurtigtast for «${command.name}» …`, action: () => openKeybindings(getView, { record: id }) },
+        { label: 'Alle hurtigtaster …', action: () => openKeybindings(getView) },
+      ]),
+    );
     container.append(el);
     buttons.push({ id, el });
   }

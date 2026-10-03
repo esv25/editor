@@ -2,16 +2,20 @@
 //
 //   npm run release                    -> next patch version (0.2.0 -> 0.2.1)
 //   npm run release -- minor           -> 0.3.0   (or: major, or an exact 1.2.3)
-//   npm run release -- --notes "Tekst" -> release notes shown in the update notice
+//   npm run release -- --notes "Tekst" -> extra release notes (see CHANGELOG.md below)
 //   npm run release -- --fast          -> build with all cores at normal priority
 //                                         (default: 2 cores, low priority – quieter)
 //
-// Steps: check dependencies for known vulnerabilities, bump version, test,
-// build + sign the installer (low priority),
-// write latest.json, commit + tag + push, create a GitHub release.
+// Release notes: what's under "## Neste versjon" in CHANGELOG.md (plus --notes),
+// or else the commit subjects since the last release. That section becomes
+// "## x.y.z – date"; the app shows it ("Hva er nytt") after updating.
+//
+// Steps: check dependencies for known vulnerabilities, bump version, update
+// CHANGELOG.md, test, build + sign the installer (low priority), write
+// latest.json, commit + tag + push, create a GitHub release.
 // Needs: clean git tree, gh logged in, signing key in ~/.tauri/editor.key.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -75,6 +79,15 @@ const version =
   : fail(`Ukjent versjon «${bump}» (bruk patch, minor, major eller x.y.z).`);
 const tag = `v${version}`;
 
+// ---- Release notes (CHANGELOG.md) ----
+const changelogPath = path.join(root, 'CHANGELOG.md');
+const PENDING = '## Neste versjon';
+const changelog = existsSync(changelogPath) ? readFileSync(changelogPath, 'utf8').replace(/\r\n/g, '\n') : '# Hva er nytt\n';
+// [intro, "## …" sections …]
+const [intro, ...sections] = changelog.split(/^(?=## )/m);
+const pendingIndex = sections.findIndex((s) => s.split('\n', 1)[0].trim() === PENDING);
+const pending = pendingIndex >= 0 ? sections[pendingIndex].slice(PENDING.length).trim() : '';
+notes = [notes, pending].filter(Boolean).join('\n\n');
 if (!notes) {
   // Commit subjects since the previous release.
   let range = 'HEAD';
@@ -83,12 +96,19 @@ if (!notes) {
   } catch {
     // No earlier tag: use recent history.
   }
-  notes = run('git', ['log', range, '--pretty=format:- %s', '-n', '15']) || 'Forbedringer og feilrettinger.';
+  notes = run('git', ['log', range, '--no-merges', '--pretty=format:- %s', '-n', '15']) || 'Forbedringer og feilrettinger.';
 }
+const today = new Date();
+const date = [today.getFullYear(), today.getMonth() + 1, today.getDate()].map((n) => String(n).padStart(2, '0')).join('-');
+// An empty "Neste versjon" stays on top, ready for the next round.
+const released = [PENDING, `## ${version} – ${date}\n\n${notes}`];
+if (pendingIndex >= 0) sections.splice(pendingIndex, 1, ...released);
+else sections.unshift(...released);
+const newChangelog = [intro, ...sections].map((s) => s.trim()).join('\n\n') + '\n';
 
 console.log(`→ Lager versjon ${version} (var ${pkg.version})`);
-const originals = [pkgPath, confPath, cargoPath].map((p) => [p, readFileSync(p, 'utf8')]);
-const restore = () => originals.forEach(([p, text]) => writeFileSync(p, text));
+const originals = [pkgPath, confPath, cargoPath, changelogPath].map((p) => [p, existsSync(p) ? readFileSync(p, 'utf8') : null]);
+const restore = () => originals.forEach(([p, text]) => (text === null ? rmSync(p) : writeFileSync(p, text)));
 
 pkg.version = version;
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
@@ -96,6 +116,7 @@ const conf = JSON.parse(readFileSync(confPath, 'utf8'));
 conf.version = version;
 writeFileSync(confPath, JSON.stringify(conf, null, 2) + '\n');
 writeFileSync(cargoPath, readFileSync(cargoPath, 'utf8').replace(/^version = ".*"$/m, `version = "${version}"`));
+writeFileSync(changelogPath, newChangelog);
 
 // ---- Test + build ----
 try {
@@ -154,7 +175,7 @@ writeFileSync(
 
 // ---- Publish ----
 console.log('→ Commit, tag og push');
-run('git', ['add', 'package.json', 'src-tauri/tauri.conf.json', 'src-tauri/Cargo.toml', 'src-tauri/Cargo.lock']);
+run('git', ['add', 'package.json', 'src-tauri/tauri.conf.json', 'src-tauri/Cargo.toml', 'src-tauri/Cargo.lock', 'CHANGELOG.md']);
 run('git', ['commit', '-m', `Versjon ${version}`]);
 run('git', ['tag', tag]);
 run('git', ['push', 'origin', 'HEAD']);

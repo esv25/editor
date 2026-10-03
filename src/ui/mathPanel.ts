@@ -4,18 +4,30 @@
  * the cursor). «Mine» holds the user's favourites and own shortcuts.
  * Right click a button: add to «Mine», or make a shortcut for it.
  *
- * Buttons don't take focus, so the formula being edited stays open.
+ * It shows while a formula is being edited (`math.paletteAuto`), or always
+ * (`math.palette`, the Σ button). Buttons don't take focus, so the formula
+ * being edited stays open.
  */
 import katex from 'katex';
 import { trust } from '../features/math/render';
-import type { EditorView } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
 import { categories, itemsById, previewLatex, searchItems, TYPED, type MathItem } from '../features/math/catalog';
-import { activeShortcuts, describeKeys, insertMath, registerFocusZone, setSymbolMenu } from '../features/math';
+import {
+  activeShortcuts,
+  describeKeys,
+  formulaOpenIn,
+  insertMath,
+  onFormulaOpenChange,
+  registerFocusZone,
+  setSymbolMenu,
+} from '../features/math';
 import { getSettings, updateSettings, type Settings } from '../settings';
 import { showContextMenu } from './contextMenu';
 import { openShortcutEditor, openShortcutManager } from './mathShortcuts';
 
 const MINE = 'mine';
+/** Wait a little before hiding: going from one formula to the next shouldn't make it jump. */
+const HIDE_DELAY_MS = 400;
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -55,12 +67,16 @@ export class MathPanel {
   private readonly grid: HTMLElement;
   private readonly search: HTMLInputElement;
   private enabled = true;
+  /** A formula is being edited. */
+  private formulaOpen = false;
+  private hideTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     private readonly root: HTMLElement,
     private readonly getView: () => EditorView,
   ) {
     registerFocusZone(root);
+    onFormulaOpenChange((open, view) => this.setFormulaOpen(open, view));
     // Right click on a symbol in a formula: make a shortcut for it.
     setSymbolMenu((e, choices) =>
       showContextMenu(e, [
@@ -100,7 +116,10 @@ export class MathPanel {
     });
     const keys = this.headButton('Hurtigtaster', 'Se og lag hurtigtaster for matte', () => openShortcutManager(this.getView));
     keys.classList.add('mp-keys');
-    const close = this.headButton('×', 'Skjul mattepanelet', () => updateSettings({ math: { palette: false } }));
+    const close = this.headButton('×', 'Skjul mattepanelet', () => {
+      if (getSettings().math.palette) updateSettings({ math: { palette: false } });
+      else this.root.hidden = true; // shown for this formula: hide it until the next one
+    });
     close.classList.add('mp-close');
     // Search and buttons in a column of their own, so the tabs form an even grid.
     const tools = document.createElement('div');
@@ -127,14 +146,37 @@ export class MathPanel {
     return b;
   }
 
-  /** Only Markdown documents have formulas. */
+  /** Only Markdown documents have formulas. Called when another document is shown. */
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    this.root.hidden = !enabled || !getSettings().math.palette;
+    clearTimeout(this.hideTimer);
+    this.formulaOpen = formulaOpenIn(this.getView().state);
+    this.update(getSettings());
+  }
+
+  private setFormulaOpen(open: boolean, view: EditorView): void {
+    clearTimeout(this.hideTimer);
+    if (!open) {
+      this.hideTimer = setTimeout(() => {
+        this.formulaOpen = false;
+        this.update(getSettings());
+      }, HIDE_DELAY_MS);
+      return;
+    }
+    this.formulaOpen = true;
+    const wasHidden = this.root.hidden;
+    this.update(getSettings());
+    // The editor got shorter: keep the formula in sight.
+    if (wasHidden && !this.root.hidden) {
+      requestAnimationFrame(() => {
+        view.dispatch({ effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: 'nearest', yMargin: 40 }) });
+      });
+    }
   }
 
   update(settings: Settings): void {
-    this.root.hidden = !this.enabled || !settings.math.palette;
+    const show = settings.math.palette || (settings.math.paletteAuto && this.formulaOpen);
+    this.root.hidden = !this.enabled || !show;
     if (this.root.hidden) return;
     this.renderTabs(settings);
     this.renderItems();

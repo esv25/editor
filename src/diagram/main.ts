@@ -7,7 +7,7 @@ import '../theme.css';
 import './diagram.css';
 import { initAppearance } from '../appearance';
 import { platform } from '../platform';
-import { getSettings } from '../settings';
+import { getSettings, onSettingsChange } from '../settings';
 import { storage, type FileRef } from '../storage';
 import { DiagramCanvas } from './canvas';
 import { DIAGRAM_EXTENSION, exportSvg, parseDiagramSvg } from './fileFormat';
@@ -116,6 +116,8 @@ async function start(): Promise<void> {
   toolbar.setStatus(file ? 'Lagret' : 'Ikke lagret');
   toolbar.update();
   properties.update();
+  // Tool keys changed in the editor's «Hurtigtaster»: show the new ones.
+  onSettingsChange(() => toolbar.update());
 
   platform.beforeClose(async () => {
     canvas.finishEditing(true);

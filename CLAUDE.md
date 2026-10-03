@@ -95,10 +95,13 @@ src/
     session.ts            husker grupper og faner mellom oppstarter (localStorage)
     fileNames.ts          filnavn fra første linje (autolagring)
     welcome.ts            velkomsttekst første gang
+    changelog.ts          CHANGELOG.md → versjoner, hva som vises etter en oppdatering
   ui/                     faner (tabs.ts), verktøylinjer (toolbar.ts, codeBar.ts), filtre
                           (fileTree.ts), høyreklikkmeny, disposisjon, statuslinje, updates,
+                          «Hva er nytt» (whatsNew.ts),
                           feilsøkingsvisningen i sidefeltet (debugPanel.ts), mattepanelet
-                          (mathPanel.ts) og hurtigtast-dialogene (mathShortcuts.ts)
+                          (mathPanel.ts), hurtigtast-dialogene (keybindings.ts for alle
+                          kommandoer, mathShortcuts.ts for matte) og modal.ts
   styles.css              editorens layout og klasser (fargene ligger i theme.css)
   diagram/                tegnevinduet – et eget lite program (se «Tegnevinduet» under)
 diagram.html              inngangen til tegnevinduet (Vite bygger to sider: index + diagram)
@@ -162,7 +165,8 @@ Markdown (`$…$`, `$$` på egne linjer), så filene virker i Obsidian/Typora/Gi
   en StateField (`activeField`) og feltet skriver hver endring til dokumentet (angre,
   autolagring og ordtelling virker som ellers; `syncField` laster på nytt ved angre).
   Inn med klikk, piltaster, Backspace/Delete; Ctrl+M / Ctrl+Shift+M lager nye.
-- `catalog.ts`: alt i mattepanelet, ordnet etter tema (LK20). `shortcuts.ts`: innebygde
+- `catalog.ts`: alt i mattepanelet (`ui/mathPanel.ts`; vises mens en formel redigeres, eller
+  alltid med Σ – `math.paletteAuto`/`math.palette`), ordnet etter tema (LK20). `shortcuts.ts`: innebygde
   forkortelser. `render.ts`: KaTeX-tegning (cache).
 - Egne hurtigtaster (`settings.math.keys`: tast/sekvens → LaTeX-mal, `settings.math.shortcuts`:
   forkortelse → mal) lages i dialogen (høyreklikk i panelet / «Hurtigtaster»), der malen
@@ -338,7 +342,9 @@ Alle brukerhandlinger er kommandoer i `commands/registry.ts`. Knapper
 (`commandKeymap()`) slår opp i registeret, så en ny kommando legges til ett sted.
 
 - `key` er standard hurtigtast i CodeMirror-notasjon (`Mod-Shift-7`); brukeren kan
-  overstyre via `settings.keybindings[id]` (null = ingen hurtigtast).
+  overstyre via `settings.keybindings[id]` (null = ingen hurtigtast) – i dialogen
+  «Hurtigtaster» (`ui/keybindings.ts`: tastaturknappen øverst, eller høyreklikk på en knapp i
+  verktøylinja). Der ligger også tegnevinduets verktøytaster (`settings.diagram.toolKeys`).
 - `isActive(state)` gir aktiv-markering på knappen.
 - Hvilke knapper verktøylinja viser styres av `settings.toolbar` (`'|'` = skillelinje).
 - App-kommandoer (fil, visning) registreres i `app/app.ts` før editoren lages.
@@ -377,7 +383,7 @@ Annet som varierer (vindustittel, ja/nei-dialog, advarsel ved lukking, fil fra
 kommandolinja) går gjennom `platform` – bruk aldri `window.confirm`/`document.title`
 direkte. Nye Tauri-API-kall krever ofte en tillatelse i `capabilities/default.json`.
 
-### Oppdateringer (`ui/updates.ts`, `scripts/release.mjs`)
+### Oppdateringer (`ui/updates.ts`, `ui/whatsNew.ts`, `scripts/release.mjs`)
 
 - Repoet er offentlig på https://github.com/esv25/editor. Appen bruker Tauri-updateren
   og sjekker `releases/latest/download/latest.json` ved oppstart (bare i bygget app),
@@ -391,13 +397,22 @@ direkte. Nye Tauri-API-kall krever ofte en tillatelse i `capabilities/default.js
   signerer (lav prioritet), skriver `latest.json`, committer «Versjon x.y.z», tagger,
   pusher og lager GitHub-release med installasjonsfil + `latest.json`. Krever ren
   arbeidsmappe. Publisering er utadrettet – kjør det bare når brukeren ber om det.
+- «Hva er nytt»: `CHANGELOG.md` (rotmappa) bygges inn i appen (`?raw`). Første oppstart med
+  en ny versjon viser seksjonene siden forrige versjon som kjørte (`editor.lastVersion` i
+  localStorage; bare i bygget app, ikke for nye brukere). Ellers via kommandoen
+  `app.whatsNew` og knappen i «Du har nyeste versjon»-varselet.
+- Endringer brukeren merker skrives som et punkt under `## Neste versjon` i `CHANGELOG.md`
+  (kort, på norsk, for brukeren – ikke commit-meldingen). `release` gjør den seksjonen om til
+  `## x.y.z – dato`, legger en tom «Neste versjon» over, og bruker teksten (pluss `--notes`)
+  i `latest.json` og GitHub-releasen. Er den tom, brukes commit-titlene siden forrige tag.
 
 ### Innstillinger
 
 `settings.ts`: `getSettings()`, `updateSettings(patch)` (dyp fletting), `onSettingsChange`.
 Kun overstyringer lagres, så endrede standardverdier slår gjennom. Editor-extensions
-bygges på nytt via en Compartment når innstillinger endres. Det finnes ennå ingen
-innstillings-UI; endre via konsollen eller standardverdiene.
+bygges på nytt via en Compartment når innstillinger endres. Endres de i et annet vindu
+(tegnevinduet), følger de andre etter via `storage`-hendelsen. Det finnes ennå ingen samlet
+innstillings-UI (bare hurtigtast-dialogene); ellers endres de via konsollen eller standardverdiene.
 
 ## Sikkerhet (`SECURITY.md`)
 
@@ -435,5 +450,6 @@ og kan starte programmer.
   følger forelderens innholdskolonne).
 - Farger kun via CSS-variabler i `styles.css` (både lyst og mørkt tema).
 - Legg til tester i `tests/` for nye tekstendrende kommandoer og heuristikker.
+- Nye ting brukeren merker får et punkt under «Neste versjon» i `CHANGELOG.md`.
 - Kjør `npm run typecheck` og `npm test` før du sier at noe er ferdig, og sjekk UI-endringer
   i nettleseren.

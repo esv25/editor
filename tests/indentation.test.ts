@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { EditorSelection, EditorState, type Extension, type StateCommand } from '@codemirror/state';
 import { deleteCharBackward, insertNewlineAndIndent } from '@codemirror/commands';
-import { ensureSyntaxTree, indentUnit, LanguageDescription } from '@codemirror/language';
+import { indentUnit, LanguageDescription } from '@codemirror/language';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { detectIndent, indentationFor, insertIndent } from '../src/code/indentation';
 import { loadLanguage } from '../src/code/languages';
 import { indentListItem, shiftTabOutsideList, tabOutsideList } from '../src/features/smartLists';
-import { textOf } from './helpers';
+import { fullyParsed, textOf } from './helpers';
 
 /** State from text where "|" is the cursor, or "<" ">" mark a selection. */
 function withSelection(text: string): { doc: string; selection: EditorSelection } {
@@ -24,9 +24,7 @@ function withSelection(text: string): { doc: string; selection: EditorSelection 
 /** A code file: language + indentation detected from the text (like createCodeState). */
 async function codeFile(text: string, lang: string): Promise<EditorState> {
   const { doc, selection } = withSelection(text);
-  const state = EditorState.create({ doc, selection, extensions: [await loadLanguage(lang), indentationFor(doc, lang)] });
-  ensureSyntaxTree(state, state.doc.length, 5000);
-  return state;
+  return fullyParsed(EditorState.create({ doc, selection, extensions: [await loadLanguage(lang), indentationFor(doc, lang)] }));
 }
 
 /** A note with Python available for code blocks (like createMarkdownState). */
@@ -34,9 +32,7 @@ async function note(text: string): Promise<EditorState> {
   await LanguageDescription.matchLanguageName(languages, 'python')!.load();
   const { doc, selection } = withSelection(text);
   const extensions: Extension = [markdown({ base: markdownLanguage, codeLanguages: languages }), indentUnit.of('    ')];
-  const state = EditorState.create({ doc, selection, extensions });
-  ensureSyntaxTree(state, state.doc.length, 5000);
-  return state;
+  return fullyParsed(EditorState.create({ doc, selection, extensions }));
 }
 
 function apply(command: StateCommand, state: EditorState): string {

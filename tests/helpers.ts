@@ -1,6 +1,6 @@
 import { EditorSelection, EditorState, type StateCommand } from '@codemirror/state';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { ensureSyntaxTree } from '@codemirror/language';
+import { ensureSyntaxTree, syntaxTree } from '@codemirror/language';
 import { mathSyntax } from '../src/features/math/syntax';
 
 /**
@@ -22,8 +22,19 @@ export function stateOf(text: string): EditorState {
     selection: EditorSelection.single(anchor, head),
     extensions: [markdown({ base: markdownLanguage, extensions: [mathSyntax] })],
   });
-  ensureSyntaxTree(state, state.doc.length, 5000);
-  return state;
+  return fullyParsed(state);
+}
+
+/**
+ * Return the state with a complete syntax tree. A new state only parses for ~20 ms, and
+ * `ensureSyntaxTree` finishes the parse without updating the tree that `syntaxTree(state)`
+ * (and so indentation, folding …) reads – an empty transaction carries it over.
+ */
+export function fullyParsed(state: EditorState): EditorState {
+  if (!ensureSyntaxTree(state, state.doc.length, 5000)) throw new Error('Parsing did not finish');
+  const next = state.update({}).state;
+  if (syntaxTree(next).length < next.doc.length) throw new Error('Syntax tree is incomplete');
+  return next;
 }
 
 /** Render a state back to text with the same cursor/selection markers. */

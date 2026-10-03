@@ -19,11 +19,13 @@ import { TerminalPanel } from '../terminal/terminalPanel';
 import { CodeBar } from '../ui/codeBar';
 import { DebugPanel } from '../ui/debugPanel';
 import { FileTree } from '../ui/fileTree';
+import { openKeybindings } from '../ui/keybindings';
 import { MathPanel } from '../ui/mathPanel';
 import { OutlinePanel } from '../ui/outline';
 import { renderCount, renderSaveStatus, renderTitle } from '../ui/statusbar';
 import { TabsUI } from '../ui/tabs';
 import { checkForUpdates } from '../ui/updates';
+import { openWhatsNew, showWhatsNewOnStart } from '../ui/whatsNew';
 import { renderButtons } from '../ui/toolbar';
 import { initAppearance, resolvedTheme } from '../appearance';
 import { EditorDocument } from './document';
@@ -195,6 +197,14 @@ export async function startApp(): Promise<void> {
       scope: 'any',
       run: () => (updateSettings({ theme: resolvedTheme() === 'dark' ? 'light' : 'dark' }), true),
     },
+    {
+      id: 'app.keybindings',
+      name: 'Hurtigtaster (se og endre alle)',
+      icon: svg('<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>'),
+      scope: 'any',
+      run: () => (openKeybindings(getView), true),
+    },
+    { id: 'app.whatsNew', name: 'Hva er nytt', scope: 'any', run: () => (void openWhatsNew(), true) },
   ]);
 
   let countTimer: ReturnType<typeof setTimeout> | undefined;
@@ -225,7 +235,7 @@ export async function startApp(): Promise<void> {
   const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save'], getView);
   const viewBar = renderButtons(
     el('view-actions'),
-    ['view.toggleOutline', ...(terminal.available ? ['view.toggleTerminal'] : []), 'view.toggleTheme'],
+    ['view.toggleOutline', ...(terminal.available ? ['view.toggleTerminal'] : []), 'view.toggleTheme', 'app.keybindings'],
     getView,
   );
   new DebugPanel(el('debug'), debug, getView);
@@ -328,10 +338,10 @@ export async function startApp(): Promise<void> {
 
   // Restore the last session, or start with one group ("Notater").
   const session = loadSession();
+  let firstRun = false;
   if (session) {
     await ws.restore(session);
   } else {
-    let firstRun = false;
     try {
       firstRun = localStorage.getItem(FIRST_RUN_KEY) === null;
       localStorage.setItem(FIRST_RUN_KEY, '1');
@@ -364,15 +374,17 @@ export async function startApp(): Promise<void> {
   });
   platform.onOpenFile?.((path) => void ws.openPath(path));
 
-  // Updates (installed desktop app only): check quietly shortly after start;
-  // clicking the version in the status bar checks on demand.
+  // Updates (installed desktop app only): say what's new after one, check
+  // quietly shortly after start; clicking the version in the status bar checks on demand.
   const beforeInstall = async () => {
     await Promise.all(ws.allDocs().filter((d) => d.dirty && d.file).map((d) => d.save({ silent: true })));
     ws.saveNow();
   };
   if (platform.appVersion) {
+    const version = await platform.appVersion();
+    if (import.meta.env.PROD) showWhatsNewOnStart(version, firstRun);
     const versionEl = el('status-version');
-    versionEl.textContent = `v${await platform.appVersion()}`;
+    versionEl.textContent = `v${version}`;
     versionEl.title = 'Se etter oppdateringer';
     versionEl.hidden = false;
     versionEl.addEventListener('click', () => void checkForUpdates(false, beforeInstall));
