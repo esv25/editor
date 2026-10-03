@@ -20,6 +20,10 @@ describe('heading suggestion rules', () => {
     expect(isHeadingCandidate(ctx('Innledning', '', 'tekst under'), cfg)).toBe(false);
     expect(isHeadingCandidate(ctx('- punkt', '', '', 'BulletList'), cfg)).toBe(false);
   });
+  it('rejects lines with a formula', () => {
+    expect(isHeadingCandidate(ctx('$x = 2$'), cfg)).toBe(false);
+    expect(isHeadingCandidate(ctx('Svar: $x = 2$'), cfg)).toBe(false);
+  });
   it('respects disabled rules', () => {
     expect(isHeadingCandidate(ctx('Setning.'), { ...cfg, disabledRules: ['ending'] })).toBe(true);
   });

@@ -11,7 +11,7 @@ html, body {
 
 #app {
   display: grid;
-  grid-template-rows: auto auto auto 1fr auto;
+  grid-template-rows: auto auto auto 1fr auto auto;
   height: 100vh;
 }
 
@@ -149,6 +149,8 @@ html, body {
 .cm-heading-5, .cm-heading-6 { font-size: 1em; color: var(--muted); }
 
 .cm-inline-code {
+  /* No ligatures: `<=` should look like the keys you type, not ≤. */
+  font-variant-ligatures: none;
   background: var(--code-bg);
   border-radius: 4px;
   padding: 0.1em 0.3em;
@@ -538,7 +540,7 @@ html, body {
 .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .context-menu {
-  position: fixed; z-index: 50; min-width: 180px; padding: 4px;
+  position: fixed; z-index: 120; /* above the math panel and dialogs */ min-width: 180px; padding: 4px;
   background: var(--panel-bg); border: 1px solid var(--border); border-radius: 6px;
   box-shadow: 0 6px 24px rgb(0 0 0 / 0.18); font: 13px var(--font-ui);
 }
@@ -552,6 +554,312 @@ html, body {
 
 /* Hidden closing fence: the line collapses to the code block's bottom padding. */
 .cm-codeblock-close-hidden { font-size: 0 !important; line-height: 0 !important; height: 0.5rem; padding-bottom: 0 !important; }
+
+/* ---------- Math ---------- */
+.cm-math { border-radius: 5px; cursor: pointer; }
+.cm-math .katex { font-size: 1.12em; }
+.cm-math-inline { display: inline-block; padding: 0 2px; margin: 0 1px; line-height: 1.2; }
+.cm-math-inline:hover { background: var(--math-hover-bg); }
+.cm-math-block { display: block; padding: 0.35em 0; text-align: center; overflow-x: auto; overflow-y: hidden; }
+.cm-math-block:hover { background: var(--math-hover-bg); }
+.cm-math-block .katex-display { margin: 0; }
+.cm-math-editing, .cm-math-editing:hover {
+  background: var(--math-edit-bg);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: text;
+}
+.cm-math-empty { color: var(--faint); font: italic 0.85em var(--font-ui); }
+.cm-math-error { border-bottom: 1px dotted var(--syn-invalid); }
+
+/* The formula field */
+.mf { position: relative; display: inline-block; min-width: 0.8em; outline: none; }
+.mf-display { display: block; text-align: center; padding: 0.15em 0; }
+.mf-display .katex-display { margin: 0; }
+.mf-view { display: inline-block; }
+.mf-display .mf-view { display: block; }
+.mf-caret {
+  position: absolute;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.mf-caret.mf-blink { animation: mf-blink 1.06s steps(1) infinite; }
+@keyframes mf-blink { 0% { opacity: 1; } 55% { opacity: 0; } }
+.mf-input {
+  position: absolute;
+  width: 1px;
+  height: 1em;
+  padding: 0;
+  border: 0;
+  margin: 0;
+  opacity: 0;
+  resize: none;
+  overflow: hidden;
+  pointer-events: none;
+  font-size: 16px;
+}
+.mf .mf-ph { color: var(--faint); }
+.mf .mf-ph-active .mf-ph, .mf .mf-sel .mf-ph { color: var(--accent); }
+.mf .mf-sel { background: var(--selection); border-radius: 2px; }
+/* The empty spot waiting for input: a coloured box, not a filled block. */
+.mf .mf-sel:has(.mf-ph) { background: none; }
+.mf .mf-slot { color: var(--accent); }
+.mf .mf-raw { color: var(--syn-invalid); }
+.mf .mf-cmd { color: var(--accent); }
+
+/* Suggestions after «\» */
+.mf-popup {
+  position: fixed;
+  z-index: 110;
+  min-width: 240px;
+  max-width: 360px;
+  padding: 4px;
+  background: var(--panel-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
+  font: 14px var(--font-ui);
+}
+.mf-popup-item { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+.mf-popup-item:hover, .mf-popup-item.active { background: var(--button-active); }
+.mf-popup-preview { min-width: 56px; text-align: center; }
+.mf-popup-hint { padding: 4px 10px 2px; color: var(--faint); font-size: 12px; }
+
+/* Waiting for the second key of a shortcut (Ctrl+M, F) */
+.math-chord-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 48px;
+  z-index: 110;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  background: var(--panel-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
+  font: 14px var(--font-ui);
+}
+
+/* ---------- Math panel ---------- */
+.math-panel {
+  /* Above the shortcut dialog's backdrop: the panel can fill in its formula. */
+  position: relative;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  max-height: 40vh;
+  min-height: 0;
+  background: var(--panel-bg);
+  border-top: 1px solid var(--border);
+  font: 14px var(--font-ui);
+}
+.math-panel[hidden] { display: none; }
+/* Tabs in an even grid on the left; search and buttons in a column on the right. */
+.mp-head {
+  display: grid;
+  grid-template-columns: 1fr 210px;
+  align-items: start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.mp-tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 4px; min-width: 0; }
+.mp-tools { display: flex; flex-direction: column; gap: 4px; }
+.mp-tool-buttons { display: flex; gap: 4px; }
+.mp-tool-buttons .mp-keys { flex: 1; }
+.mp-tab, .mp-head-button {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--button-bg);
+  color: var(--fg);
+  font: 13px var(--font-ui);
+  cursor: pointer;
+}
+.mp-tab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-head-button { white-space: nowrap; }
+.mp-tab:hover, .mp-head-button:hover { background: var(--button-hover); }
+.mp-tab.active { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.mp-close { min-width: 34px; padding: 0 8px; font-size: 18px; line-height: 1; }
+.mp-search {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px var(--font-ui);
+}
+.mp-search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.mp-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  padding: 10px;
+  overflow-y: auto;
+}
+/* Big targets: easy to hit with a joystick or a shaky hand. */
+.mp-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 50px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--button-bg);
+  color: var(--fg);
+  font-size: 17px;
+  cursor: pointer;
+}
+.mp-item:hover { background: var(--button-hover); border-color: var(--accent); }
+.mp-item:active { background: var(--button-active); }
+.mp-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mp-item .katex { font-size: 1.05em; }
+.mp-item .mf-ph, .sc-preview .mf-ph, .mf-popup .mf-ph { color: var(--faint); }
+.mp-action { border-style: dashed; }
+.mp-plus { color: var(--accent); }
+.mp-minus { color: var(--syn-invalid); }
+.mp-add { color: var(--accent); border-style: dashed; font: 600 14px var(--font-ui); }
+.mp-note { margin: 6px; color: var(--muted); font-size: 13px; }
+
+/* ---------- Dialogs (math shortcuts) ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4vh 16px 2vh;
+  background: rgb(0 0 0 / 0.35);
+}
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: min(660px, 100%);
+  max-height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+  font: 14px var(--font-ui);
+}
+.modal h2 { margin: 0; padding: 16px 20px 6px; font-size: 18px; }
+.modal-body { padding: 0 20px 14px; overflow-y: auto; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+.modal button {
+  min-height: 38px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--button-bg);
+  color: var(--fg);
+  font: 14px var(--font-ui);
+  cursor: pointer;
+}
+.modal button:hover:not(:disabled) { background: var(--button-hover); }
+.modal button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.modal button.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.1); }
+.modal button.danger { margin-right: auto; color: var(--syn-invalid); }
+.modal button:disabled { opacity: 0.5; cursor: default; }
+.sc-step { margin: 18px 0 8px; font-size: 14px; }
+.sc-hint { margin: 6px 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+/* The shortcut editor: label | content, one box looks active at a time (the focused one). */
+.sc-form { display: grid; grid-template-columns: 92px 1fr; gap: 16px 12px; margin: 10px 0 4px; }
+.sc-label { padding-top: 10px; color: var(--muted); font-weight: 600; font-size: 13px; }
+.sc-content { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sc-formula {
+  display: flex;
+  align-items: center;
+  min-height: 60px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font: 22px var(--font-prose);
+  cursor: text;
+  overflow-x: auto;
+}
+.sc-formula:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--math-edit-bg); }
+.sc-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.modal .sc-tools button { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+.sc-tools .sc-hint { margin: 0 0 0 4px; }
+.sc-segmented { display: inline-flex; align-self: flex-start; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.modal .sc-segmented button { border: none; border-radius: 0; min-height: 34px; }
+.modal .sc-segmented button + button { border-left: 1px solid var(--border); }
+.modal .sc-choice.active { background: var(--accent); color: var(--bg); font-weight: 600; }
+.sc-pane[hidden] { display: none; }
+.sc-recorder {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 8px 44px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.sc-recorder:hover { background: var(--button-hover); }
+.sc-recorder:focus, .sc-recorder.recording { outline: none; border: 1px solid var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--math-edit-bg); }
+.sc-recorded { font-size: 19px; font-weight: 600; }
+.sc-recorder.empty .sc-recorded { color: var(--muted); font-size: 14px; font-weight: 400; }
+.sc-recorder-hint { color: var(--faint); font-size: 12px; }
+.sc-recorder-hint:empty { display: none; }
+.modal .sc-again { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); min-height: 32px; padding: 0 10px; font-size: 16px; }
+.sc-text, .sc-name {
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px var(--font-ui);
+}
+.sc-text:focus, .sc-name:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.sc-warnings { margin: 8px 0 0; padding-left: 20px; color: var(--syn-type); font-size: 13px; line-height: 1.45; }
+.sc-warnings:empty { display: none; }
+.sc-list { display: flex; flex-direction: column; gap: 6px; }
+.sc-row {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) auto 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.sc-trigger { font-weight: 600; white-space: nowrap; }
+.sc-row-name { color: var(--muted); }
+.modal .sc-new { margin-top: 10px; }
+.sc-builtin { display: flex; flex-wrap: wrap; gap: 6px; }
+.modal .sc-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 10px; }
+/* Show the keys as typed: no ligatures turning <= into ≤. */
+.sc-chip code, .sc-fixed kbd, .sc-text { font-variant-ligatures: none; font-feature-settings: "calt" 0, "liga" 0; }
+.sc-chip code { color: var(--muted); font: 13px var(--font-mono); }
+.modal .sc-chip.off { opacity: 0.45; text-decoration: line-through; }
+.sc-fixed { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 6px 14px; }
+.sc-fixed kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  font: 13px var(--font-mono);
+  white-space: nowrap;
+}
+.sc-preview .katex { font-size: 1.1em; }
+.sc-action { font-weight: 600; }
 
 /* ---------- Terminal panel ---------- */
 #panel {

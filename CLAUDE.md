@@ -15,6 +15,8 @@ UI-tekst er på norsk (bokmål). Kode, identifikatorer og kodekommentarer er på
 - Vite + TypeScript (strict), ingen UI-rammeverk – vanlig DOM i `src/ui/`
 - CodeMirror 6 som editorkjerne, `@codemirror/lang-markdown` (GFM) +
   `@codemirror/language-data` for språk i kodeblokker (lastes ved behov)
+- KaTeX (+ mhchem) tegner formler – det eneste biblioteket i matte-delen; selve
+  formelredigeringen er egen kode (`src/features/math/`)
 - Vitest for tester av kommandoer og regler (kjører i Node, uten DOM)
 - Tauri 2 (`src-tauri/`) med pluginene `dialog` og `fs`; krever Rust + MSVC Build Tools
 - xterm.js (terminalvisning) og portable-pty (pseudokonsoll i Rust)
@@ -50,7 +52,8 @@ src/
   appearance.ts           tema og typografi → CSS-variabler / data-theme (delt med tegnevinduet)
   theme.css               fargevariabler for lyst/mørkt tema (delt med tegnevinduet)
   commands/registry.ts    kommandoregisteret (id, navn, ikon, hurtigtast, run, isActive)
-  commands/keys.ts        app-hurtigtaster utenfor editoren (terminal, sidefelt) + tastematching
+  commands/keys.ts        tastetrykk ⇄ CodeMirror-notasjon, tastesekvenser (Ctrl+M, F), opptak,
+                          og app-hurtigtaster utenfor editoren (terminal, sidefelt)
   editor/
     createEditor.ts       én EditorView + én EditorState per dokument (Markdown eller kode)
     theme.ts              editortema og HighlightStyle (farger via CSS-variabler)
@@ -72,6 +75,7 @@ src/
     types.ts              Feature-grensesnittet
     util/markdown.ts      felles hjelpere (liste-parsing, valgte linjer, syntakstre)
     headingSuggestion/    overskriftsforslag: index.ts (extension) + rules.ts (heuristikk)
+    math/                 formler: $…$ og $$…$$ med WYSIWYG-redigering (se «Matte» under)
   storage/                fil-laget – ALL fil-I/O går hit
     types.ts              StorageBackend-grensesnittet + FileRef
     fsAccess.ts           File System Access API (Chrome/Edge)
@@ -92,7 +96,8 @@ src/
     welcome.ts            velkomsttekst første gang
   ui/                     faner (tabs.ts), verktøylinjer (toolbar.ts, codeBar.ts), filtre
                           (fileTree.ts), høyreklikkmeny, disposisjon, statuslinje, updates,
-                          feilsøkingsvisningen i sidefeltet (debugPanel.ts)
+                          feilsøkingsvisningen i sidefeltet (debugPanel.ts), mattepanelet
+                          (mathPanel.ts) og hurtigtast-dialogene (mathShortcuts.ts)
   styles.css              editorens layout og klasser (fargene ligger i theme.css)
   diagram/                tegnevinduet – et eget lite program (se «Tegnevinduet» under)
 diagram.html              inngangen til tegnevinduet (Vite bygger to sider: index + diagram)
@@ -127,7 +132,39 @@ modul-lasting, ellers fanges ikke endringer opp.
 
 Dagens features: `livePreview` (overskriftsstørrelser, skjuling av markeringstegn, inline
 kode), `codeBlocks`, `codeBlockTools`, `images`, `headings`, `inlineFormat`, `lists`,
-`taskList`, `smartLists`, `headingSuggestion`, `closeBrackets`.
+`taskList`, `smartLists`, `headingSuggestion`, `closeBrackets`, `math`.
+
+### Matte (`features/math/`)
+
+Målet: skrive all skolematte (1. klasse → R2, pluss kjemi) effektivt, også med motoriske
+vansker – tastatur først, store klikkflater, ingen dra-bevegelser. Formlene er LaTeX i
+Markdown (`$…$`, `$$` på egne linjer), så filene virker i Obsidian/Typora/GitHub/pandoc.
+
+- `syntax.ts`: lezer-utvidelse (InlineMath, BlockMath, MathMark), lagt til i `markdown()` i
+  `createEditor.ts` og `tests/helpers.ts`. Uavsluttet `$$`-blokk vises som tekst.
+- `model.ts`: formeltreet – rader (`Row`) med noder (sym, cmd, scripts, group, text, env,
+  ph, raw …). Potens/indeks er egen node etter grunntallet (som MathQuill).
+- `latex.ts`: `parseLatex`/`toLatex`. Ukjent LaTeX blir `Raw` og bevares uendret.
+  Skriver ryddig LaTeX (`{,}` for desimalkomma, `\left…\right` bare der det trengs,
+  flere linjer → `aligned` med `&` foran første relasjon). Med `marks` pakkes hver node i
+  `\htmlData` så feltet kan finne den igjen i tegningen; noder med potens pakkes ikke (da
+  plasserer TeX potensen likt som i ferdig formel) – en tom markør står foran dem.
+- `editor.ts`: `MathEditor` – all oppførsel uten DOM (testet): `/` brøk av leddet foran,
+  `^`/`**` potens, parenteser i par, `"` tekst, `\` kommando, mellomrom «videre»,
+  Tab neste tomme felt, Backspace går inn i strukturer og pakker dem ut, forkortelser
+  (`sqrt`, `pi`, `<=` …; lengste treff vinner, Backspace rett etter angrer), maler med
+  `#?` (tomt felt), `#0` (markeringen), `#@` (markering eller leddet foran).
+- `field.ts`: `MathField` – tegner med KaTeX, egen markør, skjult textarea for inndata
+  (døde taster som `^` på norsk tastatur; `ê` tolkes som `^e`), klikk → nærmeste symbol.
+- `index.ts`: CodeMirror-koblingen. Ferdige formler er widgets; den som redigeres holdes i
+  en StateField (`activeField`) og feltet skriver hver endring til dokumentet (angre,
+  autolagring og ordtelling virker som ellers; `syncField` laster på nytt ved angre).
+  Inn med klikk, piltaster, Backspace/Delete; Ctrl+M / Ctrl+Shift+M lager nye.
+- `catalog.ts`: alt i mattepanelet, ordnet etter tema (LK20). `shortcuts.ts`: innebygde
+  forkortelser. `render.ts`: KaTeX-tegning (cache).
+- Egne hurtigtaster (`settings.math.keys`: tast/sekvens → LaTeX-mal, `settings.math.shortcuts`:
+  forkortelse → mal) lages i dialogen (høyreklikk i panelet / «Hurtigtaster»), der malen
+  bygges i et formelfelt. De går foran alt annet, også inne i formler.
 
 ### Bilder (`features/images/`)
 
@@ -308,7 +345,8 @@ Ctrl+Enter kryss av oppgave, Ctrl+Shift+Enter kjør kodeblokk/fil, Ctrl+Shift+H 
 overskrift, Ctrl+N nytt dokument, Ctrl+O/S/Shift+S fil, Ctrl+W lukk fane, Ctrl+Tab /
 Ctrl+PageDown neste fane, Ctrl+Shift+N ny gruppe, Ctrl+Shift+O disposisjon, Ctrl+J
 terminal, Ctrl+F5 kjør i terminal, F5 feilsøk/fortsett, F9 stoppunkt, F10/F11/Shift+F11
-steg, F6 pause, Shift+F5 stopp, Ctrl+Shift+F5 start på nytt.
+steg, F6 pause, Shift+F5 stopp, Ctrl+Shift+F5 start på nytt, Ctrl+M formel, Ctrl+Shift+M
+formelblokk (inne i formler: Ctrl+↑/↓ potens/indeks).
 **Unngå Ctrl+Alt-kombinasjoner**: på norsk tastatur er Ctrl+Alt = AltGr (@, {, [ osv.).
 
 ### Kommandoer som `StateCommand`

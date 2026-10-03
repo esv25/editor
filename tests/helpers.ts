@@ -1,6 +1,7 @@
 import { EditorSelection, EditorState, type StateCommand } from '@codemirror/state';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { ensureSyntaxTree } from '@codemirror/language';
+import { mathSyntax } from '../src/features/math/syntax';
 
 /**
  * Build a state from text where "|" marks the cursor, or "<" and ">" mark a selection.
@@ -19,7 +20,7 @@ export function stateOf(text: string): EditorState {
   const state = EditorState.create({
     doc: text,
     selection: EditorSelection.single(anchor, head),
-    extensions: [markdown({ base: markdownLanguage })],
+    extensions: [markdown({ base: markdownLanguage, extensions: [mathSyntax] })],
   });
   ensureSyntaxTree(state, state.doc.length, 5000);
   return state;

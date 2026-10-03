@@ -19,6 +19,24 @@ Skriv **fet**, *kursiv* og \`inline kode\` – eller marker tekst og bruk knappe
 - [ ] Klikk på boksen for å krysse av
 - [x] Ctrl+Enter gjør det samme fra tastaturet
 
+## Matte
+
+Trykk **Ctrl+M** for en formel i linja, eller **Ctrl+Shift+M** for en formelblokk på egen linje. Klikk på en formel for å endre den, eller gå inn i den med piltastene.
+
+Inne i en formel: \`/\` gir brøk, \`^\` (eller \`**\`) opphøyd, \`sqrt\` kvadratrot, \`pi\` gir π, \`<=\` gir ≤ og \`*\` gangetegn. Tab hopper til neste tomme felt, Enter gir ny linje i en formelblokk, og Esc går ut. Mattepanelet nederst (Σ-knappen) har symbolene fra 1. klasse til R2 – og under «Hurtigtaster» lager du dine egne.
+
+Løs likningen $2x + 3 = 7$:
+
+$$
+\\begin{aligned}
+2x + 3 &= 7 \\\\
+2x &= 4 \\\\
+x &= 2
+\\end{aligned}
+$$
+
+Andregradsformelen er $x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$, og $\\int_0^1 x^2\\,dx = \\frac{1}{3}$.
+
 ## Kode
 
 Kodeblokker får navn og språk i hodet sitt, og kan kjøres med ▶ Kjør (eller Ctrl+Shift+Enter). Utdataene vises under blokken.

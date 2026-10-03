@@ -62,6 +62,22 @@ export interface Settings {
     /** Wait this long after a change before saving. */
     autosaveDelayMs: number;
   };
+  math: MathSettings;
+}
+
+export interface MathSettings {
+  /** Show the math panel (symbols and templates) below the editor. */
+  palette: boolean;
+  /** Last open tab in the math panel. */
+  paletteTab: string;
+  /** Typed shortcuts in formulas: text → LaTeX template (null turns a built-in one off). */
+  shortcuts: Record<string, string | null>;
+  /** Key shortcuts: key or sequence ("Mod-Shift-r", "Mod-m f") → LaTeX template (null = removed). */
+  keys: Record<string, string | null>;
+  /** Names the user gave their own shortcuts, by key or text. */
+  names: Record<string, string>;
+  /** Panel items in «Mine» (favourites), by id. */
+  favorites: string[];
 }
 
 export const defaultSettings: Settings = {
@@ -85,9 +101,18 @@ export const defaultSettings: Settings = {
     'heading.1', 'heading.2', 'heading.3', '|',
     'format.bold', 'format.italic', 'format.code', '|',
     'list.bullet', 'list.ordered', 'list.task', '|',
-    'codeblock.toggle', 'image.insert', 'diagram.new',
+    'codeblock.toggle', 'image.insert', 'diagram.new', '|',
+    'math.inline', 'math.block', 'math.palette',
   ],
   diagram: { grid: 20, hitTolerance: 16, dragThreshold: 6, autosaveDelayMs: 500 },
+  math: {
+    palette: true,
+    paletteTab: 'basic',
+    shortcuts: {},
+    keys: {},
+    names: {},
+    favorites: ['frac', 'sqrt', 'square', 'pow', 'times', 'pm', 'le', 'ge', 'ne', 'approx', 'pi', 'paren', 'abs', 'answer'],
+  },
 };
 
 export type DeepPartial<T> = {

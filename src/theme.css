@@ -19,6 +19,9 @@
   --code-bg: rgb(120 105 80 / 0.09);
   --search-match: #f6e7a6;
   --search-match-selected: #f1c65f;
+  /* A formula being edited. */
+  --math-edit-bg: rgb(56 103 166 / 0.07);
+  --math-hover-bg: rgb(56 103 166 / 0.06);
 
   --syn-keyword: #a626a4;
   --syn-string: #3f8f3e;
@@ -75,6 +78,8 @@
   --code-bg: rgb(255 255 255 / 0.05);
   --search-match: #5a4e1c;
   --search-match-selected: #85701f;
+  --math-edit-bg: rgb(127 169 227 / 0.1);
+  --math-hover-bg: rgb(127 169 227 / 0.08);
 
   --syn-keyword: #c678dd;
   --syn-string: #98c379;

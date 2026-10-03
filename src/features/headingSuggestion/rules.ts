@@ -93,6 +93,11 @@ export const headingRules: HeadingRule[] = [
     description: 'Tom linje (eller dokumentslutt) under',
     test: (ctx, c) => !c.requireBlankAfter || isBlank(ctx.nextText),
   },
+  {
+    id: 'no-math',
+    description: 'Linja har ingen formel ($…$)',
+    test: (ctx) => !ctx.text.includes('$'),
+  },
 ];
 
 export function registerHeadingRule(rule: HeadingRule): void {
