@@ -6,6 +6,10 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+## 0.6.0 – 2026-10-03
+
+- **Sikkerhet**: kode fra en mappe du ikke har kjørt kode fra før, kjøres først når du har sagt ja. Bilder fra nettet vises først når du klikker «Vis bildet». Før en fil overskrives, legges en sikkerhetskopi til side (høyreklikk en fil i filtreet → «Vis sikkerhetskopier»).
+
 - **Hva er nytt**: etter hver oppdatering viser appen hva som er endret. Klikk på versjonsnummeret nederst for å se det igjen.
 - Mattepanelet kommer fram mens du skriver en formel, og forsvinner etterpå. Σ-knappen viser det hele tiden, som før.
 - Ny dialog **Hurtigtaster** (tastaturknappen øverst, eller høyreklikk på en knapp i verktøylinja): se og endre alle hurtigtaster, også tegnevinduets verktøytaster.
