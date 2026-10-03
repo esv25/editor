@@ -71,6 +71,10 @@ export interface Settings {
     /** Hosts whose images load without asking (others wait for «Vis bildet»). */
     imageHosts: string[];
   };
+  updates: {
+    /** Installed app: look for a new version this often while it runs (0 = only at start). */
+    checkMinutes: number;
+  };
 }
 
 export interface MathSettings {
@@ -125,6 +129,7 @@ export const defaultSettings: Settings = {
     favorites: ['frac', 'sqrt', 'square', 'pow', 'times', 'pm', 'le', 'ge', 'ne', 'approx', 'pi', 'paren', 'abs', 'answer'],
   },
   security: { trustedFolders: [], imageHosts: [] },
+  updates: { checkMinutes: 30 },
 };
 
 export type DeepPartial<T> = {
