@@ -185,6 +185,17 @@ export function setSymbolMenu(fn: (e: MouseEvent, choices: SymbolChoice[]) => vo
   symbolMenu = fn;
 }
 
+/** Told when a formula opens or closes for editing (the math panel shows itself then). */
+let openListener: ((open: boolean, view: EditorView) => void) | null = null;
+export function onFormulaOpenChange(fn: (open: boolean, view: EditorView) => void): void {
+  openListener = fn;
+}
+
+/** Whether a formula is being edited in this state. */
+export function formulaOpenIn(state: EditorState): boolean {
+  return !!state.field(activeField, false);
+}
+
 /** A field outside the document that panel clicks should go to (the shortcut editor), or null. */
 let insertTarget: MathField | null = null;
 export function setInsertTarget(field: MathField | null): void {
@@ -692,6 +703,11 @@ const syncField = EditorView.updateListener.of((u) => {
   if (u.docChanged && !u.transactions.some((tr) => tr.annotation(fieldEdit))) current.field.reload(latexOf(u.state, a));
 });
 
+const watchOpen = EditorView.updateListener.of((u) => {
+  const open = formulaOpenIn(u.state);
+  if (open !== formulaOpenIn(u.startState)) openListener?.(open, u.view);
+});
+
 const keyHandler = Prec.highest(EditorView.domEventHandlers({ keydown: (e, view) => handleUserKey(view, e) }));
 
 // --- Feature -----------------------------------------------------------------
@@ -724,7 +740,7 @@ const commands: EditorCommand[] = [
   },
   {
     id: 'math.palette',
-    name: 'Mattepanel (symboler og hurtigtaster)',
+    name: 'Vis mattepanelet hele tiden (ellers bare i formler)',
     icon: svg('<path d="M18 4H6l6 8-6 8h12"/>'),
     run: () => {
       updateSettings({ math: { palette: !getSettings().math.palette } });
@@ -746,6 +762,7 @@ export const math: Feature = {
       activeField,
       settings.hideMarkup ? typesetDecorations : rawDecorations,
       syncField,
+      watchOpen,
       keyHandler,
       settings.hideMarkup ? Prec.highest(keymap.of(enterKeys)) : [],
     ];

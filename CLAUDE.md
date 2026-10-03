@@ -160,7 +160,8 @@ Markdown (`$…$`, `$$` på egne linjer), så filene virker i Obsidian/Typora/Gi
   en StateField (`activeField`) og feltet skriver hver endring til dokumentet (angre,
   autolagring og ordtelling virker som ellers; `syncField` laster på nytt ved angre).
   Inn med klikk, piltaster, Backspace/Delete; Ctrl+M / Ctrl+Shift+M lager nye.
-- `catalog.ts`: alt i mattepanelet, ordnet etter tema (LK20). `shortcuts.ts`: innebygde
+- `catalog.ts`: alt i mattepanelet (`ui/mathPanel.ts`; vises mens en formel redigeres, eller
+  alltid med Σ – `math.paletteAuto`/`math.palette`), ordnet etter tema (LK20). `shortcuts.ts`: innebygde
   forkortelser. `render.ts`: KaTeX-tegning (cache).
 - Egne hurtigtaster (`settings.math.keys`: tast/sekvens → LaTeX-mal, `settings.math.shortcuts`:
   forkortelse → mal) lages i dialogen (høyreklikk i panelet / «Hurtigtaster»), der malen

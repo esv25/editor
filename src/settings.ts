@@ -66,8 +66,10 @@ export interface Settings {
 }
 
 export interface MathSettings {
-  /** Show the math panel (symbols and templates) below the editor. */
+  /** Always show the math panel (symbols and templates) below the editor. */
   palette: boolean;
+  /** Also show it while a formula is being edited (and hide it again after). */
+  paletteAuto: boolean;
   /** Last open tab in the math panel. */
   paletteTab: string;
   /** Typed shortcuts in formulas: text → LaTeX template (null turns a built-in one off). */
@@ -106,7 +108,8 @@ export const defaultSettings: Settings = {
   ],
   diagram: { grid: 20, hitTolerance: 16, dragThreshold: 6, autosaveDelayMs: 500 },
   math: {
-    palette: true,
+    palette: false,
+    paletteAuto: true,
     paletteTab: 'basic',
     shortcuts: {},
     keys: {},
