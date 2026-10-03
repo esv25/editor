@@ -40,6 +40,22 @@ export interface Settings {
   keybindings: Record<string, string | string[] | null>;
   /** Command ids shown in the formatting toolbar; "|" is a separator. */
   toolbar: string[];
+  math: MathSettings;
+}
+
+export interface MathSettings {
+  /** Show the math panel (symbols and templates) below the editor. */
+  palette: boolean;
+  /** Last open tab in the math panel. */
+  paletteTab: string;
+  /** Typed shortcuts in formulas: text → LaTeX template (null turns a built-in one off). */
+  shortcuts: Record<string, string | null>;
+  /** Key shortcuts: key or sequence ("Mod-Shift-r", "Mod-m f") → LaTeX template (null = removed). */
+  keys: Record<string, string | null>;
+  /** Names the user gave their own shortcuts, by key or text. */
+  names: Record<string, string>;
+  /** Panel items in «Mine» (favourites), by id. */
+  favorites: string[];
 }
 
 export const defaultSettings: Settings = {
@@ -61,8 +77,17 @@ export const defaultSettings: Settings = {
     'heading.1', 'heading.2', 'heading.3', '|',
     'format.bold', 'format.italic', 'format.code', '|',
     'list.bullet', 'list.ordered', 'list.task', '|',
-    'codeblock.toggle', 'image.insert',
+    'codeblock.toggle', 'image.insert', '|',
+    'math.inline', 'math.block', 'math.palette',
   ],
+  math: {
+    palette: true,
+    paletteTab: 'basic',
+    shortcuts: {},
+    keys: {},
+    names: {},
+    favorites: ['frac', 'sqrt', 'square', 'pow', 'times', 'pm', 'le', 'ge', 'ne', 'approx', 'pi', 'paren', 'abs', 'answer'],
+  },
 };
 
 export type DeepPartial<T> = {

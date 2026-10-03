@@ -41,6 +41,7 @@ function build(view: EditorView, hideMarkup: boolean): DecorationSet {
       enter(node) {
         const name = node.name;
         if (name === 'FencedCode' || name === 'CodeBlock') return false; // handled by codeBlocks
+        if (name === 'InlineMath' || name === 'BlockMath') return false; // handled by math
 
         const heading = /^(?:ATX|Setext)Heading(\d)$/.exec(name);
         if (heading) {

@@ -23,6 +23,7 @@ import { indentationFor } from '../code/indentation';
 import { loadLanguage, type DocKind } from '../code/languages';
 import { commandKeymap, registerCommands } from '../commands/registry';
 import { features } from '../features';
+import { mathSyntax } from '../features/math/syntax';
 import { getSettings, onSettingsChange, type Settings } from '../settings';
 import { editorHighlighting, editorTheme } from './theme';
 
@@ -74,7 +75,7 @@ export function createMarkdownState(text: string): EditorState {
       docKind.of('markdown'),
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({ spellcheck: 'true', lang: 'nb' }),
-      markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false }),
+      markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false, extensions: [mathSyntax] }),
       // Used by code blocks (auto-indent after "for …:" etc.); lists and prose indent on their own.
       indentUnit.of('    '),
       placeholder('Begynn å skrive …'),

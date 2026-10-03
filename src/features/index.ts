@@ -15,12 +15,14 @@ import { smartLists } from './smartLists';
 import { headingSuggestion } from './headingSuggestion';
 import { closeBrackets } from './closeBrackets';
 import { images } from './images';
+import { math } from './math';
 
 export const features: Feature[] = [
   livePreview,
   codeBlocks,
   codeBlockTools,
   images,
+  math,
   headings,
   inlineFormat,
   lists,

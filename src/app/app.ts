@@ -12,6 +12,7 @@ import { getSettings, onSettingsChange, updateSettings } from '../settings';
 import { drafts, storage } from '../storage';
 import { CodeBar } from '../ui/codeBar';
 import { FileTree } from '../ui/fileTree';
+import { MathPanel } from '../ui/mathPanel';
 import { OutlinePanel } from '../ui/outline';
 import { renderCount, renderSaveStatus, renderTitle } from '../ui/statusbar';
 import { TabsUI } from '../ui/tabs';
@@ -141,6 +142,7 @@ export async function startApp(): Promise<void> {
   const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save'], getView);
   const viewBar = renderButtons(el('view-actions'), ['view.toggleOutline', 'view.toggleTheme'], getView);
   const outline = new OutlinePanel(el('outline'), getView);
+  const mathPanel = new MathPanel(el('math-panel'), getView);
   const linkFolder = async (group: Group) => {
     const folder = await storage.pickFolder?.();
     if (folder) ws.setGroupFolder(group, folder);
@@ -192,6 +194,7 @@ export async function startApp(): Promise<void> {
     const isCode = doc.kind === 'code';
     el('md-tools').hidden = isCode;
     el('code-tools').hidden = !isCode;
+    mathPanel.setEnabled(!isCode);
     if (isCode) codeBar.update(doc);
     else mdToolbar.update(doc.state);
     viewBar.update(doc.state);
@@ -203,6 +206,8 @@ export async function startApp(): Promise<void> {
     el('sidebar').hidden = !next.outlineVisible;
     outline.visible = next.outlineVisible;
     viewBar.update(view.state);
+    mdToolbar.update(view.state);
+    if (next.math !== prev.math) mathPanel.update(next);
     if (next.keybindings !== prev.keybindings) {
       for (const bar of [mdToolbar, fileBar, viewBar]) bar.refreshTooltips();
     }
