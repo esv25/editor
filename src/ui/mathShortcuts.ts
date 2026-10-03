@@ -15,78 +15,13 @@ import katex from 'katex';
 import type { EditorView } from '@codemirror/view';
 import { isAltGraph, keySpecFromEvent, MODIFIER_KEYS, normalizeKey, strokes } from '../commands/keys';
 import { allCommands, keysFor } from '../commands/registry';
-import { closeMathField, describeKeys, fieldOptions, registerFocusZone, setInsertTarget, unregisterFocusZone } from '../features/math';
+import { closeMathField, describeKeys, fieldOptions, setInsertTarget } from '../features/math';
 import { itemsById, previewLatex, type MathItem } from '../features/math/catalog';
 import { MathField } from '../features/math/field';
 import { DEFAULT_SHORTCUTS } from '../features/math/shortcuts';
 import { getSettings, updateSettings } from '../settings';
-
-// --- A small modal dialog ------------------------------------------------------
-
-interface Modal {
-  dialog: HTMLElement;
-  body: HTMLElement;
-  footer: HTMLElement;
-  close(): void;
-}
-
-function openModal(title: string, onClose?: () => void): Modal {
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  const dialog = document.createElement('div');
-  dialog.className = 'modal';
-  dialog.setAttribute('role', 'dialog');
-  dialog.setAttribute('aria-modal', 'true');
-  dialog.setAttribute('aria-label', title);
-  const h = document.createElement('h2');
-  h.textContent = title;
-  const body = document.createElement('div');
-  body.className = 'modal-body';
-  const footer = document.createElement('div');
-  footer.className = 'modal-footer';
-  dialog.append(h, body, footer);
-  overlay.append(dialog);
-  // Leave the math panel free below the dialog: it can fill in the dialog's formula.
-  const panel = document.getElementById('math-panel');
-  if (panel && !panel.hidden) overlay.style.bottom = `${panel.offsetHeight}px`;
-  document.body.append(overlay);
-  registerFocusZone(overlay);
-  let closed = false;
-  const close = () => {
-    if (closed) return;
-    closed = true;
-    unregisterFocusZone(overlay);
-    overlay.remove();
-    window.removeEventListener('keydown', onKey, true);
-    onClose?.();
-  };
-  // Esc closes (a click outside doesn't: easy to do by accident). Not from the formula
-  // field or the key recorder, where Esc means something of its own.
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && !e.defaultPrevented && !(e.target as Element | null)?.closest('.sc-recorder, .mf')) {
-      e.preventDefault();
-      close();
-    }
-  };
-  window.addEventListener('keydown', onKey, true);
-  return { dialog, body, footer, close };
-}
-
-function button(label: string, onClick: () => void, className = ''): HTMLButtonElement {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.textContent = label;
-  if (className) b.className = className;
-  b.addEventListener('click', onClick);
-  return b;
-}
-
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
-  const e = document.createElement(tag);
-  e.className = className;
-  if (text !== undefined) e.textContent = text;
-  return e;
-}
+import { openKeybindings } from './keybindings';
+import { button, el, openModal } from './modal';
 
 function formulaPreview(latex: string): HTMLElement {
   const span = el('span', 'sc-preview');
@@ -495,11 +430,20 @@ export function openShortcutManager(getView: () => EditorView): void {
       ['Enter', 'ny linje i formelblokk / ferdig'],
       ['Esc', 'ut av formelen'],
       [', + mellomrom', 'liste-komma (uten mellomrom: desimalkomma)'],
-      ['Ctrl+M', 'ny formel  ·  Ctrl+Shift+M: formelblokk'],
     ];
+    for (const [id, what] of [['math.inline', 'ny formel'], ['math.block', 'ny formelblokk'], ['math.palette', 'vis mattepanelet hele tiden']]) {
+      const keys = keysFor(id);
+      fixed.push([keys.length ? keys.map(describeKeys).join(' / ') : '(ingen)', what]);
+    }
     const table = el('div', 'sc-fixed');
     for (const [k, what] of fixed) table.append(el('kbd', '', k), el('span', '', what));
-    m.body.append(table);
+    m.body.append(
+      table,
+      button('Endre disse og alle andre taster i editoren …', () => {
+        m.close();
+        openKeybindings(getView);
+      }, 'sc-new'),
+    );
   };
   m.footer.append(button('Lukk', () => m.close(), 'primary'));
   render();

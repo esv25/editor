@@ -30,7 +30,7 @@ import { drawingStyle, lineHeight, rectAnchors, styledLine } from './shapes/comm
 import { h, toDom, type SvgNode } from './svg';
 import { arrowSource, newEdgeStyle } from './tools/arrow';
 import { selectTool } from './tools/select';
-import { toolFor, tools, type Selection, type Tool, type ToolContext } from './tools';
+import { toolFor, toolKey, tools, type Selection, type Tool, type ToolContext } from './tools';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_ZOOM = 0.25;
@@ -537,7 +537,7 @@ export class DiagramCanvas {
     else if (key === '-') this.zoomBy(1 / 1.25);
     else if (key === '0' && !mod) this.zoomReset();
     else if (!mod && !e.altKey && key.length === 1) {
-      const tool = tools.find((t) => t.key === key.toLowerCase());
+      const tool = tools.find((t) => toolKey(t) === key.toLowerCase());
       if (tool) this.setTool(tool.id);
       else handled = false;
     } else handled = false;

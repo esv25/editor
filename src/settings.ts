@@ -61,6 +61,8 @@ export interface Settings {
     dragThreshold: number;
     /** Wait this long after a change before saving. */
     autosaveDelayMs: number;
+    /** Tool id → the key that picks it ('' = none), overriding the tool's own. */
+    toolKeys: Record<string, string>;
   };
   math: MathSettings;
 }
@@ -106,7 +108,7 @@ export const defaultSettings: Settings = {
     'codeblock.toggle', 'image.insert', 'diagram.new', '|',
     'math.inline', 'math.block', 'math.palette',
   ],
-  diagram: { grid: 20, hitTolerance: 16, dragThreshold: 6, autosaveDelayMs: 500 },
+  diagram: { grid: 20, hitTolerance: 16, dragThreshold: 6, autosaveDelayMs: 500, toolKeys: {} },
   math: {
     palette: false,
     paletteAuto: true,
@@ -178,6 +180,17 @@ export function resetSettings(): void {
   const prev = current;
   current = defaultSettings;
   for (const fn of listeners) fn(current, prev);
+}
+
+// Another window (the drawing window, or the editor) changed them: follow along.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY) return;
+    const prev = current;
+    overrides = loadOverrides();
+    current = mergeDeep(defaultSettings, overrides);
+    for (const fn of listeners) fn(current, prev);
+  });
 }
 
 export function onSettingsChange(fn: (next: Settings, prev: Settings) => void): () => void {

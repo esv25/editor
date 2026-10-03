@@ -18,6 +18,7 @@ import { TerminalPanel } from '../terminal/terminalPanel';
 import { CodeBar } from '../ui/codeBar';
 import { DebugPanel } from '../ui/debugPanel';
 import { FileTree } from '../ui/fileTree';
+import { openKeybindings } from '../ui/keybindings';
 import { MathPanel } from '../ui/mathPanel';
 import { OutlinePanel } from '../ui/outline';
 import { renderCount, renderSaveStatus, renderTitle } from '../ui/statusbar';
@@ -193,6 +194,13 @@ export async function startApp(): Promise<void> {
       scope: 'any',
       run: () => (updateSettings({ theme: resolvedTheme() === 'dark' ? 'light' : 'dark' }), true),
     },
+    {
+      id: 'app.keybindings',
+      name: 'Hurtigtaster (se og endre alle)',
+      icon: svg('<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>'),
+      scope: 'any',
+      run: () => (openKeybindings(getView), true),
+    },
   ]);
 
   let countTimer: ReturnType<typeof setTimeout> | undefined;
@@ -223,7 +231,7 @@ export async function startApp(): Promise<void> {
   const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save'], getView);
   const viewBar = renderButtons(
     el('view-actions'),
-    ['view.toggleOutline', ...(terminal.available ? ['view.toggleTerminal'] : []), 'view.toggleTheme'],
+    ['view.toggleOutline', ...(terminal.available ? ['view.toggleTerminal'] : []), 'view.toggleTheme', 'app.keybindings'],
     getView,
   );
   new DebugPanel(el('debug'), debug, getView);
