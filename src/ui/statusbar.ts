@@ -2,6 +2,8 @@
  * Window title and the status bar (save status, word count / code info).
  */
 import type { EditorDocument } from '../app/document';
+import { activeFeatures, problemCounts } from '../code/assist';
+import { describeCommand } from '../commands/registry';
 import { languageChoices } from '../features/codeBlockTools/runners';
 import { platform } from '../platform';
 import { getSettings } from '../settings';
@@ -45,6 +47,28 @@ export function renderSaveStatus(doc: EditorDocument, message: string | null): v
       el.textContent = s.message;
       break;
   }
+}
+
+/** Errors and warnings in a code file (click: the list of problems). */
+export function renderProblems(doc: EditorDocument): void {
+  const el = document.getElementById('status-problems')!;
+  const help = activeFeatures(getSettings().codeHelp);
+  el.hidden = doc.kind !== 'code' || !(help.has('syntaxErrors') || help.has('names'));
+  if (el.hidden) return;
+  const { errors, warnings, infos } = problemCounts(doc.state);
+  const parts: HTMLElement[] = [];
+  const part = (cls: string, text: string) => {
+    const span = document.createElement('span');
+    span.className = cls;
+    span.textContent = text;
+    parts.push(span);
+  };
+  if (errors) part('sp-error', `● ${errors} feil`);
+  if (warnings) part('sp-warning', `▲ ${warnings} ${warnings === 1 ? 'advarsel' : 'advarsler'}`);
+  if (infos) part('sp-info', `${infos} råd`);
+  if (!parts.length) part('sp-ok', '✓ Ingen feil');
+  el.replaceChildren(...parts.flatMap((p, i) => (i ? [document.createTextNode('  '), p] : [p])));
+  el.title = describeCommand('code.problems');
 }
 
 /** Words and characters for notes; language, lines and cursor position for code. */

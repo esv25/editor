@@ -23,6 +23,7 @@ import { breakpointGutter } from '../debug/breakpoints';
 import { inlineValues } from '../debug/inlineValues';
 import { renderOutput } from '../features/codeBlockTools/output';
 import { runCode, runnability, type RunOutcome } from '../features/codeBlockTools/run';
+import { assistPhrases } from './assist';
 
 /** The language of the code file in this state (runner id, e.g. "python"). */
 export const codeLanguage = Facet.define<string, string>({ combine: (values) => values[0] ?? '' });
@@ -96,6 +97,7 @@ export function codeModeExtensions(debuggable: boolean): Extension {
     closeBrackets(),
     keymap.of([...closeBracketsKeymap, { key: 'Tab', run: insertIndent, shift: indentLess }]),
     runField,
+    assistPhrases,
     EditorView.editorAttributes.of({ class: 'cm-code-mode' }),
     EditorView.contentAttributes.of({ spellcheck: 'false' }),
   ];

@@ -6,6 +6,11 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- **Kodehjelp** i Python- og JavaScript-filer, som i VS Code: rød bølgestrek under feilstavede navn med forslag til hva du mente («mente du count?» – klikk for å rette), ubrukte variabler, funksjoner og importer tones ned, og kode som aldri kjøres blir grå. Python får egne meldinger for manglende kolon, feil innrykk, `=` i stedet for `==` og glemte importer.
+- Fargede parentespar, innrykkslinjer, og alle stedene samme variabel brukes markeres når markøren står på den. Forslag dukker opp mens du skriver.
+- Velg hvor mye hjelp du vil ha under **Kodehjelp** i innstillingsmenyen: Av, Litt, Som VS Code eller Mye (da står feilmeldingen på linja, med forklaring). Hver ting kan også slås av og på for seg.
+- **Innstillinger** (tannhjulet øverst til høyre): en meny med hva som vises (sidefelt, terminal), lyst/mørkt tema, Kodehjelp, Hurtigtaster og Hva er nytt. Tema- og tastaturknappene øverst er flyttet dit.
+- Nye taster i kodefiler: `F8` neste feil, `Ctrl+Shift+M` listen over problemer, `F2` gi nytt navn overalt, `F12` gå til der navnet er definert. Antall feil står nederst til høyre.
 - Appen sier fra om nye versjoner mens den er åpen (den ser etter hver halvtime), ikke bare når den starter. Trykker du «Senere», står den nye versjonen ved versjonsnummeret nederst – klikk der for å oppdatere.
 - Feilsøking: «Steg tilbake» (Shift+F10 eller knappen ved siden av «Neste linje») viser linja og variablene slik de var ved stoppet før – fint når det kommer en feilmelding eller noe rart skjer. Programmet spoles ikke tilbake; F10 går fram igjen, og F5 tar deg tilbake til nå. Variabler som nettopp ble endret, er markert. Når programmet er ferdig (eller krasjet), blir feilsøkingsvisningen stående, så du fortsatt kan gå tilbake gjennom stoppene.
 - Feilsøking: Trykk ☆ ved en variabel (eller sett markøren på den i koden og trykk Shift+F9) for å fremheve den. Fremhevede variabler vises stort øverst i feilsøkingsvisningen, med verdien rett ved linja programmet står på, og de får hver sin farge i koden. De huskes til neste gang du feilsøker samme fil.

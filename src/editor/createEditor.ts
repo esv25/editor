@@ -18,6 +18,7 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { search, searchKeymap } from '@codemirror/search';
 import { indentUnit } from '@codemirror/language';
+import { assistCommands, codeAssistExtensions } from '../code/assist';
 import { codeCommands, codeLanguage, codeModeExtensions } from '../code/codeMode';
 import { indentationFor } from '../code/indentation';
 import { loadLanguage, type DocKind } from '../code/languages';
@@ -34,8 +35,8 @@ export const docKind = Facet.define<DocKind, DocKind>({ combine: (values) => val
 /** Holds everything that depends on settings; reconfigured on change. */
 const dynamic = new Compartment();
 
-function dynamicExtensions(kind: DocKind, settings: Settings): Extension {
-  if (kind === 'code') return commandKeymap('code');
+function dynamicExtensions(kind: DocKind, settings: Settings, lang = ''): Extension {
+  if (kind === 'code') return [commandKeymap('code'), codeAssistExtensions(lang, settings.codeHelp)];
   return [commandKeymap('markdown'), features.map((f) => f.extension?.(settings) ?? [])];
 }
 
@@ -49,7 +50,7 @@ export function currentSettingsVersion(): number {
 
 /** Effects that bring a state up to date with the current settings. */
 export function refreshForSettings(state: EditorState): StateEffect<unknown>[] {
-  return [dynamic.reconfigure(dynamicExtensions(state.facet(docKind), getSettings()))];
+  return [dynamic.reconfigure(dynamicExtensions(state.facet(docKind), getSettings(), state.facet(codeLanguage)))];
 }
 
 let updateHandler: (u: ViewUpdate) => void = () => {};
@@ -97,7 +98,7 @@ export async function createCodeState(text: string, lang: string): Promise<Edito
       support,
       indentationFor(text, lang),
       codeModeExtensions(debuggerFor(lang) !== null),
-      dynamic.of(dynamicExtensions('code', getSettings())),
+      dynamic.of(dynamicExtensions('code', getSettings(), lang)),
       sharedExtensions(),
     ],
   });
@@ -111,6 +112,7 @@ export async function createCodeState(text: string, lang: string): Promise<Edito
 export function createView(parent: HTMLElement, onUpdate: (u: ViewUpdate) => void): EditorView {
   for (const feature of features) registerCommands(feature.commands ?? []);
   registerCommands(codeCommands);
+  registerCommands(assistCommands((state) => state.facet(codeLanguage)));
   updateHandler = onUpdate;
   return new EditorView({ parent, state: createMarkdownState('') });
 }
