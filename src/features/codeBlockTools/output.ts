@@ -5,6 +5,7 @@
  */
 import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType } from '@codemirror/view';
+import { platform } from '../../platform';
 import { blockAt } from '../util/fence';
 import type { RunOutcome } from './run';
 
@@ -124,8 +125,16 @@ export function renderOutput(opts: {
   if (o?.kind === 'html') {
     const frame = document.createElement('iframe');
     frame.className = 'cm-code-output-frame';
+    // Never allow-same-origin: the opaque origin is what keeps Tauri IPC away from the preview.
     frame.setAttribute('sandbox', 'allow-scripts');
-    frame.srcdoc = o.html;
+    const previewUrl = platform.htmlPreviewUrl;
+    if (previewUrl) {
+      const html = o.html;
+      frame.addEventListener('load', () => frame.contentWindow?.postMessage(html, '*'), { once: true });
+      frame.src = previewUrl;
+    } else {
+      frame.srcdoc = o.html;
+    }
     root.append(frame);
   } else if (o) {
     const pre = document.createElement('pre');

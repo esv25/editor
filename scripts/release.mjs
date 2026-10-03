@@ -10,8 +10,9 @@
 // or else the commit subjects since the last release. That section becomes
 // "## x.y.z – date"; the app shows it ("Hva er nytt") after updating.
 //
-// Steps: bump version, update CHANGELOG.md, test, build + sign the installer
-// (low priority), write latest.json, commit + tag + push, create a GitHub release.
+// Steps: check dependencies for known vulnerabilities, bump version, update
+// CHANGELOG.md, test, build + sign the installer (low priority), write
+// latest.json, commit + tag + push, create a GitHub release.
 // Needs: clean git tree, gh logged in, signing key in ~/.tauri/editor.key.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -48,6 +49,20 @@ try {
   run('gh', ['auth', 'status']);
 } catch {
   fail('gh er ikke logget inn (kjør: gh auth login).');
+}
+
+// ---- Known vulnerabilities (NSM 3.1) ----
+// npm: only what ships in the app (--omit=dev); high or critical stops the release.
+// cargo: `cargo audit` (install with `cargo install cargo-audit --locked`) checks
+// Cargo.lock against the RustSec database; any vulnerability stops the release.
+console.log('→ Sjekker avhengigheter for kjente sårbarheter');
+const npmAudit = spawnSync('npm', ['audit', '--omit=dev', '--audit-level=high'], { cwd: root, stdio: 'inherit', shell: true });
+if (npmAudit.status !== 0) fail('npm audit fant alvorlige sårbarheter. Oppdater pakkene (npm audit fix) før release.');
+const cargo = (args, opts = {}) => spawnSync('cargo', args, { cwd: path.join(root, 'src-tauri'), shell: true, ...opts });
+if (cargo(['audit', '--version']).status !== 0) {
+  console.warn('  (cargo audit er ikke installert – hopper over Rust-sjekken. Installer: cargo install cargo-audit --locked)');
+} else if (cargo(['audit'], { stdio: 'inherit' }).status !== 0) {
+  fail('cargo audit fant sårbarheter i Rust-avhengighetene. Oppdater (cargo update) før release.');
 }
 
 // ---- Version ----

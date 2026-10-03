@@ -97,6 +97,12 @@ export interface Platform {
   /** Run a program on a code snippet (desktop only). */
   runProgram?(request: RunRequest): Promise<RunResult>;
   /**
+   * Page that shows an HTML preview sent to it with postMessage (desktop).
+   * The app's CSP forbids inline scripts, and a srcdoc frame would inherit
+   * it; this page has its own, looser CSP. Without it, previews use srcdoc.
+   */
+  readonly htmlPreviewUrl?: string;
+  /**
    * Open another page of the app (e.g. "diagram.html") with query `params`: a
    * new window on the desktop (or focus the one already open for `key`), a new
    * tab in the browser.

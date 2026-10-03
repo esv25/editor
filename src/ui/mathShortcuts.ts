@@ -12,6 +12,7 @@
  * turned off), and the fixed keys of the formula field.
  */
 import katex from 'katex';
+import { trust } from '../features/math/render';
 import type { EditorView } from '@codemirror/view';
 import { isAltGraph, keySpecFromEvent, MODIFIER_KEYS, normalizeKey, strokes } from '../commands/keys';
 import { allCommands, keysFor } from '../commands/registry';
@@ -31,7 +32,7 @@ function formulaPreview(latex: string): HTMLElement {
     return span;
   }
   try {
-    span.innerHTML = katex.renderToString(previewLatex({ latex } as MathItem), { throwOnError: true, strict: 'ignore', trust: true });
+    span.innerHTML = katex.renderToString(previewLatex({ latex } as MathItem), { throwOnError: true, strict: 'ignore', trust });
   } catch {
     span.textContent = latex;
   }

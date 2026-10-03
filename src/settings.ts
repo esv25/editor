@@ -65,6 +65,12 @@ export interface Settings {
     toolKeys: Record<string, string>;
   };
   math: MathSettings;
+  security: {
+    /** Folders code may run from without asking (see app/trust.ts). */
+    trustedFolders: string[];
+    /** Hosts whose images load without asking (others wait for «Vis bildet»). */
+    imageHosts: string[];
+  };
 }
 
 export interface MathSettings {
@@ -118,6 +124,7 @@ export const defaultSettings: Settings = {
     names: {},
     favorites: ['frac', 'sqrt', 'square', 'pow', 'times', 'pm', 'le', 'ge', 'ne', 'approx', 'pi', 'paren', 'abs', 'answer'],
   },
+  security: { trustedFolders: [], imageHosts: [] },
 };
 
 export type DeepPartial<T> = {

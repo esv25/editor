@@ -11,9 +11,12 @@ export type RunOutcome =
   | { kind: 'html'; html: string }
   | { kind: 'error'; message: string };
 
-/** Where snippets run from (the document's folder). Set by the app. */
+/** Set by the app: where snippets run from, and whether they may (trusted folders). */
 export const runContext = {
+  /** The document's folder. */
   cwd: (): string | undefined => undefined,
+  /** Whether code in the active document may run as a program (asks the user if needed). */
+  allow: (): Promise<boolean> => Promise.resolve(true),
 };
 
 export type Runnability = { ok: true } | { ok: false; reason: string };
@@ -36,6 +39,7 @@ export async function runCode(lang: string, code: string): Promise<RunOutcome> {
 
   const runner = runnerFor(id);
   if (runner && platform.runProgram) {
+    if (!(await runContext.allow())) return { kind: 'error', message: 'Ikke kjørt: du valgte å ikke stole på mappa fila ligger i.' };
     try {
       const source = (runner.bom ? '﻿' : '') + (runner.prelude ?? '') + code;
       const result = await platform.runProgram({

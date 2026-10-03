@@ -82,6 +82,7 @@ src/
     download.ts           reserve for andre nettlesere (input + nedlasting)
     tauri.ts              skrivebordsappen: native dialoger + plugin-fs (også bilder: readBinary)
     drafts.ts             gammelt enkeltdokument-utkast (leses bare for migrering)
+    backupRules.ts        sikkerhetskopi før overskriving: navn og opprydding (ren logikk)
     index.ts              velger backend
   platform/               det som ellers skiller nettleser og skrivebord
     types.ts              Platform: vindustittel, bekreftelsesdialog, lukking, oppstartsfil,
@@ -107,7 +108,8 @@ diagram.html              inngangen til tegnevinduet (Vite bygger to sider: inde
 tests/                    Vitest; helpers.ts har `run(command, "tekst med | markør")`
 src-tauri/
   tauri.conf.json         vindu, bundling, .md-filtilknytning
-  capabilities/default.json  tillatelser for `main` og `diagram-*` (fs-scope er `**` – det er en vanlig editor)
+  capabilities/default.json  tillatelser for `main` og `diagram-*` (fs-scope er `**` – det er en vanlig editor –
+                          men `fs:scope` sperrer mapper med hemmeligheter, se «Sikkerhet»)
   src/lib.rs              Tauri-oppsett, single-instance (videresender «Åpne med» som
                           hendelsen `open-file`) + kommandoen `startup_file`
   src/runner.rs           kommandoen `run_program` (kjøring av kodeblokker)
@@ -180,7 +182,9 @@ Markdown (`$…$`, `$$` på egne linjer), så filene virker i Obsidian/Typora/Gi
   tekst. Bilder i kode tegnes ikke. Tekstendringene (`commands.ts`) er testet.
 - Stier (`features/util/imagePath.ts`, testet i `tests/imagePath.test.ts`): relative stier
   regnes fra dokumentets mappe (`imageContext.baseDir`, satt i `app.ts`), `<…>` og `%20`
-  forstås, `http(s):`/`data:` brukes direkte. Nye lenker skrives relativt med `/`.
+  forstås, `data:` brukes direkte. `http(s):`-bilder hentes ikke før brukeren trykker «Vis bildet»
+  eller har lagt nettstedet i `settings.security.imageHosts` («Alltid fra …»); de hentes uten
+  referrer. Nye lenker skrives relativt med `/`.
 - Filer leses via `storage.readBinary` (bare skrivebord; `fs:allow-read-file`) og caches
   som blob-URL-er i `loader.ts`. `reloadImages(view, stier)` leser filer på nytt (f.eks.
   når en tegning er lagret); `redrawImages(view)` når dokumentet har flyttet mappe.
@@ -409,6 +413,32 @@ Kun overstyringer lagres, så endrede standardverdier slår gjennom. Editor-exte
 bygges på nytt via en Compartment når innstillinger endres. Endres de i et annet vindu
 (tegnevinduet), følger de andre etter via `storage`-hendelsen. Det finnes ennå ingen samlet
 innstillings-UI (bare hurtigtast-dialogene); ellers endres de via konsollen eller standardverdiene.
+
+## Sikkerhet (`SECURITY.md`)
+
+Arbeidet følger NSMs grunnprinsipper; trusselmodell og tiltak står i `SECURITY.md`. Det viktigste
+er at en fil fra noen andre aldri skal kunne kjøre skript i webvisningen, for den har fs-tilgang
+og kan starte programmer.
+
+- **CSP** i `tauri.conf.json` (`script-src 'self'`, ingen `eval`). Den gjelder bare i bygget app
+  (dev-serveren på Windows går utenom), så CSP-endringer må prøves i et bygg:
+  `npx tauri build --no-bundle --config '{"identifier":"com.eirik.editor.csptest",…}'` og kjør
+  `src-tauri/target/release/editor.exe` med remote debugging. `style-src` har `'unsafe-inline'`
+  (CodeMirror, KaTeX) og `dangerousDisableAssetCspModification: ["style-src"]`, ellers legger
+  Tauri på en nonce som slår av `'unsafe-inline'`.
+- Aldri `innerHTML` med tekst fra dokumenter eller filer – bare egne ikoner/KaTeX. KaTeX bruker
+  alltid `trust` fra `features/math/render.ts`, aldri `trust: true`.
+- **HTML-forhåndsvisning** (`output.ts`): i appen lastes `http://preview.localhost/` (URI-ordningen
+  `preview` i `lib.rs`, egen løs CSP) i en iframe med `sandbox="allow-scripts"`, og HTML-en sendes
+  med `postMessage`. En `srcdoc`-ramme ville arvet appens CSP. **Aldri `allow-same-origin`**: det
+  ugjennomsiktige opphavet er det som får Tauri til å avvise IPC fra rammen.
+- **Klarerte mapper** (`app/trust.ts`, regler i `trustRules.ts`): alt som kjører kode som et
+  program (`runContext.allow`, `runInTerminal`, `DebugController.launch`) spør via
+  `allowRunning(sti)` først. Ny kjørevei → bruk den.
+- **Sikkerhetskopi** (`storage/tauri.ts`): første overskriving av en fil per økt kopierer det
+  gamle innholdet til `$APPLOCALDATA/backups/<dag>/`; `fs:allow-remove` gjelder bare der.
+- `npm run release` kjører `npm audit --omit=dev --audit-level=high` og `cargo audit` (hvis
+  installert) før den bygger.
 
 ## Konvensjoner
 

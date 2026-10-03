@@ -74,6 +74,82 @@
         }
       ]
     },
-    "opener:allow-reveal-item-in-dir"
+    "opener:allow-reveal-item-in-dir",
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [
+        {
+          "path": "$APPLOCALDATA/backups/*"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:scope",
+      "deny": [
+        {
+          "path": "$HOME/.tauri"
+        },
+        {
+          "path": "$HOME/.tauri/**"
+        },
+        {
+          "path": "$HOME/.ssh"
+        },
+        {
+          "path": "$HOME/.ssh/**"
+        },
+        {
+          "path": "$HOME/.gnupg"
+        },
+        {
+          "path": "$HOME/.gnupg/**"
+        },
+        {
+          "path": "$HOME/.aws"
+        },
+        {
+          "path": "$HOME/.aws/**"
+        },
+        {
+          "path": "$HOME/.azure"
+        },
+        {
+          "path": "$HOME/.azure/**"
+        },
+        {
+          "path": "$HOME/.kube"
+        },
+        {
+          "path": "$HOME/.kube/**"
+        },
+        {
+          "path": "$HOME/.docker"
+        },
+        {
+          "path": "$HOME/.docker/**"
+        },
+        {
+          "path": "$HOME/.claude/.credentials.json"
+        },
+        {
+          "path": "$HOME/.git-credentials"
+        },
+        {
+          "path": "$HOME/.npmrc"
+        },
+        {
+          "path": "$HOME/.cargo/credentials"
+        },
+        {
+          "path": "$HOME/.cargo/credentials.toml"
+        },
+        {
+          "path": "$APPDATA/GitHub CLI"
+        },
+        {
+          "path": "$APPDATA/GitHub CLI/**"
+        }
+      ]
+    }
   ]
 }

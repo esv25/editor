@@ -9,6 +9,7 @@
  * being edited stays open.
  */
 import katex from 'katex';
+import { trust } from '../features/math/render';
 import { EditorView } from '@codemirror/view';
 import { categories, itemsById, previewLatex, searchItems, TYPED, type MathItem } from '../features/math/catalog';
 import {
@@ -32,7 +33,7 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function renderPreview(latex: string): string {
   try {
-    return katex.renderToString(latex, { throwOnError: true, strict: 'ignore', trust: true, output: 'html' });
+    return katex.renderToString(latex, { throwOnError: true, strict: 'ignore', trust, output: 'html' });
   } catch {
     return '';
   }

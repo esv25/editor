@@ -5,7 +5,9 @@ import {
   dirOf,
   imageMarkdown,
   imageMime,
+  isHostAllowed,
   relativeImagePath,
+  remoteHost,
   resolveImageSource,
 } from '../src/features/util/imagePath';
 import { run, stateOf } from './helpers';
@@ -106,5 +108,29 @@ describe('image edits', () => {
 
   it('keeps the rest of a line', () => {
     expect(run(removeImage(3), 'Se |![a](b.png) her')).toBe('Se | her');
+  });
+});
+
+describe('web images', () => {
+  const host = (dest: string) => remoteHost(resolveImageSource(dest, 'C:/notes'));
+
+  it('names the host of http(s) images', () => {
+    expect(host('https://Example.com/a.png')).toBe('example.com');
+    expect(host('http://cdn.example.com:8080/a.png?x=1')).toBe('cdn.example.com');
+  });
+
+  it('treats files, data: and blob: as local', () => {
+    expect(host('bilde.png')).toBeNull();
+    expect(host('data:image/png;base64,AAAA')).toBeNull();
+    expect(host('blob:http://tauri.localhost/1234')).toBeNull();
+  });
+
+  it('allows a listed host and its subdomains, nothing else', () => {
+    const hosts = ['example.com'];
+    expect(isHostAllowed('example.com', hosts)).toBe(true);
+    expect(isHostAllowed('cdn.example.com', hosts)).toBe(true);
+    expect(isHostAllowed('badexample.com', hosts)).toBe(false);
+    expect(isHostAllowed('example.com.evil.net', hosts)).toBe(false);
+    expect(isHostAllowed('example.com', [''])).toBe(false);
   });
 });

@@ -216,7 +216,9 @@ html, body {
   border-radius: 6px;
   padding: 8px 12px;
 }
-.cm-image-notice-path { font-family: var(--font-mono); font-size: 12px; color: var(--faint); }
+.cm-image-notice-path { font-family: var(--font-mono); font-size: 12px; color: var(--faint); word-break: break-all; }
+.cm-image-remote-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.cm-editor .cm-image-remote-actions button { font-size: 13px; padding: 3px 10px; }
 
 /* Task lists */
 .cm-task-checkbox {
@@ -285,6 +287,7 @@ html, body {
 .cm-codeblock-lang,
 .cm-codeblock-run,
 .cm-image-header button,
+.cm-image-remote-actions button,
 .cm-code-output-head button {
   font: 12px var(--font-ui);
   color: var(--fg);
@@ -299,6 +302,7 @@ html, body {
 .cm-codeblock-lang:hover,
 .cm-codeblock-run:not(:disabled):hover,
 .cm-image-header button:hover,
+.cm-image-remote-actions button:hover,
 .cm-code-output-head button:hover { background: var(--button-hover); }
 
 /* Run output below a code block */

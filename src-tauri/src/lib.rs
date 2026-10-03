@@ -15,6 +15,31 @@ fn startup_file() -> Option<String> {
     file_arg(&std::env::args().collect::<Vec<_>>())
 }
 
+/// The page behind `platform.htmlPreviewUrl` (http://preview.localhost/ on Windows).
+/// The app's CSP forbids inline scripts, and a srcdoc frame would inherit it, so the
+/// HTML preview loads this page instead: it writes whatever HTML the editor posts to
+/// it. It has its own loose CSP, and the editor shows it in a sandboxed iframe
+/// without allow-same-origin: the opaque origin ("null") is what makes Tauri refuse
+/// IPC from it (checked in the built app), so never add allow-same-origin there.
+const PREVIEW_PAGE: &str = r#"<!doctype html><meta charset="utf-8"><script>
+addEventListener('message', function show(event) {
+  removeEventListener('message', show);
+  document.open();
+  document.write(String(event.data));
+  document.close();
+});
+</script>"#;
+
+const PREVIEW_CSP: &str = "default-src * data: blob: 'unsafe-inline' 'unsafe-eval'";
+
+fn preview_response() -> tauri::http::Response<Vec<u8>> {
+    tauri::http::Response::builder()
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Content-Security-Policy", PREVIEW_CSP)
+        .body(PREVIEW_PAGE.as_bytes().to_vec())
+        .expect("static preview response")
+}
+
 /// Stop terminals and debug adapters left over from before the page (re)loaded.
 #[tauri::command]
 fn processes_reset(terminals: tauri::State<'_, terminal::Terminals>, adapters: tauri::State<'_, debug::Adapters>) {
@@ -41,6 +66,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
+        .register_uri_scheme_protocol("preview", |_ctx, _request| preview_response())
         .manage(terminal::Terminals::default())
         .manage(debug::Adapters::default())
         .invoke_handler(tauri::generate_handler![
