@@ -2,7 +2,7 @@
  * Indentation for code: which unit to use (detected from the file, or the
  * language's usual one) and a VS Code-like Tab.
  */
-import { countColumn, EditorSelection, type Extension, type StateCommand } from '@codemirror/state';
+import { countColumn, EditorSelection, type EditorState, type Extension, type StateCommand } from '@codemirror/state';
 import { getIndentUnit, indentUnit } from '@codemirror/language';
 import { indentMore } from '@codemirror/commands';
 
@@ -71,3 +71,77 @@ export const insertIndent: StateCommand = ({ state, dispatch }) => {
   dispatch(state.update(tr, { scrollIntoView: true, userEvent: 'input.indent' }));
   return true;
 };
+
+// ---- Indentation levels (indent guides, status bar) ----
+
+/** Indent width of a line in columns, or null for a blank line. */
+export function indentColumns(text: string, tabSize: number): number | null {
+  let col = 0;
+  for (const ch of text) {
+    if (ch === ' ') col++;
+    else if (ch === '\t') col += tabSize - (col % tabSize);
+    else return col;
+  }
+  return null;
+}
+
+/**
+ * Indentation level per line (1-based line numbers), cached. A blank line gets
+ * the smaller level of the nearest non-blank lines around it, so guides run through it.
+ */
+export function indentLevels(state: EditorState): (lineNo: number) => number {
+  const { doc, tabSize } = state;
+  const unit = getIndentUnit(state) || 4;
+  const cache = new Map<number, number>();
+  const nearest = (from: number, step: 1 | -1): number => {
+    for (let n = from, i = 0; n >= 1 && n <= doc.lines && i < 200; n += step, i++) {
+      const cols = indentColumns(doc.line(n).text, tabSize);
+      if (cols !== null) return cols;
+    }
+    return 0;
+  };
+  return (n) => {
+    let level = cache.get(n);
+    if (level === undefined) {
+      let cols = indentColumns(doc.line(n).text, tabSize);
+      if (cols === null) cols = Math.min(nearest(n - 1, -1), nearest(n + 1, 1));
+      level = Math.ceil(cols / unit);
+      cache.set(n, level);
+    }
+    return level;
+  };
+}
+
+/**
+ * The block the cursor is in, the way VS Code highlights its indent guide: on a line
+ * that opens a block (the next line is deeper) it's that block; otherwise the
+ * innermost block the line belongs to. `level` is the guide (1 = the first one);
+ * `from`/`to` are the line numbers the guide runs through.
+ */
+export function activeIndentBlock(state: EditorState, pos: number, levelOf = indentLevels(state)): { level: number; from: number; to: number } | null {
+  const { doc } = state;
+  const lineNo = doc.lineAt(pos).number;
+  const here = levelOf(lineNo);
+  let next = lineNo + 1;
+  while (next <= doc.lines && indentColumns(doc.line(next).text, state.tabSize) === null) next++;
+  const opens = next <= doc.lines && levelOf(next) > here;
+  const level = opens ? here + 1 : here;
+  if (level < 1) return null;
+  let from = opens ? lineNo + 1 : lineNo;
+  let to = from;
+  while (from > 1 && levelOf(from - 1) >= level) from--;
+  while (to < doc.lines && levelOf(to + 1) >= level) to++;
+  // Trailing blank lines don't belong to the block.
+  while (to > from && indentColumns(doc.line(to).text, state.tabSize) === null) to--;
+  return { level, from, to };
+}
+
+/** "innrykk 2" for the cursor's line – counting the whitespace even on an otherwise empty line. */
+export function describeIndent(state: EditorState, pos: number): string {
+  const text = state.doc.lineAt(pos).text;
+  const cols = countColumn(/^[ \t]*/.exec(text)![0], state.tabSize);
+  const unit = getIndentUnit(state) || 4;
+  const level = Math.floor(cols / unit);
+  const extra = cols % unit;
+  return `innrykk ${level}` + (extra ? ` + ${extra} mellomrom` : '');
+}

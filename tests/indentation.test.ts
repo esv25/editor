@@ -4,7 +4,7 @@ import { deleteCharBackward, insertNewlineAndIndent } from '@codemirror/commands
 import { indentUnit, LanguageDescription } from '@codemirror/language';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
-import { detectIndent, indentationFor, insertIndent } from '../src/code/indentation';
+import { activeIndentBlock, describeIndent, detectIndent, indentationFor, insertIndent } from '../src/code/indentation';
 import { loadLanguage } from '../src/code/languages';
 import { indentListItem, shiftTabOutsideList, tabOutsideList } from '../src/features/smartLists';
 import { fullyParsed, textOf } from './helpers';
@@ -94,5 +94,39 @@ describe('code blocks in notes', () => {
     expect(apply(tabOutsideList, await note('```python\n|x\n```'))).toBe('```python\n    |x\n```');
     expect(apply(tabOutsideList, await note('Tekst|'))).toBe('  Tekst|');
     expect(apply(shiftTabOutsideList, await note('  Tekst|'))).toBe('Tekst|');
+  });
+});
+
+describe('indent levels', () => {
+  const code = ['def f(x):', '    if x:', '        a = 1', '', '        b = 2', '    return x', '', 'f(1)'].join('\n');
+  const stateAt = (line: number, col = 0) => {
+    const state = EditorState.create({ doc: code, extensions: indentUnit.of('    ') });
+    return { state, pos: state.doc.line(line).from + col };
+  };
+  const block = (line: number) => {
+    const { state, pos } = stateAt(line);
+    return activeIndentBlock(state, pos);
+  };
+
+  it('highlights the block a header line opens', () => {
+    expect(block(1)).toEqual({ level: 1, from: 2, to: 6 });
+    expect(block(2)).toEqual({ level: 2, from: 3, to: 5 });
+  });
+
+  it('highlights the innermost block a line belongs to, through blank lines', () => {
+    expect(block(3)).toEqual({ level: 2, from: 3, to: 5 });
+    expect(block(4)).toEqual({ level: 2, from: 3, to: 5 });
+    expect(block(6)).toEqual({ level: 1, from: 2, to: 6 });
+  });
+
+  it('has no block at the top level', () => {
+    expect(block(8)).toBeNull();
+  });
+
+  it('describes the indentation at the cursor', () => {
+    const { state, pos } = stateAt(3);
+    expect(describeIndent(state, pos)).toBe('innrykk 2');
+    const odd = EditorState.create({ doc: '      x', extensions: indentUnit.of('    ') });
+    expect(describeIndent(odd, 0)).toBe('innrykk 1 + 2 mellomrom');
   });
 });

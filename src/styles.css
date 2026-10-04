@@ -480,6 +480,17 @@ html, body {
   background-size: calc(var(--indent-unit) * 1ch) 100%;
   pointer-events: none;
 }
+/* The guide of the block the cursor is in. */
+.cm-code-mode .cm-line.cm-indent-active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(6px + (var(--indent-active) - 1) * var(--indent-unit) * 1ch);
+  width: 2px;
+  background: var(--indent-guide-active);
+  pointer-events: none;
+}
 .cm-line-message {
   margin-left: 2.5em;
   font: italic 0.92em var(--font-ui);
