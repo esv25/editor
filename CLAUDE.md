@@ -286,7 +286,9 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   Go). Tab er som i VS Code (`insertIndent`: mellomrom til neste tabulatorstopp ved
   markøren, eller rykk inn markerte linjer). Notater har `indentUnit` 4 for kodeblokkene;
   Tab i kodeblokk = `insertIndent`, i vanlig tekst flyttes linja 2 mellomrom, og
-  listekommandoene gjelder ikke inni kodeblokker. Testet i `tests/indentation.test.ts`.
+  listekommandoene gjelder ikke inni kodeblokker. Innrykksnivåer (`indentLevels`,
+  `activeIndentBlock` – blokka markøren står i, farget innrykkslinje; `describeIndent` i
+  statuslinja) ligger også her. Testet i `tests/indentation.test.ts`.
 
 ### Kodehjelp (`code/assist/`)
 

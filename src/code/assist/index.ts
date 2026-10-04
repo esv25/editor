@@ -35,6 +35,7 @@ import { analyze, assistLang, diagnose, type AnyAnalysis } from './diagnose';
 import { pythonModules } from './globals';
 import { activeFeatures, type CodeHelpFeature, type CodeHelpSettings } from './levels';
 import type { Issue, Ref } from './types';
+import { activeIndentBlock, indentLevels } from '../indentation';
 
 export { activeFeatures } from './levels';
 
@@ -305,16 +306,6 @@ const bracketColors = ViewPlugin.fromClass(
 
 // ---- Indent guides ----
 
-function indentColumns(text: string, tabSize: number): number | null {
-  let col = 0;
-  for (const ch of text) {
-    if (ch === ' ') col++;
-    else if (ch === '\t') col += tabSize - (col % tabSize);
-    else return col;
-  }
-  return null; // blank
-}
-
 const indentGuides = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
@@ -322,35 +313,34 @@ const indentGuides = ViewPlugin.fromClass(
       this.decorations = this.build(view);
     }
     update(u: ViewUpdate) {
-      if (u.docChanged || u.viewportChanged) this.decorations = this.build(u.view);
+      if (u.docChanged || u.viewportChanged || u.selectionSet) this.decorations = this.build(u.view);
     }
     build(view: EditorView): DecorationSet {
       const { state } = view;
-      const { doc, tabSize } = state;
+      const { doc } = state;
       const unit = getIndentUnit(state) || 4;
+      const levelOf = indentLevels(state);
+      // The guide of the block the cursor is in is drawn stronger.
+      const active = state.selection.ranges.length === 1 ? activeIndentBlock(state, state.selection.main.head, levelOf) : null;
       const builder = new RangeSetBuilder<Decoration>();
-      // A blank line continues the guides of the lines around it.
-      const nearest = (from: number, step: 1 | -1): number => {
-        for (let n = from, i = 0; n >= 1 && n <= doc.lines && i < 200; n += step, i++) {
-          const cols = indentColumns(doc.line(n).text, tabSize);
-          if (cols !== null) return cols;
-        }
-        return 0;
-      };
       let lastLine = 0;
       for (const { from, to } of view.visibleRanges) {
         for (let pos = from; pos <= to; ) {
           const line = doc.lineAt(pos);
           if (line.number > lastLine) {
             lastLine = line.number;
-            let cols = indentColumns(line.text, tabSize);
-            if (cols === null) cols = Math.min(nearest(line.number - 1, -1), nearest(line.number + 1, 1));
-            const levels = Math.ceil(cols / unit);
+            const levels = levelOf(line.number);
             if (levels > 0) {
+              const inActive = active && line.number >= active.from && line.number <= active.to;
               builder.add(
                 line.from,
                 line.from,
-                Decoration.line({ attributes: { class: 'cm-indent-guides', style: `--indent-levels: ${levels}; --indent-unit: ${unit}` } }),
+                Decoration.line({
+                  attributes: {
+                    class: inActive ? 'cm-indent-guides cm-indent-active' : 'cm-indent-guides',
+                    style: `--indent-levels: ${levels}; --indent-unit: ${unit}` + (inActive ? `; --indent-active: ${active.level}` : ''),
+                  },
+                }),
               );
             }
           }

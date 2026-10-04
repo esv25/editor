@@ -3,6 +3,7 @@
  */
 import type { EditorDocument } from '../app/document';
 import { activeFeatures, problemCounts } from '../code/assist';
+import { describeIndent } from '../code/indentation';
 import { describeCommand } from '../commands/registry';
 import { languageChoices } from '../features/codeBlockTools/runners';
 import { platform } from '../platform';
@@ -79,7 +80,7 @@ export function renderCount(doc: EditorDocument): void {
     const head = state.selection.main.head;
     const line = state.doc.lineAt(head);
     const lang = languageChoices.find((c) => c.id === doc.lang)?.label ?? (doc.lang || 'Ren tekst');
-    el.textContent = `${lang} · linje ${line.number}, kol ${head - line.from + 1} · ${state.doc.lines} linjer`;
+    el.textContent = `${lang} · linje ${line.number}, kol ${head - line.from + 1} · ${describeIndent(state, head)} · ${state.doc.lines} linjer`;
     return;
   }
   const text = state.doc.toString();
