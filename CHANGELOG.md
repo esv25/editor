@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+## 0.7.1 – 2026-10-05
+
 - Lettere å se innrykket i kodefiler: innrykkslinjene er litt tydeligere, blokka markøren står i får en farget linje (som i VS Code), og statuslinja viser innrykksnivået («innrykk 2»).
 
 ## 0.7.0 – 2026-10-03

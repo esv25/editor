@@ -1,6 +1,6 @@
 [package]
 name = "editor"
-version = "0.7.0"
+version = "0.7.1"
 description = "Markdown-editor"
 edition = "2021"
 
