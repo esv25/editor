@@ -41,13 +41,13 @@ export const levels: LevelInfo[] = [
   { id: 'basic', name: 'Litt', description: 'Streker under feil: skrivefeil i koden og navn som ikke finnes.' },
   {
     id: 'standard',
-    name: 'Som VS Code',
+    name: 'Standard',
     description: 'Feil og advarsler, ubrukt kode tones ned, forslag mens du skriver, fargede parenteser og innrykkslinjer.',
   },
   {
     id: 'full',
     name: 'Mye',
-    description: 'Alt i «Som VS Code», og i tillegg står feilmeldingen på linja, med forklaringer og råd for nybegynnere.',
+    description: 'Alt i «Standard», og i tillegg står feilmeldingen på linja, med forklaringer og råd for nybegynnere.',
   },
 ];
 

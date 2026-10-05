@@ -320,7 +320,7 @@ Alt unntatt `index.ts` er ren logikk (testet i `tests/export.test.ts`).
 VS Code-lignende skrivestøtte i kodefiler, uten språkserver: egen analyse av Lezer-syntakstreet.
 Alt unntatt `index.ts` er ren logikk uten CodeMirror (testet i `tests/codeAssist.test.ts`).
 
-- `levels.ts`: nivåene (Av / Litt / Som VS Code / Mye) og funksjonene (`CodeHelpFeature`).
+- `levels.ts`: nivåene (Av / Litt / Standard / Mye) og funksjonene (`CodeHelpFeature`).
   `settings.codeHelp = { level, overrides }`; en override (`true`/`false`) går foran nivået,
   `null` = følg nivået. `activeFeatures()` gir det som er på. Ny funksjon = linje i `featureInfo`.
 - `python.ts` / `javascript.ts`: scopes, bindinger og referanser (pyflakes / ESLint-aktig).
