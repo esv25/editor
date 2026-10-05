@@ -4,7 +4,7 @@
  */
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { appLocalDataDir, documentDir, join } from '@tauri-apps/api/path';
-import { exists, mkdir, readDir, readFile, readTextFile, remove, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { exists, mkdir, readDir, readFile, readTextFile, remove, rename, writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { codeFileExtensions } from '../code/fileTypes';
 import { backupDay, backupFileName, expiredBackupDays } from './backupRules';
 import type { FileRef, FolderEntry, OpenedFile, StorageBackend } from './types';
@@ -118,6 +118,14 @@ export const tauriStorage: StorageBackend = {
 
   readBinary(path: string): Promise<Uint8Array> {
     return readFile(path);
+  },
+
+  async pickSavePath({ title, defaultPath, filters }): Promise<string | null> {
+    return (await save({ title, defaultPath, filters })) ?? null;
+  },
+
+  writeBinary(path: string, data: Uint8Array): Promise<void> {
+    return writeFile(path, data);
   },
 
   async save(file: FileRef, content: string): Promise<void> {

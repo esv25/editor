@@ -1215,3 +1215,89 @@ html, body {
 .cm-debug-value.changed { border-color: var(--pin); box-shadow: 0 0 0 1px var(--pin); font-weight: 600; }
 .cm-debug-value-name { color: var(--pin); font-weight: 600; }
 .cm-debug-ref { border-radius: 2px; background: color-mix(in srgb, var(--pin) 15%, transparent); box-shadow: inset 0 -2px var(--pin); }
+
+/* ---------- PDF and printing (src/export/index.ts) ---------- */
+/* The document is put in #print-root while printing; paper always has the same colours, whatever the theme. */
+#print-root {
+  display: none;
+  --paper-fg: #1a1a1a;
+  --paper-muted: #595959;
+  --paper-rule: #bfbfbf;
+  --paper-code-bg: #f3f4f6;
+  --paper-link: #0563c1;
+  color: var(--paper-fg);
+  background: #fff;
+  font-family: var(--font-prose);
+  font-size: 11pt;
+  line-height: 1.45;
+}
+
+@page { size: A4; margin: 2cm; }
+
+@media print {
+  html:has(body.printing), body.printing { height: auto; background: #fff; }
+  body.printing > :not(#print-root) { display: none !important; }
+  body.printing #print-root { display: block; }
+}
+
+#print-root h1, #print-root h2, #print-root h3, #print-root h4, #print-root h5, #print-root h6 {
+  margin: 1.2em 0 0.4em;
+  line-height: 1.25;
+  break-after: avoid;
+}
+#print-root h1 { font-size: 20pt; }
+#print-root h2 { font-size: 16pt; }
+#print-root h3 { font-size: 13pt; }
+#print-root h4, #print-root h5, #print-root h6 { font-size: 11pt; font-style: italic; }
+#print-root > :first-child { margin-top: 0; }
+#print-root p { margin: 0 0 0.7em; }
+#print-root a { color: var(--paper-link); }
+#print-root code { font-family: var(--font-mono); font-size: 0.92em; background: var(--paper-code-bg); padding: 0 0.2em; border-radius: 3px; }
+#print-root .code { margin: 0 0 0.8em; break-inside: avoid; }
+#print-root .code-title { font-size: 9pt; font-weight: 600; color: var(--paper-muted); margin-bottom: 2px; }
+#print-root pre { margin: 0; padding: 6px 8px; background: var(--paper-code-bg); border-radius: 4px; white-space: pre-wrap; tab-size: 4; }
+#print-root pre code { background: none; padding: 0; font-size: 9.5pt; }
+#print-root .math-block { margin: 0.6em 0 0.8em; break-inside: avoid; }
+#print-root blockquote { margin: 0 0 0.8em; padding-left: 12px; border-left: 3px solid var(--paper-rule); color: var(--paper-muted); }
+#print-root ul, #print-root ol { margin: 0 0 0.7em; padding-left: 1.6em; }
+#print-root li > p { margin-bottom: 0.2em; }
+#print-root li.task { list-style: none; }
+#print-root li.task .box { float: left; margin-left: -1.4em; }
+#print-root li.task > p:first-of-type { margin-bottom: 0.2em; }
+#print-root hr { border: none; border-top: 1px solid var(--paper-rule); margin: 1em 0; }
+#print-root table { border-collapse: collapse; margin: 0 0 0.8em; break-inside: avoid; }
+#print-root th, #print-root td { border: 1px solid var(--paper-rule); padding: 3px 8px; }
+#print-root th { background: var(--paper-code-bg); }
+#print-root figure { margin: 0.4em 0 0.8em; break-inside: avoid; }
+#print-root img { max-width: 100%; }
+#print-root figcaption { font-size: 9pt; font-style: italic; color: var(--paper-muted); }
+#print-root .missing-image { color: var(--paper-muted); font-style: italic; }
+
+/* ---------- "Lagret" bubble under the export button (ui/savedBubble.ts) ---------- */
+.saved-bubble {
+  position: fixed; z-index: 120; width: 300px; padding: 12px;
+  background: var(--bg); border: 1px solid var(--accent); border-radius: 10px;
+  box-shadow: 0 12px 36px rgb(0 0 0 / 0.35), 0 0 0 3px rgb(from var(--accent) r g b / 0.15);
+  font: 13px var(--font-ui); color: var(--fg);
+  animation: saved-bubble-in 0.15s ease-out;
+}
+.saved-bubble::before {
+  content: ''; position: absolute; top: -6px; left: calc(var(--arrow-x, 20px) - 6px);
+  width: 10px; height: 10px; background: var(--bg);
+  border-left: 1px solid var(--accent); border-top: 1px solid var(--accent); transform: rotate(45deg);
+}
+@keyframes saved-bubble-in { from { opacity: 0; transform: translateY(-4px); } }
+.sb-file { display: flex; gap: 10px; align-items: center; }
+.sb-type {
+  flex: none; display: grid; place-items: center; width: 34px; height: 40px; border-radius: 4px;
+  background: var(--button-active); color: var(--accent); font: 700 11px var(--font-ui);
+}
+.sb-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 230px; }
+.sb-dir { color: var(--muted); font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 230px; }
+.sb-actions { display: flex; gap: 8px; margin-top: 12px; }
+.sb-actions button {
+  flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--panel-bg); color: var(--fg); font: 600 13px var(--font-ui); cursor: pointer;
+}
+.sb-actions button:first-child { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.sb-actions button:hover, .sb-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

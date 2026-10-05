@@ -92,6 +92,10 @@ export interface Platform {
   onOpenFile?(handler: (path: string) => void): void;
   /** Show a file or folder in the system file manager (desktop only). */
   revealPath?(path: string): Promise<void>;
+  /** Open a file in its default program, e.g. a .docx in Word (desktop only). */
+  openPath?(path: string): Promise<void>;
+  /** Print the window's page straight to a PDF file, without a dialog (desktop only; see src/export/print.ts). */
+  printToPdf?(path: string): Promise<void>;
   /** The installed app's version (desktop only). */
   appVersion?(): Promise<string>;
   /** Look for a newer published version (desktop only). */

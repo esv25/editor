@@ -38,8 +38,10 @@ async function stateFor(kind: DocKind, content: string, lang: string) {
 export class Workspace {
   groups: Group[] = [];
   activeGroupId = '';
-  /** Last error to show in the status bar (e.g. a file that couldn't be opened). */
+  /** Last message to show in the status bar (e.g. a file that couldn't be opened). */
   message: string | null = null;
+  /** Whether `message` is an error (red) or just news ("PDF lagret"). */
+  messageIsError = true;
 
   private listeners = new Set<() => void>();
   private activeListeners = new Set<() => void>();
@@ -324,7 +326,12 @@ export class Workspace {
   // ---------- Messages ----------
 
   showError(message: string): void {
+    this.showMessage(message, true);
+  }
+
+  showMessage(message: string, isError = false): void {
     this.message = message;
+    this.messageIsError = isError;
     this.changed();
     setTimeout(() => {
       if (this.message === message) {
