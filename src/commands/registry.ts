@@ -33,6 +33,8 @@ export interface EditorCommand {
   run: (view: EditorView) => boolean;
   /** Whether the command's effect is active at the cursor (for toggle buttons). */
   isActive?: (state: EditorState) => boolean;
+  /** Whether the command can do anything now; the button is greyed out when not. */
+  isEnabled?: (state: EditorState) => boolean;
 }
 
 const commands = new Map<string, EditorCommand>();

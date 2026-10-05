@@ -51,7 +51,8 @@ html, body {
   font: 600 13px var(--font-ui);
   cursor: pointer;
 }
-.tb-button:hover { background: var(--button-hover); }
+.tb-button:hover:not(:disabled) { background: var(--button-hover); }
+.tb-button:disabled { opacity: 0.35; cursor: default; }
 .tb-button.active { background: var(--button-active); color: var(--accent); }
 .tb-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tb-button .tb-label-italic { font-style: italic; font-family: Georgia, serif; font-size: 15px; }
