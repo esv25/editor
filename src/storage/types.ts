@@ -55,6 +55,10 @@ export interface StorageBackend {
   pickFile?(options: { title: string; filters: FileFilter[] }): Promise<string | null>;
   /** Read a file's raw bytes by path (e.g. an image). Desktop only. */
   readBinary?(path: string): Promise<Uint8Array>;
+  /** Ask where to save a file of the given type. Resolves to its path, or null if cancelled. Desktop only. */
+  pickSavePath?(options: { title: string; defaultPath: string; filters: FileFilter[] }): Promise<string | null>;
+  /** Write raw bytes to a path (exports: .docx). Desktop only. */
+  writeBinary?(path: string, data: Uint8Array): Promise<void>;
   /** Write to an already-known file. */
   save(file: FileRef, content: string): Promise<void>;
   /** Ask the user where to save. Resolves to null if cancelled. */

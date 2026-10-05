@@ -76,6 +76,25 @@
     },
     "opener:allow-reveal-item-in-dir",
     {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        {
+          "path": "**/*.docx"
+        },
+        {
+          "path": "**/*.pdf"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [
+        {
+          "path": "**"
+        }
+      ]
+    },
+    {
       "identifier": "fs:allow-remove",
       "allow": [
         {

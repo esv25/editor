@@ -50,13 +50,14 @@ export function showContextMenu(event: MouseEvent, items: MenuItem[]): void {
 export function showMenuUnder(button: HTMLElement, items: MenuItem[]): void {
   if (open && open.dataset.owner === button.dataset.command) return close();
   const rect = button.getBoundingClientRect();
-  const menu = showMenuAt(rect.right, rect.bottom + 4, items, true);
+  // Right-aligned with the button, unless that would run off the left edge (buttons on the left).
+  const menu = showMenuAt(rect.right, rect.bottom + 4, items, true, rect.left);
   menu.dataset.owner = button.dataset.command ?? '';
   button.classList.add('menu-open');
   menu.querySelector('button')?.focus();
 }
 
-function showMenuAt(x: number, y: number, items: MenuItem[], alignRight = false): HTMLElement {
+function showMenuAt(x: number, y: number, items: MenuItem[], alignRight = false, fallbackLeft = 4): HTMLElement {
   close();
   const menu = document.createElement('div');
   menu.className = 'context-menu';
@@ -91,7 +92,8 @@ function showMenuAt(x: number, y: number, items: MenuItem[], alignRight = false)
   const { innerWidth, innerHeight } = window;
   const rect = menu.getBoundingClientRect();
   // Under a button: its right edge lines up with the button's.
-  if (alignRight) menu.style.right = `${Math.max(4, document.documentElement.clientWidth - x)}px`;
+  if (alignRight && x - rect.width >= 4) menu.style.right = `${Math.max(4, document.documentElement.clientWidth - x)}px`;
+  else if (alignRight) menu.style.left = `${Math.max(4, fallbackLeft)}px`;
   else menu.style.left = `${Math.max(4, Math.min(x, innerWidth - rect.width - 4))}px`;
   menu.style.top = `${Math.min(y, innerHeight - rect.height - 4)}px`;
   open = menu;

@@ -1,4 +1,5 @@
 mod debug;
+mod pdf;
 mod runner;
 mod terminal;
 
@@ -82,6 +83,7 @@ pub fn run() {
             debug::adapter_kill,
             debug::free_port,
             debug::inspector_url,
+            pdf::print_to_pdf,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

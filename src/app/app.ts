@@ -17,6 +17,8 @@ import { getSettings, onSettingsChange, updateSettings } from '../settings';
 import { drafts, storage } from '../storage';
 import { TerminalPanel } from '../terminal/terminalPanel';
 import { diagnosticsChanged } from '../code/assist';
+import { exportPdf, openInWord, printDocument, type ExportHost } from '../export';
+import { openSavedFile, showSavedBubble } from '../ui/savedBubble';
 import { CodeBar } from '../ui/codeBar';
 import { codeHelpLevelName, openCodeHelp } from '../ui/codeHelp';
 import { showMenuUnder, type MenuItem } from '../ui/contextMenu';
@@ -127,6 +129,48 @@ export async function startApp(): Promise<void> {
       run: () => (void active()?.saveAs(), true),
     },
     {
+      id: 'file.export',
+      name: 'Lagre som PDF, åpne i Word, skriv ut',
+      icon: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 18v-7M9 14l3 3 3-3"/>'),
+      scope: 'any',
+      run: () => {
+        const button = document.querySelector<HTMLElement>('#file-actions [data-command="file.export"]');
+        if (button) showMenuUnder(button, exportMenu());
+        return true;
+      },
+    },
+    {
+      id: 'file.exportPdf',
+      name: 'Lagre som PDF',
+      scope: 'any',
+      run: () => {
+        const doc = active();
+        if (doc) void exportPdf(doc, exportHost);
+        return true;
+      },
+    },
+    {
+      id: 'file.openInWord',
+      name: platform.isDesktop ? 'Åpne i Word' : 'Last ned som Word-fil',
+      scope: 'any',
+      run: () => {
+        const doc = active();
+        if (doc) void openInWord(doc, exportHost);
+        return true;
+      },
+    },
+    {
+      id: 'file.print',
+      name: 'Skriv ut',
+      key: 'Mod-p',
+      scope: 'any',
+      run: () => {
+        const doc = active();
+        if (doc) void printDocument(doc);
+        return true;
+      },
+    },
+    {
       id: 'tab.close',
       name: 'Lukk fanen',
       key: 'Mod-w',
@@ -224,6 +268,46 @@ export async function startApp(): Promise<void> {
     },
   ]);
 
+  /** Files exported this session, newest first (the export menu lists them, like Chrome's downloads). */
+  const recentExports: string[] = [];
+  const exportHost: ExportHost = {
+    showError: (message) => ws.showError(message),
+    saved: (path) => {
+      const key = path.toLowerCase();
+      const old = recentExports.findIndex((p) => p.toLowerCase() === key);
+      if (old >= 0) recentExports.splice(old, 1);
+      recentExports.unshift(path);
+      recentExports.length = Math.min(recentExports.length, 5);
+      const button = document.querySelector<HTMLElement>('#file-actions [data-command="file.export"]');
+      if (button) showSavedBubble(button, path, (message) => ws.showError(message));
+    },
+  };
+
+  /** The export button's menu. */
+  const exportMenu = (): MenuItem[] => {
+    const run = (id: string) => () => {
+      runCommand(view, id);
+      view.focus();
+    };
+    const recent: MenuItem[] = platform.openPath && recentExports.length
+      ? [
+          'separator',
+          { heading: 'Nylig lagret' },
+          ...recentExports.map((path) => ({
+            label: path.split(/[\\/]/).pop() ?? path,
+            action: () => openSavedFile(path, (message) => ws.showError(message)),
+          })),
+        ]
+      : [];
+    return [
+      { label: 'Lagre som PDF …', action: run('file.exportPdf') },
+      { label: platform.isDesktop ? 'Åpne i Word …' : 'Last ned som Word-fil', action: run('file.openInWord') },
+      'separator',
+      { label: 'Skriv ut …', action: run('file.print') },
+      ...recent,
+    ];
+  };
+
   /** The gear menu: what's shown, and the settings dialogs. */
   const settingsMenu = (): MenuItem[] => {
     const s = getSettings();
@@ -275,7 +359,7 @@ export async function startApp(): Promise<void> {
   if (import.meta.env.DEV) Object.assign(window, { editorView: view, workspace: ws, debug, terminal });
   const mdToolbar = renderButtons(el('md-tools'), getSettings().toolbar, getView);
   const codeBar = new CodeBar(el('code-tools'), getView, debug, (doc, lang) => void ws.setLanguage(doc, lang));
-  const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save'], getView);
+  const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save', 'file.export'], getView);
   const viewBar = renderButtons(
     el('view-actions'),
     ['view.toggleOutline', ...(terminal.available ? ['view.toggleTerminal'] : []), 'app.settings'],
@@ -346,7 +430,7 @@ export async function startApp(): Promise<void> {
     tabs.render();
     refreshTree();
     renderTitle(doc);
-    renderSaveStatus(doc, ws.message);
+    renderSaveStatus(doc, ws.message, ws.messageIsError);
   });
 
   // Another document became active (or was rebuilt): everything that shows it.

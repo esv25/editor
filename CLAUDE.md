@@ -81,6 +81,7 @@ src/
     util/markdown.ts      felles hjelpere (liste-parsing, valgte linjer, syntakstre)
     headingSuggestion/    overskriftsforslag: index.ts (extension) + rules.ts (heuristikk)
     math/                 formler: $…$ og $$…$$ med WYSIWYG-redigering (se «Matte» under)
+  export/                 PDF, Word og utskrift (se «Eksport» under)
   storage/                fil-laget – ALL fil-I/O går hit
     types.ts              StorageBackend-grensesnittet + FileRef
     fsAccess.ts           File System Access API (Chrome/Edge)
@@ -120,6 +121,7 @@ src-tauri/
                           hendelsen `open-file`) + kommandoen `startup_file`
   src/runner.rs           kommandoen `run_program` (kjøring av kodeblokker)
   src/terminal.rs         terminaler i pseudokonsoll (portable-pty/ConPTY), utdata via Channel
+  src/pdf.rs              kommandoen `print_to_pdf` (WebView2 PrintToPdf, A4)
   src/debug.rs            DAP-adaptere over stdin/stdout (rammer meldinger), ledig port,
                           WebSocket-adressen til Node sin inspector
   icons/                  generert fra app-icon.svg med `npx tauri icon src-tauri/app-icon.svg`
@@ -274,6 +276,26 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   kaller `app.ts` `reloadImages`. Bildecachen sammenligner stier uten å bry seg om store
   bokstaver og `/` vs `\`.
 
+### Eksport (`export/`)
+
+Knappen ved Lagre (`file.export`) åpner en meny: `file.exportPdf`, `file.openInWord`, `file.print` (Ctrl+P).
+Alt unntatt `index.ts` er ren logikk (testet i `tests/export.test.ts`).
+
+- `document.ts`: Markdown → en liten dokumentmodell (`Block`/`Inline`) med samme Lezer-grammatikk som
+  editoren (GFM + matte), uten kodespråk. Rå HTML blir tekst. En kodefil blir én kodeblokk.
+- `html.ts`: modell → HTML for PDF/utskrift (tekst escapet, formler med KaTeX). `index.ts` legger den i
+  `#print-root`, som `@media print` i `styles.css` viser i stedet for appen (faste papirfarger).
+  Skrivebord: `platform.printToPdf` (Rust `print_to_pdf`, ingen dialog). Nettleser: utskriftsdialogen.
+- `docx.ts`: modell → .docx skrevet for hånd (stiler, nummerering, tabeller, bilder som PNG/JPEG/GIF –
+  SVG-tegninger rastreres i `index.ts`), pakket med `zip.ts` (lagret, ukomprimert).
+- `omml.ts`: formler → ekte Word-formler (OMML): KaTeX skriver MathML, som oversettes (brøk, potens,
+  rot, ∑/∫ som n-ær med resten fram til en relasjon som kropp, parenteser, aksenter, matriser, `aligned`
+  → `eqArr` med `&`, funksjoner som `sin x`, mhchem-indekser hektet på grunnstoffet). `xml.ts` leser MathML uten DOM.
+- Skrivebord: «Åpne i Word» spør hvor fila skal lagres (`storage.pickSavePath`/`writeBinary`) og åpner den
+  med `platform.openPath` (opener-tillatelsen gjelder bare `.docx`/`.pdf`). Nettleser: nedlasting.
+- Lagrede filer meldes til `ExportHost.saved` (i `app.ts`): en boble under knappen (`ui/savedBubble.ts`,
+  som nedlastinger i Chrome: Åpne / Vis i mappen, lukker seg selv) og «Nylig lagret» i eksportmenyen.
+
 ### Kodefiler (`code/`)
 
 - Filer som ikke er .md/.txt åpnes i kode-modus (`createCodeState`): linjenumre,
@@ -406,7 +428,7 @@ Alle brukerhandlinger er kommandoer i `commands/registry.ts`. Knapper
 Standard hurtigtaster: Ctrl+Shift+1/2/3 overskrift, Ctrl+B/I fet/kursiv, Ctrl+E inline
 kode, Ctrl+Shift+8/7/9 punkt-/nummerert/huskeliste, Ctrl+Shift+E kodeblokk,
 Ctrl+Enter kryss av oppgave, Ctrl+Shift+Enter kjør kodeblokk/fil, Ctrl+Shift+H gjør til
-overskrift, Ctrl+N nytt dokument, Ctrl+O/S/Shift+S fil, Ctrl+W lukk fane, Ctrl+Tab /
+overskrift, Ctrl+N nytt dokument, Ctrl+O/S/Shift+S fil, Ctrl+P skriv ut, Ctrl+W lukk fane, Ctrl+Tab /
 Ctrl+PageDown neste fane, Ctrl+Shift+N ny gruppe, Ctrl+Shift+O disposisjon, Ctrl+J
 terminal, Ctrl+F5 kjør i terminal, F5 feilsøk/fortsett, F9 stoppunkt, F10/F11/Shift+F11
 steg, Shift+F10 steg tilbake, Shift+F9 fremhev variabel, F6 pause, Shift+F5 stopp, Ctrl+Shift+F5

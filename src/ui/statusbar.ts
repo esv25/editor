@@ -16,11 +16,11 @@ export function renderTitle(doc: EditorDocument): void {
   platform.setWindowTitle(`${doc.dirty ? '● ' : ''}${doc.name} — ${APP_NAME}`);
 }
 
-/** Save status of the active document, or a workspace message (errors) if there is one. */
-export function renderSaveStatus(doc: EditorDocument, message: string | null): void {
+/** Save status of the active document, or a workspace message if there is one. */
+export function renderSaveStatus(doc: EditorDocument, message: string | null, messageIsError = true): void {
   const el = document.getElementById('status-save')!;
   const s = doc.status;
-  el.classList.toggle('error', s.kind === 'error' || message !== null);
+  el.classList.toggle('error', message !== null ? messageIsError : s.kind === 'error');
   if (message) {
     el.textContent = message;
     return;
