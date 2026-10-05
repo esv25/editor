@@ -18,6 +18,7 @@ export type CodeHelpFeature =
   | 'occurrences'
   | 'bracketColors'
   | 'indentGuides'
+  | 'stickyScroll'
   | 'autocomplete'
   | 'trailingSpace';
 
@@ -72,6 +73,7 @@ export const featureInfo: FeatureInfo[] = [
   { id: 'occurrences', group: 'show', from: 'standard', name: 'Marker samme variabel', description: 'Står markøren på et navn, markeres alle stedene den samme variabelen brukes.' },
   { id: 'bracketColors', group: 'show', from: 'standard', name: 'Fargede parentespar', description: 'Parenteser som hører sammen, får samme farge.' },
   { id: 'indentGuides', group: 'show', from: 'standard', name: 'Innrykkslinjer', description: 'Tynne loddrette linjer viser hvilke linjer som hører til samme blokk.' },
+  { id: 'stickyScroll', group: 'show', from: 'standard', name: 'Blokkstart øverst', description: 'Ruller du forbi linja som starter en funksjon, løkke eller klasse, blir den stående øverst, så du ser hvor du er. Klikk på den for å gå dit.' },
   { id: 'trailingSpace', group: 'show', from: 'full', name: 'Mellomrom på slutten', description: 'Mellomrom på slutten av linjer vises med farge.' },
   { id: 'autocomplete', group: 'writing', from: 'standard', name: 'Forslag mens du skriver', description: 'En liste med navn og kodemaler dukker opp mens du skriver (Ctrl+Mellomrom viser den alltid).' },
 ];

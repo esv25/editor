@@ -310,7 +310,10 @@ Alt unntatt `index.ts` er ren logikk (testet i `tests/export.test.ts`).
   Tab i kodeblokk = `insertIndent`, i vanlig tekst flyttes linja 2 mellomrom, og
   listekommandoene gjelder ikke inni kodeblokker. Innrykksnivåer (`indentLevels`,
   `activeIndentBlock` – blokka markøren står i, farget innrykkslinje; `describeIndent` i
-  statuslinja) ligger også her. Testet i `tests/indentation.test.ts`.
+  statuslinja) ligger også her, og `blockHeaders`/`stickyHeaders`: linjene som åpner blokkene over
+  første synlige linje (kommentarer teller ikke; `):` står for linja parentesen åpnet på), som
+  `code/stickyScroll.ts` holder fast øverst (Kodehjelp-funksjonen `stickyScroll`). Testet i
+  `tests/indentation.test.ts`.
 
 ### Kodehjelp (`code/assist/`)
 

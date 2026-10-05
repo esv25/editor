@@ -1,7 +1,7 @@
 /**
  * «Kodehjelp» in the editor: problems as squiggles (via @codemirror/lint),
  * the message at the end of the line, the same variable highlighted
- * everywhere, coloured bracket pairs, indent guides and completion – each
+ * everywhere, coloured bracket pairs, indent guides, sticky scroll and completion – each
  * switched on by the settings (see levels.ts). Also F2 (rename everywhere),
  * F12 (go to definition) and the problems list.
  */
@@ -36,6 +36,7 @@ import { pythonModules } from './globals';
 import { activeFeatures, type CodeHelpFeature, type CodeHelpSettings } from './levels';
 import type { Issue, Ref } from './types';
 import { activeIndentBlock, indentLevels } from '../indentation';
+import { stickyScroll } from '../stickyScroll';
 
 export { activeFeatures } from './levels';
 
@@ -398,6 +399,7 @@ export function codeAssistExtensions(lang: string, settings: CodeHelpSettings): 
   }
   if (features.has('bracketColors')) out.push(bracketColors);
   if (features.has('indentGuides')) out.push(indentGuides);
+  if (features.has('stickyScroll')) out.push(stickyScroll);
   if (features.has('trailingSpace')) out.push(highlightTrailingWhitespace());
   return out;
 }

@@ -4,7 +4,7 @@ import { deleteCharBackward, insertNewlineAndIndent } from '@codemirror/commands
 import { indentUnit, LanguageDescription } from '@codemirror/language';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
-import { activeIndentBlock, describeIndent, detectIndent, indentationFor, insertIndent } from '../src/code/indentation';
+import { activeIndentBlock, blockHeaders, describeIndent, stickyHeaders, detectIndent, indentationFor, insertIndent } from '../src/code/indentation';
 import { loadLanguage } from '../src/code/languages';
 import { indentListItem, shiftTabOutsideList, tabOutsideList } from '../src/features/smartLists';
 import { fullyParsed, textOf } from './helpers';
@@ -128,5 +128,54 @@ describe('indent levels', () => {
     expect(describeIndent(state, pos)).toBe('innrykk 2');
     const odd = EditorState.create({ doc: '      x', extensions: indentUnit.of('    ') });
     expect(describeIndent(odd, 0)).toBe('innrykk 1 + 2 mellomrom');
+  });
+});
+
+describe('sticky scroll', () => {
+  const py = [
+    'class A:', //       1
+    '    def f(self):', // 2
+    '        # note', //    3
+    '        for i in x:', // 4
+    '            a = 1', //   5
+    '# commented out', //     6
+    '            b = 2', //   7
+    '', //                    8
+    '    def g(', //          9
+    '        self,', //       10
+    '    ):', //              11
+    '        return 1', //    12
+    '', //                    13
+    'f(1)', //                14
+  ].join('\n');
+
+  it('finds the lines that open the blocks around a line, skipping comments', async () => {
+    const state = await codeFile(py, 'python');
+    expect(blockHeaders(state, 7)).toEqual([1, 2, 4]);
+    expect(blockHeaders(state, 3)).toEqual([1, 2]);
+    expect(blockHeaders(state, 6)).toEqual([1, 2, 4]);
+    // A blank line between two methods belongs to the class.
+    expect(blockHeaders(state, 8)).toEqual([1]);
+    expect(blockHeaders(state, 13)).toEqual([]);
+    expect(blockHeaders(state, 14)).toEqual([]);
+  });
+
+  it('uses the line a long parameter list starts on', async () => {
+    const state = await codeFile(py, 'python');
+    expect(blockHeaders(state, 12)).toEqual([1, 9]);
+  });
+
+  it('keeps headers whose blocks go on below them', async () => {
+    const state = await codeFile(py, 'python');
+    expect(stickyHeaders(state, 1)).toEqual([]);
+    // The class covers line 2, so "def f" goes under it.
+    expect(stickyHeaders(state, 2)).toEqual([1, 2]);
+    expect(stickyHeaders(state, 4)).toEqual([1, 2, 4]);
+    expect(stickyHeaders(state, 4, 2)).toEqual([1, 2]);
+    // Three headers would cover lines 5–7 and leave the blank line before "def g" below them.
+    expect(stickyHeaders(state, 5)).toEqual([1, 2]);
+    expect(stickyHeaders(state, 6)).toEqual([1]);
+    expect(stickyHeaders(state, 9)).toEqual([1]);
+    expect(stickyHeaders(state, 10)).toEqual([1, 9]);
   });
 });
