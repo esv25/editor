@@ -6,19 +6,21 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Kodefiler: ruller du forbi linja som starter en funksjon, løkke eller klasse, blir den stående øverst i editoren, så du alltid ser hvor du er. Klikk på den for å hoppe dit. Kan slås av under **Kodehjelp** («Blokkstart øverst»).
+
 ## 0.8.0 – 2026-10-05
 
 - **Lagre som PDF og åpne i Word**: den nye knappen øverst til venstre (ved Lagre) lager en PDF-fil av dokumentet, eller en Word-fil som åpnes i Word med en gang. Formler blir ekte Word-formler som kan redigeres, og overskrifter, lister, tabeller, kode og bilder (også tegninger) kommer med. Når fila er lagret, dukker det opp en boble under knappen (som nedlastinger i Chrome) med «Åpne» og «Vis i mappen», og menyen husker det du nylig har lagret. Der finnes også «Skriv ut» (Ctrl+P).
 
 ## 0.7.1 – 2026-10-05
 
-- Lettere å se innrykket i kodefiler: innrykkslinjene er litt tydeligere, blokka markøren står i får en farget linje (som i VS Code), og statuslinja viser innrykksnivået («innrykk 2»).
+- Lettere å se innrykket i kodefiler: innrykkslinjene er litt tydeligere, blokka markøren står i får en farget linje, og statuslinja viser innrykksnivået («innrykk 2»).
 
 ## 0.7.0 – 2026-10-03
 
-- **Kodehjelp** i Python- og JavaScript-filer, som i VS Code: rød bølgestrek under feilstavede navn med forslag til hva du mente («mente du count?» – klikk for å rette), ubrukte variabler, funksjoner og importer tones ned, og kode som aldri kjøres blir grå. Python får egne meldinger for manglende kolon, feil innrykk, `=` i stedet for `==` og glemte importer.
+- **Kodehjelp** i Python- og JavaScript-filer: rød bølgestrek under feilstavede navn med forslag til hva du mente («mente du count?» – klikk for å rette), ubrukte variabler, funksjoner og importer tones ned, og kode som aldri kjøres blir grå. Python får egne meldinger for manglende kolon, feil innrykk, `=` i stedet for `==` og glemte importer.
 - Fargede parentespar, innrykkslinjer, og alle stedene samme variabel brukes markeres når markøren står på den. Forslag dukker opp mens du skriver.
-- Velg hvor mye hjelp du vil ha under **Kodehjelp** i innstillingsmenyen: Av, Litt, Som VS Code eller Mye (da står feilmeldingen på linja, med forklaring). Hver ting kan også slås av og på for seg.
+- Velg hvor mye hjelp du vil ha under **Kodehjelp** i innstillingsmenyen: Av, Litt, Standard eller Mye (da står feilmeldingen på linja, med forklaring). Hver ting kan også slås av og på for seg.
 - **Innstillinger** (tannhjulet øverst til høyre): en meny med hva som vises (sidefelt, terminal), lyst/mørkt tema, Kodehjelp, Hurtigtaster og Hva er nytt. Tema- og tastaturknappene øverst er flyttet dit.
 - Nye taster i kodefiler: `F8` neste feil, `Ctrl+Shift+M` listen over problemer, `F2` gi nytt navn overalt, `F12` gå til der navnet er definert. Antall feil står nederst til høyre.
 - Appen sier fra om nye versjoner mens den er åpen (den ser etter hver halvtime), ikke bare når den starter. Trykker du «Senere», står den nye versjonen ved versjonsnummeret nederst – klikk der for å oppdatere.
@@ -49,7 +51,7 @@ Terminal i editoren (`Ctrl+J`). «Kjør i terminal» (`Ctrl+F5`) for programmer 
 
 ## 0.3.4 – 2026-10-02
 
-Riktig innrykk i kode: Python får 4 mellomrom, Enter holder nivået, og Tab fungerer som i VS Code.
+Riktig innrykk i kode: Python får 4 mellomrom, Enter holder nivået, og Tab rykker inn til neste tabulatorstopp.
 
 ## 0.3.3 – 2026-10-01
 

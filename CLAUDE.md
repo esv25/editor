@@ -310,14 +310,17 @@ Alt unntatt `index.ts` er ren logikk (testet i `tests/export.test.ts`).
   Tab i kodeblokk = `insertIndent`, i vanlig tekst flyttes linja 2 mellomrom, og
   listekommandoene gjelder ikke inni kodeblokker. Innrykksnivåer (`indentLevels`,
   `activeIndentBlock` – blokka markøren står i, farget innrykkslinje; `describeIndent` i
-  statuslinja) ligger også her. Testet i `tests/indentation.test.ts`.
+  statuslinja) ligger også her, og `blockHeaders`/`stickyHeaders`: linjene som åpner blokkene over
+  første synlige linje (kommentarer teller ikke; `):` står for linja parentesen åpnet på), som
+  `code/stickyScroll.ts` holder fast øverst (Kodehjelp-funksjonen `stickyScroll`). Testet i
+  `tests/indentation.test.ts`.
 
 ### Kodehjelp (`code/assist/`)
 
 VS Code-lignende skrivestøtte i kodefiler, uten språkserver: egen analyse av Lezer-syntakstreet.
 Alt unntatt `index.ts` er ren logikk uten CodeMirror (testet i `tests/codeAssist.test.ts`).
 
-- `levels.ts`: nivåene (Av / Litt / Som VS Code / Mye) og funksjonene (`CodeHelpFeature`).
+- `levels.ts`: nivåene (Av / Litt / Standard / Mye) og funksjonene (`CodeHelpFeature`).
   `settings.codeHelp = { level, overrides }`; en override (`true`/`false`) går foran nivået,
   `null` = følg nivået. `activeFeatures()` gir det som er på. Ny funksjon = linje i `featureInfo`.
 - `python.ts` / `javascript.ts`: scopes, bindinger og referanser (pyflakes / ESLint-aktig).
