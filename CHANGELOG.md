@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+## 0.8.0 – 2026-10-05
+
 - **Lagre som PDF og åpne i Word**: den nye knappen øverst til venstre (ved Lagre) lager en PDF-fil av dokumentet, eller en Word-fil som åpnes i Word med en gang. Formler blir ekte Word-formler som kan redigeres, og overskrifter, lister, tabeller, kode og bilder (også tegninger) kommer med. Når fila er lagret, dukker det opp en boble under knappen (som nedlastinger i Chrome) med «Åpne» og «Vis i mappen», og menyen husker det du nylig har lagret. Der finnes også «Skriv ut» (Ctrl+P).
 
 ## 0.7.1 – 2026-10-05
