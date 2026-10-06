@@ -59,6 +59,8 @@ export function renderButtons(container: HTMLElement, ids: string[], getView: ()
   const bar: ButtonBar = {
     update(state) {
       for (const { id, el } of buttons) {
+        const isEnabled = getCommand(id)?.isEnabled;
+        if (isEnabled) el.disabled = !isEnabled(state);
         const isActive = getCommand(id)?.isActive;
         if (!isActive) continue;
         const active = isActive(state);

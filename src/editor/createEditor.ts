@@ -13,7 +13,7 @@ import {
   placeholder,
   type ViewUpdate,
 } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { search, searchKeymap } from '@codemirror/search';
@@ -28,6 +28,7 @@ import { features } from '../features';
 import { mathSyntax } from '../features/math/syntax';
 import { getSettings, onSettingsChange, type Settings } from '../settings';
 import { editorHighlighting, editorTheme } from './theme';
+import { undoCommands, undoHistory } from './undo';
 
 /** What kind of document a state holds. */
 export const docKind = Facet.define<DocKind, DocKind>({ combine: (values) => values[0] ?? 'markdown' });
@@ -57,7 +58,7 @@ let updateHandler: (u: ViewUpdate) => void = () => {};
 
 function sharedExtensions(): Extension {
   return [
-    history(),
+    undoHistory(),
     drawSelection(),
     dropCursor(),
     highlightSpecialChars(),
@@ -65,7 +66,7 @@ function sharedExtensions(): Extension {
     editorHighlighting,
     editorTheme,
     search({ top: true }),
-    keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+    keymap.of([...defaultKeymap, ...searchKeymap]),
     EditorView.updateListener.of((u) => updateHandler(u)),
   ];
 }
@@ -111,6 +112,7 @@ export async function createCodeState(text: string, lang: string): Promise<Edito
  */
 export function createView(parent: HTMLElement, onUpdate: (u: ViewUpdate) => void): EditorView {
   for (const feature of features) registerCommands(feature.commands ?? []);
+  registerCommands(undoCommands);
   registerCommands(codeCommands);
   registerCommands(assistCommands((state) => state.facet(codeLanguage)));
   updateHandler = onUpdate;

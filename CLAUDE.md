@@ -58,6 +58,8 @@ src/
   editor/
     createEditor.ts       én EditorView + én EditorState per dokument (Markdown eller kode)
     theme.ts              editortema og HighlightStyle (farger via CSS-variabler)
+    undo.ts               angrehistorikk som i Word (alt skrevet i ett strekk = ett steg, også
+                          Enter; nytt steg ved markørflytting, sletting, kommandoer) + edit.undo/redo
   code/
     languages.ts          filtyper: Markdown vs. kode, språk fra filendelse, språklasting
     fileTypes.ts          filendelsene som ren data (uten CodeMirror; brukes av storage)
@@ -428,7 +430,7 @@ Alle brukerhandlinger er kommandoer i `commands/registry.ts`. Knapper
 - Hvilke knapper verktøylinja viser styres av `settings.toolbar` (`'|'` = skillelinje).
 - App-kommandoer (fil, visning) registreres i `app/app.ts` før editoren lages.
 
-Standard hurtigtaster: Ctrl+Shift+1/2/3 overskrift, Ctrl+B/I fet/kursiv, Ctrl+E inline
+Standard hurtigtaster: Ctrl+Z angre, Ctrl+Y / Ctrl+Shift+Z gjør om (knappene til venstre i verktøylinja), Ctrl+Shift+1/2/3 overskrift, Ctrl+B/I fet/kursiv, Ctrl+E inline
 kode, Ctrl+Shift+8/7/9 punkt-/nummerert/huskeliste, Ctrl+Shift+E kodeblokk,
 Ctrl+Enter kryss av oppgave, Ctrl+Shift+Enter kjør kodeblokk/fil, Ctrl+Shift+H gjør til
 overskrift, Ctrl+N nytt dokument, Ctrl+O/S/Shift+S fil, Ctrl+P skriv ut, Ctrl+W lukk fane, Ctrl+Tab /

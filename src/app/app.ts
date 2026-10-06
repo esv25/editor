@@ -348,6 +348,7 @@ export async function startApp(): Promise<void> {
       clearTimeout(countTimer);
       countTimer = setTimeout(() => renderCount(doc), u.docChanged ? 300 : 50);
       if (doc.kind === 'markdown') mdToolbar.update(u.state);
+      editBar.update(u.state);
       outline.highlightActive(u.state);
     }
   };
@@ -357,6 +358,7 @@ export async function startApp(): Promise<void> {
   debug = new DebugController(ws, getView, terminal);
   // Handy for debugging in the browser console during development.
   if (import.meta.env.DEV) Object.assign(window, { editorView: view, workspace: ws, debug, terminal });
+  const editBar = renderButtons(el('edit-actions'), ['edit.undo', 'edit.redo'], getView);
   const mdToolbar = renderButtons(el('md-tools'), getSettings().toolbar, getView);
   const codeBar = new CodeBar(el('code-tools'), getView, debug, (doc, lang) => void ws.setLanguage(doc, lang));
   const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save', 'file.export'], getView);
@@ -443,6 +445,7 @@ export async function startApp(): Promise<void> {
     mathPanel.setEnabled(!isCode);
     if (isCode) codeBar.update(doc);
     else mdToolbar.update(doc.state);
+    editBar.update(doc.state);
     viewBar.update(doc.state);
     outline.refresh(doc.state);
     renderCount(doc);
@@ -461,7 +464,7 @@ export async function startApp(): Promise<void> {
     mdToolbar.update(view.state);
     if (next.math !== prev.math) mathPanel.update(next);
     if (next.keybindings !== prev.keybindings) {
-      for (const bar of [mdToolbar, fileBar, viewBar]) bar.refreshTooltips();
+      for (const bar of [editBar, mdToolbar, fileBar, viewBar]) bar.refreshTooltips();
       const doc = ws.activeDoc;
       if (doc?.kind === 'code') codeBar.update(doc);
     }
