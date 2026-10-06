@@ -492,6 +492,35 @@ html, body {
   background: var(--indent-guide-active);
   pointer-events: none;
 }
+/* Code help: sticky scroll – the lines that open the blocks above stay at the top. */
+.cm-sticky-scroll {
+  position: absolute;
+  left: 0;
+  z-index: 250;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 3px 6px -3px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+}
+.cm-sticky-line { position: relative; height: var(--sticky-line-height); line-height: var(--sticky-line-height); }
+.cm-sticky-line:hover { background: rgb(128 128 128 / 0.1); }
+.cm-sticky-text { position: absolute; top: 0; left: calc(var(--sticky-text-left) + 6px); white-space: pre; }
+.cm-sticky-number {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--sticky-gutter);
+  box-sizing: border-box;
+  padding-right: calc(var(--sticky-gutter) - var(--sticky-numbers) + 3px);
+  text-align: right;
+  color: var(--faint);
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+}
+.cm-sticky-line:hover .cm-sticky-number { color: var(--muted); }
 .cm-line-message {
   margin-left: 2.5em;
   font: italic 0.92em var(--font-ui);

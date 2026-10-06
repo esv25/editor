@@ -3,7 +3,7 @@
  * language's usual one) and a VS Code-like Tab.
  */
 import { countColumn, EditorSelection, type EditorState, type Extension, type StateCommand } from '@codemirror/state';
-import { getIndentUnit, indentUnit } from '@codemirror/language';
+import { getIndentUnit, indentUnit, matchBrackets } from '@codemirror/language';
 import { indentMore } from '@codemirror/commands';
 
 /** Languages that are usually indented with 2 spaces; most others use 4. */
@@ -144,4 +144,63 @@ export function describeIndent(state: EditorState, pos: number): string {
   const level = Math.floor(cols / unit);
   const extra = cols % unit;
   return `innrykk ${level}` + (extra ? ` + ${extra} mellomrom` : '');
+}
+
+// ---- Sticky scroll: the lines that open the blocks around a line ----
+
+const COMMENT = /^\s*(#|\/\/|\/\*|\*|<!--|--)/;
+
+/**
+ * The lines that open the blocks a line is inside (function, loop, class …), outermost
+ * first: going up, each line indented less than the last one found. A line that starts
+ * with ")" or "]" (the end of a long parameter list) stands for the line its bracket opens on.
+ */
+export function blockHeaders(state: EditorState, lineNo: number): number[] {
+  const { doc, tabSize } = state;
+  // Comment lines don't open blocks, and one at column 0 inside a function
+  // (commented-out code) doesn't end it.
+  const colsOf = (n: number) => {
+    const text = doc.line(n).text;
+    return COMMENT.test(text) ? null : indentColumns(text, tabSize);
+  };
+  let cols = colsOf(lineNo) ?? (indentColumns(doc.line(lineNo).text, tabSize) || null);
+  if (cols === null) {
+    // A blank line belongs to the shallower of the blocks around it.
+    let up = lineNo - 1;
+    while (up >= 1 && colsOf(up) === null) up--;
+    let down = lineNo + 1;
+    while (down <= doc.lines && colsOf(down) === null) down++;
+    cols = Math.min(up >= 1 ? colsOf(up)! : 0, down <= doc.lines ? colsOf(down)! : 0);
+  }
+  const out: number[] = [];
+  for (let n = lineNo - 1; n >= 1 && cols > 0 && lineNo - n < 5000; n--) {
+    const line = doc.line(n);
+    const c = colsOf(n);
+    if (c === null || c >= cols) continue;
+    let header = n;
+    const first = line.from + line.text.length - line.text.trimStart().length;
+    if (line.text[first - line.from] === ')' || line.text[first - line.from] === ']') {
+      const match = matchBrackets(state, first + 1, -1);
+      if (match?.matched && match.end) header = Math.min(n, doc.lineAt(match.end.from).number);
+    }
+    out.unshift(header);
+    cols = indentColumns(doc.line(header).text, tabSize) ?? 0;
+    n = header;
+  }
+  return out;
+}
+
+/**
+ * The header lines to keep at the top when `top` is the first visible line, at most `max`.
+ * The headers cover lines themselves, so they are the headers of the first line *below*
+ * them: as many as fit that way (otherwise "def a" could stand over the start of "def b").
+ */
+export function stickyHeaders(state: EditorState, top: number, max = 5): number[] {
+  for (let k = max; k > 0; k--) {
+    const below = Math.min(top + k, state.doc.lines);
+    const headers = blockHeaders(state, below);
+    // A header at slot i must be above the line the slot covers.
+    if (headers.length >= k && headers.slice(0, k).every((h, i) => h < top + i)) return headers.slice(0, k);
+  }
+  return [];
 }
