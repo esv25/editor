@@ -89,4 +89,6 @@ export const arrowTool: Tool = {
   reset() {
     source = null;
   },
+
+  busy: () => !!source,
 };

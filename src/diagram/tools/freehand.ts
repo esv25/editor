@@ -89,4 +89,6 @@ export const freehandTool: Tool = {
   reset() {
     points = [];
   },
+
+  busy: () => points.length > 0,
 };

@@ -21,6 +21,8 @@ import { setUnderline, styledLine, textUnderline } from '../src/diagram/shapes/c
 import { absolutePoints, curveData, pathNodeFrom } from '../src/diagram/shapes/path';
 import { classSections } from '../src/diagram/shapes/umlClass';
 import { toSvgString } from '../src/diagram/svg';
+import { selectTool } from '../src/diagram/tools/select';
+import type { ToolContext } from '../src/diagram/tools/types';
 
 const box = (x: number, y: number, text = '') => ({ shape: 'box', x, y, w: 160, h: 80, text });
 
@@ -285,5 +287,54 @@ describe('snap points and line ends', () => {
     const line = { id: 'n2', ...pathNodeFrom([{ x: 0, y: 0 }, { x: 100, y: 0 }], false), head: 'arrow' as const };
     expect(toSvgString(shapeFor('path').render(line))).toContain('polygon');
     expect(toSvgString(shapeFor('path').render({ ...line, closed: true }))).not.toContain('polygon');
+  });
+});
+
+describe('Velg tool', () => {
+  const context = (diagram: Diagram) => {
+    const panned: [number, number][] = [];
+    let selection: ToolContext['selection'] = null;
+    const ctx: ToolContext = {
+      diagram,
+      get selection() {
+        return selection;
+      },
+      grid: 20,
+      tolerance: 10,
+      dragThreshold: 6,
+      handleSize: 14,
+      commit: () => {},
+      select: (s) => (selection = s),
+      editText: () => {},
+      setTool: () => {},
+      nodeAt: (p) => nodeAt(diagram, p, 10),
+      snapPoint: (p) => ({ point: p, anchored: false }),
+      edgeAt: () => null,
+      refresh: () => {},
+      panBy: (dx, dy) => panned.push([dx, dy]),
+    };
+    return { ctx, panned };
+  };
+
+  it('moves the view when dragging empty space, but not on a shaky click', () => {
+    const { ctx, panned } = context(twoBoxes());
+    selectTool.pointerDown(ctx, { x: 1000, y: 1000 });
+    selectTool.pointerMove!(ctx, { x: 1003, y: 1000 });
+    expect(panned).toEqual([]);
+    selectTool.pointerMove!(ctx, { x: 1050, y: 980 });
+    // The point that was grabbed stays under the pointer.
+    expect(panned).toEqual([[-50, 20]]);
+    expect(selectTool.busy!()).toBe(false);
+    selectTool.pointerUp!(ctx, { x: 1050, y: 980 });
+  });
+
+  it('counts dragging a figure as busy (the view scrolls at the edge)', () => {
+    const { ctx, panned } = context(twoBoxes());
+    selectTool.pointerDown(ctx, { x: 50, y: 50 });
+    selectTool.pointerMove!(ctx, { x: 90, y: 50 });
+    expect(selectTool.busy!()).toBe(true);
+    expect(panned).toEqual([]);
+    selectTool.pointerUp!(ctx, { x: 90, y: 50 });
+    expect(selectTool.busy!()).toBe(false);
   });
 });

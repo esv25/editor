@@ -32,6 +32,8 @@ export interface ToolContext {
   edgeAt(p: Point): DiagramEdge | null;
   /** Something in the tool's own state changed: redraw and update the hint. */
   refresh(): void;
+  /** Move the view by this much (drawing units): what was at (x, y) is now at (x − dx, y − dy) on screen. */
+  panBy(dx: number, dy: number): void;
 }
 
 export interface Preview {
@@ -66,4 +68,9 @@ export interface Tool {
   cancel?(ctx: ToolContext): boolean;
   /** The tool is being switched away from. */
   reset?(): void;
+  /**
+   * Something is half done (a figure being dragged, a line between its
+   * clicks): the view then scrolls when the pointer rests near its edge.
+   */
+  busy?(): boolean;
 }
