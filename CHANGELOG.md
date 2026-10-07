@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+## 0.8.2 – 2026-10-07
+
 - Tegnevinduet: du kan **flytte deg rundt** i tegningen, så du ikke trenger å ha alt i bildet samtidig. Dra på et tomt sted (med Velg) for å flytte visningen, eller bruk piltastene når ingen figur er valgt (Shift: lengre). Drar du en figur, eller har begynt på en strek eller pil, og holder pekeren ved kanten, ruller tegningen den veien. **Vis alt** (Home) viser hele tegningen igjen. Midtknappen og musehjulet flytter også visningen.
 
 ## 0.8.1 – 2026-10-07
