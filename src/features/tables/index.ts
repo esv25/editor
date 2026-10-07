@@ -46,7 +46,7 @@ import {
   type TableAt,
 } from './commands';
 import { cellFormula, cellName, columnName, computeTable, formatValue, FormulaError, type Value } from './formula';
-import { parseTable } from './model';
+import { parseTable, pipesEscaped, pipesUnescaped } from './model';
 
 type TableBlock = Extract<Block, { t: 'table' }>;
 
@@ -58,8 +58,8 @@ const run = (command: StateCommand) => (view: EditorView) => command(view);
  * In the field a pipe is just a pipe (in the Markdown it must be escaped), and a
  * computed cell shows its formula, not the stored answer.
  */
-const shown = (raw: string) => cellFormula(raw) ?? raw.replace(/\\\|/g, '|');
-const written = (text: string) => text.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim();
+const shown = (raw: string) => cellFormula(raw) ?? pipesUnescaped(raw);
+const written = (text: string) => pipesEscaped(text.replace(/\r?\n/g, ' ').trim());
 
 // --- Drawing ---------------------------------------------------------------------------
 

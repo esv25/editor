@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EditorSelection, EditorState, type StateCommand } from '@codemirror/state';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { fullyParsed } from './helpers';
-import { cellAt, formatTable, parseTable } from '../src/features/tables/model';
+import { cellAt, formatTable, parseTable, pipesEscaped, pipesUnescaped } from '../src/features/tables/model';
 import {
   insertTable,
   tableAlign,
@@ -38,6 +38,22 @@ function run(command: StateCommand, text: string): string {
 }
 
 describe('table model', () => {
+  it('escapes pipes and backslashes so cell text never makes a border', () => {
+    expect(pipesEscaped('a|b')).toBe('a\\|b');
+    expect(pipesEscaped('a\\|b')).toBe('a\\|b');
+    expect(pipesEscaped('a\\\\|b')).toBe('a\\\\\\|b');
+    expect(pipesEscaped('C:\\')).toBe('C:\\\\');
+    expect(pipesEscaped('C:\\\\')).toBe('C:\\\\');
+    expect(pipesUnescaped('a\\|b')).toBe('a|b');
+    expect(pipesUnescaped('a\\\\\\|b')).toBe('a\\\\|b');
+    for (const text of ['a|b', 'a\\\\|b', 'x\\\\\\\\|y|', 'C:\\\\', '\\*ikke\\*']) {
+      const raw = pipesEscaped(text);
+      expect(pipesUnescaped(raw)).toBe(text);
+      // One cell: no pipe in it becomes a border.
+      expect(parseTable([`| ${raw} |`, '| - |'])?.rows[0]).toHaveLength(1);
+    }
+  });
+
   it('reads cells, alignment and escaped pipes', () => {
     const t = parseTable(['a | b\\|c', ':-|--:', '| 1 |  |']);
     expect(t).toEqual({ indent: '', rows: [['a', 'b\\|c'], ['1', '']], align: ['left', 'right'] });

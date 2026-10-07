@@ -50,15 +50,25 @@ export function formatValue(value: Value): string {
   return String(Object.is(rounded, -0) ? 0 : rounded).replace('.', ',');
 }
 
+/** The text outside HTML comments (an unclosed comment runs to the end, as in HTML). */
+function withoutComments(text: string): string {
+  let out = '';
+  for (let i = 0; ; ) {
+    const start = text.indexOf('<!--', i);
+    if (start < 0) return out + text.slice(i);
+    out += text.slice(i, start);
+    const end = text.indexOf('-->', start + 4);
+    if (end < 0) return out;
+    i = end + 3;
+  }
+}
+
 /**
  * The number in a cell's text: "25", "2,5", "1 234,50", "-3", "20 %", "25 kr",
  * "**40**". Null for text that isn't a number (and for an empty cell).
  */
 export function numberIn(text: string): number | null {
-  const plain = text
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/[*_`]/g, '')
-    .trim();
+  const plain = withoutComments(text).replace(/[*_`]/g, '').trim();
   const m = /^([-+−]?)\s*(\d{1,3}(?:[  ]\d{3})+|\d+)(?:[.,](\d+))?\s*(%)?\s*(?:kr|,-|[a-zæøå€$£]{0,3}\.?)?$/i.exec(plain);
   if (!m) return null;
   const n = Number(`${m[2].replace(/[  ]/g, '')}.${m[3] ?? '0'}`) * (m[1] === '-' || m[1] === '−' ? -1 : 1);

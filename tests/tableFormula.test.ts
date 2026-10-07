@@ -27,6 +27,9 @@ describe('table formulas', () => {
     expect(numberIn('Melk')).toBeNull();
     expect(numberIn('')).toBeNull();
     expect(numberIn('65 <!-- =A2+A3 -->')).toBe(65);
+    expect(numberIn('<!-- a -->5<!-- b -->')).toBe(5);
+    expect(numberIn('5 <!-- uten slutt')).toBe(5);
+    expect(numberIn('<!<!---->--5')).toBeNull();
   });
 
   it('writes answers with a decimal comma', () => {

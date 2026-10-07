@@ -59,6 +59,26 @@ function segments(line: string): Segment[] {
   return out;
 }
 
+/**
+ * A cell's Markdown as it is typed in a field, where a pipe is just a pipe. A pipe
+ * belongs to the cell when an odd run of backslashes stands before it; the last of
+ * them is the table's escape.
+ */
+export function pipesUnescaped(raw: string): string {
+  return raw.replace(/\\+\|/g, (m) => (m.length % 2 === 0 ? m.slice(0, -2) + '|' : m));
+}
+
+/**
+ * The other way: every pipe not already escaped gets a backslash, and a backslash at
+ * the end gets a partner, so neither can turn a pipe into a cell border. Markdown
+ * shows the text the same either way.
+ */
+export function pipesEscaped(text: string): string {
+  return text
+    .replace(/\\*\|/g, (m) => (m.length % 2 === 1 ? m.slice(0, -1) + '\\|' : m))
+    .replace(/\\+$/, (m) => (m.length % 2 === 1 ? m + '\\' : m));
+}
+
 const DELIMITER_CELL = /^:?-+:?$/;
 
 export function isDelimiterRow(line: string): boolean {
