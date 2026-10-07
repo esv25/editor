@@ -239,7 +239,8 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
 - `model.ts`: ren data (`Diagram` = nodes + edges) og rene funksjoner som gir ny `Diagram`
   (addNode, connect, updateEdge, reverseEdge, addNeighbor, nodeAt med toleranse …). Noder kan
   ha `double`/`dashed` kant; frihånd har `points` som brøkdeler av boksen (så flytting og
-  størrelse virker som for andre figurer). Linjer har `head`/`tail` (`EndKind`), `dashed`
+  størrelse virker som for andre figurer). Linjer har `head`/`tail` (`EndKind`), `dashed`, `double`
+  (to parallelle streker; ikke del av forhåndsvalgene, men en egen bryter som beholdes ved typebytte)
   og tekst `label`/`fromLabel`/`toLabel`. `normalizeDiagram` tar bare med gyldige felt.
   `history.ts` angrer med øyeblikksbilder. `svg.ts`: `SvgNode`-tre → DOM (lerretet) eller
   tekst (fila), så det man ser er det som lagres. `render.ts`: diagram → SvgNode.

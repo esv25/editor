@@ -43,6 +43,8 @@ export interface EdgeStyle {
   /** At `from`. */
   tail: EndKind;
   dashed: boolean;
+  /** Two parallel lines (ER: total participation). Not part of the presets – it's a toggle of its own. */
+  double?: boolean;
 }
 
 export const defaultEdgeStyle: EdgeStyle = { head: 'arrow', tail: 'none', dashed: false };
@@ -55,6 +57,7 @@ export interface DiagramEdge {
   head?: EndKind;
   tail?: EndKind;
   dashed?: boolean;
+  double?: boolean;
   /** Text in the middle of the line. */
   label?: string;
   /** Text near each end (multiplicity, cardinality: «1», «0..*», «N»). */
@@ -67,6 +70,7 @@ export const styleOf = (e: DiagramEdge): EdgeStyle => ({
   head: e.head ?? defaultEdgeStyle.head,
   tail: e.tail ?? defaultEdgeStyle.tail,
   dashed: e.dashed ?? defaultEdgeStyle.dashed,
+  ...(e.double ? { double: true } : {}),
 });
 
 export interface Diagram {
@@ -284,6 +288,7 @@ export function normalizeDiagram(value: unknown): Diagram | null {
         head: end(e.head),
         tail: end(e.tail),
         dashed: typeof e.dashed === 'boolean' ? e.dashed : undefined,
+        double: flag(e.double),
         label: str(e.label),
         fromLabel: str(e.fromLabel),
         toLabel: str(e.toLabel),

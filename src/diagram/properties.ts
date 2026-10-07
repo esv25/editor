@@ -76,10 +76,19 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
     bar.append(el);
   };
 
+  /** The line types, then «Dobbel linje» (kept when the type changes). */
   const presetButtons = (current: () => EdgeStyle, choose: (style: EdgeStyle) => void) => {
+    const withDouble = (style: EdgeStyle, double: boolean): EdgeStyle => ({ ...style, double: double || undefined });
     for (const preset of edgePresets) {
-      button(preset.name, preset.title, () => choose(preset.style), () => sameStyle(current(), preset.style), toSvgString(presetIcon(preset.style)));
+      button(preset.name, preset.title, () => choose(withDouble(preset.style, !!current().double)), () => sameStyle(current(), preset.style), toSvgString(presetIcon(preset.style)));
     }
+    button(
+      'Dobbel linje',
+      'To streker ved siden av hverandre (total deltakelse i ER …)',
+      () => choose(withDouble(current(), !current().double)),
+      () => !!current().double,
+      toSvgString(presetIcon({ head: 'none', tail: 'none', dashed: false, double: true })),
+    );
   };
 
   function build(): void {
@@ -128,25 +137,32 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
     if (node) {
       heading('Figur');
       button('Skriv tekst', 'Skriv eller endre teksten (Enter)', () => canvas.editSelection());
-      heading('Kant');
-      button('Dobbel kant', 'To streker rundt (svak entitet, flerverdi-attributt …)', () => canvas.updateSelectedNode({ double: canvas.selectedNode?.double ? undefined : true }), () => !!canvas.selectedNode?.double);
-      button('Stiplet kant', 'Stiplet strek (avledet attributt …)', () => canvas.updateSelectedNode({ dashed: canvas.selectedNode?.dashed ? undefined : true }), () => !!canvas.selectedNode?.dashed);
-      if (node.shape === 'path' && !node.closed) {
+      const toggleDashed = (label: string) =>
+        button(label, 'Stiplet strek (avledet attributt …)', () => canvas.updateSelectedNode({ dashed: canvas.selectedNode?.dashed ? undefined : true }), () => !!canvas.selectedNode?.dashed);
+      // An open line has no outline: «Dobbel linje» comes with its ends, «Stiplet» under Strek.
+      const openLine = node.shape === 'path' && !node.closed;
+      if (!openLine) {
+        heading('Kant');
+        button('Dobbel kant', 'To streker rundt (svak entitet, flerverdi-attributt …)', () => canvas.updateSelectedNode({ double: canvas.selectedNode?.double ? undefined : true }), () => !!canvas.selectedNode?.double);
+        toggleDashed('Stiplet kant');
+      } else {
         heading('Ender');
         const ends = (): EdgeStyle => {
           const n = canvas.selectedNode;
-          return { head: n?.head ?? 'none', tail: n?.tail ?? 'none', dashed: !!n?.dashed };
+          return { head: n?.head ?? 'none', tail: n?.tail ?? 'none', dashed: !!n?.dashed, double: n?.double };
         };
         presetButtons(ends, (style) =>
           canvas.updateSelectedNode({
             head: style.head === 'none' ? undefined : style.head,
             tail: style.tail === 'none' ? undefined : style.tail,
             dashed: style.dashed || undefined,
+            double: style.double || undefined,
           }),
         );
       }
       if (node.shape === 'path') {
         heading('Strek');
+        if (openLine) toggleDashed('Stiplet');
         button('Glatt', 'Myk kurve gjennom punktene (av: rette streker)', () => canvas.updateSelectedNode({ smooth: canvas.selectedNode?.smooth === false ? undefined : false }), () => canvas.selectedNode?.smooth !== false);
         button('Lukket', 'Koble siste punkt tilbake til det første', () => canvas.updateSelectedNode({ closed: canvas.selectedNode?.closed ? undefined : true }), () => !!canvas.selectedNode?.closed);
       }
