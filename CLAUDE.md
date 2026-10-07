@@ -147,7 +147,7 @@ modul-lasting, ellers fanges ikke endringer opp.
 
 Dagens features: `livePreview` (overskriftsstørrelser, skjuling av markeringstegn, inline
 kode), `codeBlocks`, `codeBlockTools`, `images`, `headings`, `inlineFormat`, `lists`,
-`taskList`, `smartLists`, `headingSuggestion`, `closeBrackets`, `math`.
+`taskList`, `smartLists`, `headingSuggestion`, `closeBrackets`, `math`, `tables`.
 
 ### Matte (`features/math/`)
 
@@ -200,6 +200,30 @@ Markdown (`$…$`, `$$` på egne linjer), så filene virker i Obsidian/Typora/Gi
   når en tegning er lagret); `redrawImages(view)` når dokumentet har flyttet mappe.
 - `image.insert` («Sett inn bilde», i verktøylinja) velger fil med `storage.pickFile`; i
   nettleseren settes `![]()` inn i stedet.
+
+### Tabeller (`features/tables/`)
+
+- GFM-tabeller. `model.ts` (ren logikk): linjer ⇄ `Table` (celletekster, justering), `formatTable`
+  (rette kolonner, `| --- |`), celle ved kolonne, og redigeringene (rad/kolonne inn/ut/flytt, Tab,
+  Enter). `commands.ts`: `StateCommand`-er som finner tabellen via syntakstreet (`tableAt`; ikke i
+  sitater) og skriver hele tabellen pent tilbake. Testet i `tests/tables.test.ts` (der er `¦`
+  markøren, siden tabeller er fulle av `|`).
+- `index.ts`: med `hideMarkup` er tabellen *alltid* en blokk-widget, og hver celle er et
+  `contenteditable`-felt (som i Word – rå Markdown for hele tabellen ble for rotete). Feltet viser
+  bare cellens egen Markdown mens det redigeres; hvert tegn skrives til dokumentet med en gang
+  (minimal endring, så angring grupperes som vanlig skriving), og `updateDOM` tegner de andre
+  cellene på nytt uten å ta fokus fra feltet. Editorens markør følges med cellen, så kommandoene
+  (meny, verktøylinje) virker. Transaksjoner med `tableFocus` flytter fokus til cellen markøren
+  står i; Tab/Enter/piltaster/Ctrl+Z i cellen går via kommandoene. CodeMirror ser ikke tastene fra
+  widgeten, så app-kommandoer (`commandsForKey`) videresendes, og Ctrl+B/I/E pakker inn i cellen.
+  Uten `hideMarkup` er tabellen Markdown med monospace-linjer, og Tab/Enter virker der.
+- Formler (`formula.ts`, ren logikk, testet i `tests/tableFormula.test.ts`): celle som starter med
+  `=`, adresser A1 (overskriften er rad 1), områder `B2:B4`, + − × ÷ ^ %, sammenligninger, `&`, og
+  funksjoner med norske og engelske navn (`SUMMER`/`SUM` …). Lagres som `svar <!-- =formel -->`, så
+  andre programmer viser svaret. Svarene skrives når tabellen skrives tilbake (`settled` i
+  `commands.ts`: Tab, Enter, meny, når man forlater tabellen), og tegnes live i widgeten
+  (`computeTable`). Rad/kolonne inn/ut/flytt flytter adressene (`remapRows`, som i regneark).
+  Egen kode – ingenting er hentet fra andre programmer, bare den vanlige formelskrivemåten.
 
 ### Faner og dokumenter (`app/workspace.ts`, `app/document.ts`)
 

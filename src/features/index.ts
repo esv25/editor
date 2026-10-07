@@ -16,12 +16,14 @@ import { headingSuggestion } from './headingSuggestion';
 import { closeBrackets } from './closeBrackets';
 import { images } from './images';
 import { math } from './math';
+import { tables } from './tables';
 
 export const features: Feature[] = [
   livePreview,
   codeBlocks,
   codeBlockTools,
   images,
+  tables,
   math,
   headings,
   inlineFormat,

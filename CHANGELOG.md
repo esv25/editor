@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- **Tabeller**: tabellknappen i verktøylinja setter inn en tabell. Den vises som en ekte tabell, og du skriver rett i cellene som i Word. Tab går til neste celle (og lager en ny rad etter den siste), Shift+Tab tilbake, Enter til raden under, og piltastene flytter mellom cellene og ut av tabellen. Enter på en tom nederste rad tar deg ut av tabellen. Høyreklikk (eller tabellknappen når du står i en tabell) for å legge til, flytte og slette rader og kolonner, og for å justere en kolonne til venstre, midten eller høyre. Fila er fortsatt vanlig Markdown, pent oppstilt.
+- **Formler i tabeller**: skriv `=` først i en celle for å regne, som i et regneark: `=B2*C2`, `=SUMMER(C2:C4)`, `=GJENNOMSNITT(…)`, `=AVRUND(…;2)`, `=HVIS(…;…;…)` med flere. Mens du skriver en formel vises kolonnebokstaver og radnummer, og klikk på en celle setter inn adressen (Shift+klikk lager et område, som `C2:C4`). Svaret regnes ut mens du skriver i de andre cellene, og flytter du eller sletter rader og kolonner, følger adressene med. I fila lagres svaret med formelen skjult bak, så andre programmer viser svaret.
 - Tegnevinduet: linjer kan være **doble** (to streker ved siden av hverandre, f.eks. total deltakelse i ER). Velg linja og trykk «Dobbel linje» i panelet til høyre – den gjelder også nye linjer og streker. Dobbel kant på frihåndsfigurer tegnes nå også.
 
 ## 0.8.2 – 2026-10-07
