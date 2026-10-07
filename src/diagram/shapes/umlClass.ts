@@ -8,11 +8,11 @@
  *   --
  *   + hils(): void
  *
- * `_static_` lines are underlined, `*abstract*` ones italic, and «stereotype»
- * lines in the name part aren't bold.
+ * `_static_` lines are underlined (`__dashed__` too), `*abstract*` ones
+ * italic, and «stereotype» lines in the name part aren't bold.
  */
 import { h, type SvgNode } from '../svg';
-import { lineHeight, outline, rectBoundary, shapeIcon, styledLine, textAttrs, tspan } from './common';
+import { lineHeight, outline, rectBoundary, shapeIcon, styledLine, textBlock } from './common';
 import type { ShapeType } from './types';
 
 const PAD_X = 10;
@@ -70,17 +70,12 @@ export const umlClass: ShapeType = {
       if (i > 0) parts.push(h('line', { x1: node.x, y1: top, x2: node.x + node.w, y2: top, stroke: outline(node)!.stroke, 'stroke-width': outline(node)!['stroke-width'] }));
       const name = i === 0;
       const x = name ? node.x + node.w / 2 : node.x + PAD_X;
-      if (lines.length) {
-        parts.push(
-          h(
-            'text',
-            { 'text-anchor': name ? 'middle' : 'start', 'dominant-baseline': 'central', ...textAttrs },
-            lines.map((line, j) =>
-              tspan(line, x, top + PAD_Y + lineHeight / 2 + j * lineHeight, name && !isStereotype(line) ? { 'font-weight': 600 } : {}),
-            ),
-          ),
-        );
-      }
+      parts.push(
+        ...textBlock(
+          lines.map((line, j) => ({ line, x, y: top + PAD_Y + lineHeight / 2 + j * lineHeight, bold: name && !isStereotype(line) })),
+          name ? 'middle' : 'start',
+        ),
+      );
       top += sectionHeight(lines);
     });
     return h('g', {}, parts);

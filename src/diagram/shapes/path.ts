@@ -6,7 +6,7 @@
 import { distanceToSegment, type DiagramNode, type Point } from '../model';
 import { h } from '../svg';
 import { endMark } from '../edges';
-import { drawingStyle, label, outline, rectBoundary, shapeIcon } from './common';
+import { DOUBLE_GAP, drawingStyle, label, outline, rectBoundary, shapeIcon } from './common';
 import type { ShapeType } from './types';
 
 /** The node's points in drawing coordinates. */
@@ -109,14 +109,20 @@ export const path: ShapeType = {
       if (node.head && node.head !== 'none') marks.push(...endMark(node.head, b, Math.atan2(b.y - a.y, b.x - a.x), drawingStyle.stroke).marks);
       if (node.tail && node.tail !== 'none') marks.push(...endMark(node.tail, d, Math.atan2(d.y - c.y, d.x - c.x), drawingStyle.stroke).marks);
     }
+    const d = curveData(points, !!node.closed, node.smooth !== false);
+    const stroke = { 'stroke-linecap': node.double ? 'butt' : 'round', 'stroke-linejoin': 'round' };
     return h('g', {}, [
       h('path', {
-        d: curveData(points, !!node.closed, node.smooth !== false),
+        d,
         ...outline(node),
         fill: node.closed ? outline(node)!.fill : 'none',
-        'stroke-linecap': 'round',
-        'stroke-linejoin': 'round',
+        ...stroke,
+        ...(node.double ? { 'stroke-width': DOUBLE_GAP + drawingStyle.strokeWidth } : {}),
       }),
+      // Double: a wide line with a paper-coloured one down its middle, so curves and corners stay even.
+      ...(node.double
+        ? [h('path', { d, ...outline(node), fill: 'none', ...stroke, stroke: drawingStyle.paper, 'stroke-width': DOUBLE_GAP - drawingStyle.strokeWidth })]
+        : []),
       ...marks,
       ...label(node),
     ]);

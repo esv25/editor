@@ -263,7 +263,8 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
 - `model.ts`: ren data (`Diagram` = nodes + edges) og rene funksjoner som gir ny `Diagram`
   (addNode, connect, updateEdge, reverseEdge, addNeighbor, nodeAt med toleranse …). Noder kan
   ha `double`/`dashed` kant; frihånd har `points` som brøkdeler av boksen (så flytting og
-  størrelse virker som for andre figurer). Linjer har `head`/`tail` (`EndKind`), `dashed`
+  størrelse virker som for andre figurer). Linjer har `head`/`tail` (`EndKind`), `dashed`, `double`
+  (to parallelle streker; ikke del av forhåndsvalgene, men en egen bryter som beholdes ved typebytte)
   og tekst `label`/`fromLabel`/`toLabel`. `normalizeDiagram` tar bare med gyldige felt.
   `history.ts` angrer med øyeblikksbilder. `svg.ts`: `SvgNode`-tre → DOM (lerretet) eller
   tekst (fila), så det man ser er det som lagres. `render.ts`: diagram → SvgNode.
@@ -275,12 +276,15 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   trenger), `distance` (klikk nær figuren; frihånd: nær streken), `multiline`/`placeholder`
   for tekstfeltet, `ownTool` (frihånd har eget verktøy). Ny type = ny fil + linje i
   `shapes/index.ts`; den får verktøyknapp automatisk. Tekstmarkering per linje
-  (`styledLine`): `_tekst_` understreket (ER-nøkkel, static), `*tekst*` kursiv.
+  (`styledLine`): `_tekst_` understreket (ER-nøkkel, static), `__tekst__` stiplet
+  understreket (delnøkkel), `*tekst*` kursiv; understreker tegnes som egne `<line>`-er (`textBlock`),
+  og knappene «Understrek»/«Stiplet understrek» setter markeringen på alle linjer.
   UML-klasse: én tekst der linjer med `--` deler i navn/felt/metoder (`classSections`).
   ER (Chen): entitet = boks, attributt = ellipse, relasjon = rombe, Linje + kardinalitet.
 - Verktøy (`tools/`, én fil per verktøy, `Tool`-grensesnittet i `tools/types.ts`;
   `pointerDown`/`pointerMove`/`pointerUp`, lerretet fanger pekeren mens knappen er nede):
-  Velg (klikk = velg, dra = flytt, dra hjørnehåndtaket = størrelse, Esc under dra = avbryt), ett plasseringsverktøy per figurtype (gjennomsiktig «spøkelse» følger pekeren),
+  Velg (klikk = velg, dra = flytt, dra hjørnehåndtaket = størrelse, dra tomt sted = flytt
+  visningen via `ctx.panBy`, Esc under dra = avbryt), ett plasseringsverktøy per figurtype (gjennomsiktig «spøkelse» følger pekeren),
   Strek (klikk start, klikk slutt → rett strek/pil hvor som helst; en frihåndsfigur med to
   punkter og `head`/`tail`; endene hekter seg på figurers hjørner/midtpunkter og andre
   streker via `ctx.snapPoint` og `ShapeType.anchors`, ellers et halvt rutenett), Frihånd (klikk punkter → glatt kurve; klikk første punkt = lukket; Enter/Esc = ferdig),
@@ -289,8 +293,11 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
 - `properties.ts`: panelet til høyre (fast bredde, så lerretet aldri flytter seg): linjetype,
   Snu og tekst ved start/midt/slutt for en valgt linje; Skriv tekst, Dobbel/Stiplet kant
   (og Glatt/Lukket for frihånd) for en figur; type for nye linjer når Pil er på.
-- `canvas.ts` (`DiagramCanvas`): tegner, zoom/panorering (viewBox), tastatur (Ctrl+pil = ny
-  tilkoblet figur, piltaster flytter, Enter skriver tekst, Delete, Ctrl+Z/Y), tekstfelt
+- `canvas.ts` (`DiagramCanvas`): tegner, zoom/panorering (viewBox; hjul, midtknapp-dra, piltaster
+  uten valgt figur, «Vis alt»/Home = `zoomToFit`). Mens noe er halvferdig (`Tool.busy`: figur som
+  dras, strek/pil/frihånd mellom klikkene) ruller visningen når pekeren hviler ved kanten
+  (`startEdgeScroll`, kort forsinkelse). Tastatur (Ctrl+pil = ny
+  tilkoblet figur, piltaster flytter valgt figur, Enter skriver tekst, Delete, Ctrl+Z/Y), tekstfelt
   over figuren eller midt på linja (figuren vokser så teksten får plass). I tekstfeltet
   beholder Esc det som er skrevet (Ctrl+Z angrer); i klasser er Enter ny linje og
   Ctrl+Enter/Esc ferdig.

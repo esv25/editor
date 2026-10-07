@@ -1,10 +1,10 @@
 /**
  * Lines between figures: their end marks (arrow heads, UML triangles and
- * diamonds), dashes, and texts at the ends and in the middle. The presets
+ * diamonds), dashes, double lines, and texts at the ends and in the middle. The presets
  * are the one-click choices in the properties bar.
  */
 import { styleOf, type DiagramEdge, type EdgeStyle, type EndKind, type Point } from './model';
-import { drawingStyle } from './shapes/common';
+import { DOUBLE_GAP, drawingStyle } from './shapes/common';
 import { h, type SvgNode } from './svg';
 
 export interface EdgePreset {
@@ -105,18 +105,23 @@ export function renderEdge(edge: Partial<DiagramEdge>, a: Point, b: Point, color
   if (length > head.inset + tail.inset) {
     const start = { x: a.x + tail.inset * Math.cos(angle), y: a.y + tail.inset * Math.sin(angle) };
     const end = { x: b.x - head.inset * Math.cos(angle), y: b.y - head.inset * Math.sin(angle) };
-    parts.push(
-      h('line', {
-        x1: start.x,
-        y1: start.y,
-        x2: end.x,
-        y2: end.y,
-        stroke: color,
-        'stroke-width': drawingStyle.strokeWidth,
-        'stroke-linecap': style.dashed ? 'butt' : 'round',
-        'stroke-dasharray': style.dashed ? '8 6' : undefined,
-      }),
-    );
+    // A double line is two lines, half the gap to each side of the middle.
+    const offsets = style.double ? [-DOUBLE_GAP / 2, DOUBLE_GAP / 2] : [0];
+    for (const offset of offsets) {
+      const [dx, dy] = [-offset * Math.sin(angle), offset * Math.cos(angle)];
+      parts.push(
+        h('line', {
+          x1: start.x + dx,
+          y1: start.y + dy,
+          x2: end.x + dx,
+          y2: end.y + dy,
+          stroke: color,
+          'stroke-width': drawingStyle.strokeWidth,
+          'stroke-linecap': style.dashed || style.double ? 'butt' : 'round',
+          'stroke-dasharray': style.dashed ? '8 6' : undefined,
+        }),
+      );
+    }
   }
   parts.push(...head.marks, ...tail.marks);
   if (edge.label) parts.push(tag(edge.label, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }));

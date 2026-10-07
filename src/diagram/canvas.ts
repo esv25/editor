@@ -26,7 +26,7 @@ import {
 } from './model';
 import { edgeEnds, renderDiagram } from './render';
 import { shapeFor, type Measure } from './shapes';
-import { drawingStyle, lineHeight, rectAnchors, styledLine } from './shapes/common';
+import { drawingStyle, lineHeight, measureText, rectAnchors, styledLine } from './shapes/common';
 import { h, toDom, type SvgNode } from './svg';
 import { arrowSource, newEdgeStyle } from './tools/arrow';
 import { selectTool } from './tools/select';
@@ -35,6 +35,10 @@ import { toolFor, toolKey, tools, type Selection, type Tool, type ToolContext } 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
+/** Edge scrolling: how close to the edge (screen px), how long to rest there first (ms), top speed (px per frame). */
+const EDGE_ZONE = 48;
+const EDGE_DELAY = 250;
+const EDGE_SPEED = 14;
 
 export interface CanvasOptions {
   /** The drawing changed (save it). */
@@ -52,6 +56,11 @@ export class DiagramCanvas {
   zoom = 1;
   private pan: Point = { x: -40, y: -40 };
   private pointer: Point | null = null;
+  /** Where the pointer last was on screen and which buttons were down (for edge scrolling). */
+  private lastPointer: { clientX: number; clientY: number; buttons: number } | null = null;
+  /** Middle button held: the drawing point kept under the pointer. */
+  private middlePan: Point | null = null;
+  private edgeScroll = { frame: 0, since: 0 };
   private history = new History();
   private svg: SVGSVGElement;
   private gridRect: SVGRectElement;
@@ -64,7 +73,6 @@ export class DiagramCanvas {
     finish: (save: boolean) => void;
   } | null = null;
   private frame = 0;
-  private measure = document.createElement('canvas').getContext('2d')!;
 
   constructor(
     private root: HTMLElement,
@@ -95,18 +103,27 @@ export class DiagramCanvas {
     if (box) this.pan = { x: snap(box.x, grid) - 2 * grid, y: snap(box.y, grid) - 2 * grid };
 
     this.svg.addEventListener('pointermove', (e) => {
+      this.lastPointer = { clientX: e.clientX, clientY: e.clientY, buttons: e.buttons };
+      if (this.middlePan) {
+        const p = this.toDrawing(e);
+        this.panBy(this.middlePan.x - p.x, this.middlePan.y - p.y);
+      }
       this.pointer = this.toDrawing(e);
       if (e.buttons & 1) this.tool.pointerMove?.(this.context, this.pointer);
+      this.startEdgeScroll();
       this.schedule();
     });
     this.svg.addEventListener('pointerup', (e) => {
+      if (e.button === 1) this.middlePan = null;
       if (e.button !== 0) return;
+      this.lastPointer = { clientX: e.clientX, clientY: e.clientY, buttons: e.buttons };
       this.pointer = this.toDrawing(e);
       this.tool.pointerUp?.(this.context, this.pointer);
       this.refresh();
     });
     this.svg.addEventListener('pointerleave', () => {
       this.pointer = null;
+      this.lastPointer = null;
       this.schedule();
     });
     this.svg.addEventListener('pointerdown', (e) => this.pointerDown(e));
@@ -149,6 +166,7 @@ export class DiagramCanvas {
       snapPoint: (p) => canvas.snapPoint(p),
       edgeAt: (p) => canvas.edgeAt(p),
       refresh: () => canvas.refresh(),
+      panBy: (dx, dy) => canvas.panBy(dx, dy),
     };
   })();
 
@@ -404,10 +422,7 @@ export class DiagramCanvas {
   /** Grow the figure (never shrink it) so the text fits, in whole grid steps. */
   private fitText(node: DiagramNode, text: string): { w: number; h: number } {
     const grid = getSettings().diagram.grid;
-    const measure: Measure = (line, bold) => {
-      this.measure.font = `${bold ? '600 ' : ''}${drawingStyle.fontSize}px ${drawingStyle.font}`;
-      return this.measure.measureText(line).width;
-    };
+    const measure: Measure = (line, bold) => measureText(line, bold);
     const shape = shapeFor(node.shape);
     const needed = shape.fit
       ? shape.fit(text, measure)
@@ -439,6 +454,62 @@ export class DiagramCanvas {
 
   zoomReset(): void {
     this.zoomBy(1 / this.zoom);
+  }
+
+  /** «Vis alt»: the whole drawing in view (never zoomed in beyond 100 %). */
+  zoomToFit(): void {
+    const box = bounds(this.diagram);
+    const rect = this.svg.getBoundingClientRect();
+    if (!box || rect.width < 1 || rect.height < 1) return;
+    const margin = 40;
+    const fit = Math.min(rect.width / (box.w + 2 * margin), rect.height / (box.h + 2 * margin), 1);
+    this.zoom = Math.max(MIN_ZOOM, fit);
+    this.pan = {
+      x: box.x + box.w / 2 - rect.width / this.zoom / 2,
+      y: box.y + box.h / 2 - rect.height / this.zoom / 2,
+    };
+    this.updateViewBox();
+  }
+
+  /** Move the view by (dx, dy) drawing units. */
+  panBy(dx: number, dy: number): void {
+    if (!dx && !dy) return;
+    this.pan = { x: this.pan.x + dx, y: this.pan.y + dy };
+    this.updateViewBox();
+  }
+
+  /**
+   * While something is half done (a figure being dragged, a line waiting for
+   * its end), resting the pointer near the canvas edge scrolls that way – so
+   * the other end can be out of sight when you start. The short delay keeps
+   * it from scrolling when the pointer just passes the edge.
+   */
+  private startEdgeScroll(): void {
+    if (this.edgeScroll.frame) return;
+    this.edgeScroll.since = 0;
+    const step = (time: number) => {
+      this.edgeScroll.frame = 0;
+      const at = this.lastPointer;
+      const v = at && !this.editing && !this.middlePan && this.tool.busy?.() ? this.edgeVelocity(at) : null;
+      if (!at || !v) return;
+      if (!this.edgeScroll.since) this.edgeScroll.since = time;
+      if (time - this.edgeScroll.since >= EDGE_DELAY) {
+        this.panBy(v.x / this.zoom, v.y / this.zoom);
+        this.pointer = this.toDrawing(at);
+        if (at.buttons & 1) this.tool.pointerMove?.(this.context, this.pointer);
+      }
+      this.edgeScroll.frame = requestAnimationFrame(step);
+    };
+    this.edgeScroll.frame = requestAnimationFrame(step);
+  }
+
+  /** Scroll speed (screen px per frame) for a pointer at this spot: faster the closer to (or past) the edge. */
+  private edgeVelocity(at: { clientX: number; clientY: number }): Point | null {
+    const rect = this.svg.getBoundingClientRect();
+    const speed = (distance: number) => (distance >= EDGE_ZONE ? 0 : (Math.min(EDGE_ZONE, EDGE_ZONE - distance) / EDGE_ZONE) * EDGE_SPEED);
+    const x = speed(rect.right - at.clientX) - speed(at.clientX - rect.left);
+    const y = speed(rect.bottom - at.clientY) - speed(at.clientY - rect.top);
+    return x || y ? { x, y } : null;
   }
 
   private scrollIntoView(nodeId: string): void {
@@ -481,6 +552,17 @@ export class DiagramCanvas {
       this.escape();
       return;
     }
+    // Middle button (or wheel press): drag the view, whatever the tool.
+    if (e.button === 1) {
+      e.preventDefault();
+      this.middlePan = this.toDrawing(e);
+      try {
+        this.svg.setPointerCapture(e.pointerId);
+      } catch {
+        // Synthetic event: nothing to capture.
+      }
+      return;
+    }
     if (e.button !== 0) return;
     e.preventDefault();
     this.finishEditing(true);
@@ -492,7 +574,9 @@ export class DiagramCanvas {
     }
     const p = this.toDrawing(e);
     this.pointer = p;
+    this.lastPointer = { clientX: e.clientX, clientY: e.clientY, buttons: e.buttons };
     this.tool.pointerDown(this.context, p);
+    this.startEdgeScroll();
     this.refresh();
   }
 
@@ -529,13 +613,19 @@ export class DiagramCanvas {
     else if (mod && (key.toLowerCase() === 'y' || (key.toLowerCase() === 'z' && e.shiftKey))) this.redo();
     else if (mod && key.toLowerCase() === 's') this.options.onSave();
     else if (mod && arrows[key]) this.addNeighbor(arrows[key]);
-    else if (arrows[key]) {
+    else if (arrows[key] && this.selection?.kind === 'node') {
       const step = e.shiftKey ? grid * 5 : grid;
       const d = arrows[key];
       this.nudge(d === 'left' ? -step : d === 'right' ? step : 0, d === 'up' ? -step : d === 'down' ? step : 0);
+    } else if (arrows[key]) {
+      // Nothing to move: the arrows move the view instead.
+      const step = (e.shiftKey ? 400 : 100) / this.zoom;
+      const d = arrows[key];
+      this.panBy(d === 'left' ? -step : d === 'right' ? step : 0, d === 'up' ? -step : d === 'down' ? step : 0);
     } else if (key === '+' || key === '=') this.zoomBy(1.25);
     else if (key === '-') this.zoomBy(1 / 1.25);
     else if (key === '0' && !mod) this.zoomReset();
+    else if (key === 'Home') this.zoomToFit();
     else if (!mod && !e.altKey && key.length === 1) {
       const tool = tools.find((t) => toolKey(t) === key.toLowerCase());
       if (tool) this.setTool(tool.id);

@@ -7,6 +7,7 @@
 import type { DiagramCanvas } from './canvas';
 import { edgePresets, presetIcon, sameStyle } from './edges';
 import { styleOf, type EdgeStyle } from './model';
+import { setUnderline, shapeIcon, textUnderline, type Underline } from './shapes/common';
 import { toSvgString } from './svg';
 import { newEdgeStyle, setNewEdgeStyle } from './tools/arrow';
 import { newLineStyle, setNewLineStyle } from './tools/line';
@@ -14,6 +15,9 @@ import { newLineStyle, setNewLineStyle } from './tools/line';
 export interface PropertiesBar {
   update(): void;
 }
+
+const underlineIcon = (kind: Underline) =>
+  shapeIcon(`<path d="M7 4v7a5 5 0 0 0 10 0V4"/><path d="M4 20h16"${kind === 'dashed' ? ' stroke-dasharray="3 3"' : ''}/>`);
 
 export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): PropertiesBar {
   let shownFor = '';
@@ -72,10 +76,19 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
     bar.append(el);
   };
 
+  /** The line types, then «Dobbel linje» (kept when the type changes). */
   const presetButtons = (current: () => EdgeStyle, choose: (style: EdgeStyle) => void) => {
+    const withDouble = (style: EdgeStyle, double: boolean): EdgeStyle => ({ ...style, double: double || undefined });
     for (const preset of edgePresets) {
-      button(preset.name, preset.title, () => choose(preset.style), () => sameStyle(current(), preset.style), toSvgString(presetIcon(preset.style)));
+      button(preset.name, preset.title, () => choose(withDouble(preset.style, !!current().double)), () => sameStyle(current(), preset.style), toSvgString(presetIcon(preset.style)));
     }
+    button(
+      'Dobbel linje',
+      'To streker ved siden av hverandre (total deltakelse i ER …)',
+      () => choose(withDouble(current(), !current().double)),
+      () => !!current().double,
+      toSvgString(presetIcon({ head: 'none', tail: 'none', dashed: false, double: true })),
+    );
   };
 
   function build(): void {
@@ -124,30 +137,54 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
     if (node) {
       heading('Figur');
       button('Skriv tekst', 'Skriv eller endre teksten (Enter)', () => canvas.editSelection());
-      heading('Kant');
-      button('Dobbel kant', 'To streker rundt (svak entitet, flerverdi-attributt …)', () => canvas.updateSelectedNode({ double: canvas.selectedNode?.double ? undefined : true }), () => !!canvas.selectedNode?.double);
-      button('Stiplet kant', 'Stiplet strek (avledet attributt …)', () => canvas.updateSelectedNode({ dashed: canvas.selectedNode?.dashed ? undefined : true }), () => !!canvas.selectedNode?.dashed);
-      if (node.shape === 'path' && !node.closed) {
+      const toggleDashed = (label: string) =>
+        button(label, 'Stiplet strek (avledet attributt …)', () => canvas.updateSelectedNode({ dashed: canvas.selectedNode?.dashed ? undefined : true }), () => !!canvas.selectedNode?.dashed);
+      // An open line has no outline: «Dobbel linje» comes with its ends, «Stiplet» under Strek.
+      const openLine = node.shape === 'path' && !node.closed;
+      if (!openLine) {
+        heading('Kant');
+        button('Dobbel kant', 'To streker rundt (svak entitet, flerverdi-attributt …)', () => canvas.updateSelectedNode({ double: canvas.selectedNode?.double ? undefined : true }), () => !!canvas.selectedNode?.double);
+        toggleDashed('Stiplet kant');
+      } else {
         heading('Ender');
         const ends = (): EdgeStyle => {
           const n = canvas.selectedNode;
-          return { head: n?.head ?? 'none', tail: n?.tail ?? 'none', dashed: !!n?.dashed };
+          return { head: n?.head ?? 'none', tail: n?.tail ?? 'none', dashed: !!n?.dashed, double: n?.double };
         };
         presetButtons(ends, (style) =>
           canvas.updateSelectedNode({
             head: style.head === 'none' ? undefined : style.head,
             tail: style.tail === 'none' ? undefined : style.tail,
             dashed: style.dashed || undefined,
+            double: style.double || undefined,
           }),
         );
       }
       if (node.shape === 'path') {
         heading('Strek');
+        if (openLine) toggleDashed('Stiplet');
         button('Glatt', 'Myk kurve gjennom punktene (av: rette streker)', () => canvas.updateSelectedNode({ smooth: canvas.selectedNode?.smooth === false ? undefined : false }), () => canvas.selectedNode?.smooth !== false);
         button('Lukket', 'Koble siste punkt tilbake til det første', () => canvas.updateSelectedNode({ closed: canvas.selectedNode?.closed ? undefined : true }), () => !!canvas.selectedNode?.closed);
       }
+      if (node.shape !== 'class') {
+        heading('Tekst');
+        const underlineButton = (kind: Underline, label: string, title: string) =>
+          button(
+            label,
+            title,
+            () => {
+              const text = canvas.selectedNode?.text ?? '';
+              if (!text.trim()) return canvas.editSelection();
+              canvas.updateSelectedNode({ text: setUnderline(text, textUnderline(text) === kind ? null : kind) });
+            },
+            () => textUnderline(canvas.selectedNode?.text ?? '') === kind,
+            underlineIcon(kind),
+          );
+        underlineButton('solid', 'Understrek', 'Heltrukken strek under teksten (nøkkel)');
+        underlineButton('dashed', 'Stiplet understrek', 'Stiplet strek under teksten (delnøkkel i en svak entitet)');
+      }
       if (node.shape === 'class') tip('«--» på egen linje deler klassen i navn, felt og metoder.');
-      tip('_tekst_ blir understreket (nøkkel, static). *tekst* blir kursiv.');
+      tip('_tekst_ blir understreket (nøkkel, static), __tekst__ stiplet understreket (delnøkkel). *tekst* blir kursiv.');
       return;
     }
 

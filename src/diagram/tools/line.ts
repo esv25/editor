@@ -49,6 +49,7 @@ export const lineTool: Tool = {
       ...(style.head !== 'none' ? { head: style.head } : {}),
       ...(style.tail !== 'none' ? { tail: style.tail } : {}),
       ...(style.dashed ? { dashed: true } : {}),
+      ...(style.double ? { double: true } : {}),
     };
     const added = addNode(ctx.diagram, { ...pathNodeFrom([start.point, q.point], false), smooth: false, ...ends });
     start = null;
@@ -78,4 +79,6 @@ export const lineTool: Tool = {
   reset() {
     start = null;
   },
+
+  busy: () => !!start,
 };

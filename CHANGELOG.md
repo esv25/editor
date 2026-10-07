@@ -8,8 +8,17 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 - **Tabeller**: tabellknappen i verktøylinja setter inn en tabell. Den vises som en ekte tabell, og du skriver rett i cellene som i Word. Tab går til neste celle (og lager en ny rad etter den siste), Shift+Tab tilbake, Enter til raden under, og piltastene flytter mellom cellene og ut av tabellen. Enter på en tom nederste rad tar deg ut av tabellen. Høyreklikk (eller tabellknappen når du står i en tabell) for å legge til, flytte og slette rader og kolonner, og for å justere en kolonne til venstre, midten eller høyre. Fila er fortsatt vanlig Markdown, pent oppstilt.
 - **Formler i tabeller**: skriv `=` først i en celle for å regne, som i et regneark: `=B2*C2`, `=SUMMER(C2:C4)`, `=GJENNOMSNITT(…)`, `=AVRUND(…;2)`, `=HVIS(…;…;…)` med flere. Mens du skriver en formel vises kolonnebokstaver og radnummer, og klikk på en celle setter inn adressen (Shift+klikk lager et område, som `C2:C4`). Svaret regnes ut mens du skriver i de andre cellene, og flytter du eller sletter rader og kolonner, følger adressene med. I fila lagres svaret med formelen skjult bak, så andre programmer viser svaret.
+- Tegnevinduet: linjer kan være **doble** (to streker ved siden av hverandre, f.eks. total deltakelse i ER). Velg linja og trykk «Dobbel linje» i panelet til høyre – den gjelder også nye linjer og streker. Dobbel kant på frihåndsfigurer tegnes nå også.
+
+## 0.8.2 – 2026-10-07
+
+- Tegnevinduet: du kan **flytte deg rundt** i tegningen, så du ikke trenger å ha alt i bildet samtidig. Dra på et tomt sted (med Velg) for å flytte visningen, eller bruk piltastene når ingen figur er valgt (Shift: lengre). Drar du en figur, eller har begynt på en strek eller pil, og holder pekeren ved kanten, ruller tegningen den veien. **Vis alt** (Home) viser hele tegningen igjen. Midtknappen og musehjulet flytter også visningen.
+
+## 0.8.1 – 2026-10-07
+
 - **Angre og Gjør om** har fått egne knapper til venstre i verktøylinja (grå når det ikke er noe å angre). Angre virker som i Word: alt du skriver i ett strekk (også linjeskift) angres samlet, uansett hvor lenge du holder på. Et nytt angresteg begynner når du gjør noe annet – flytter markøren, sletter, limer inn, formaterer eller en liste fortsetter av seg selv. Gjør om virker også med Ctrl+Shift+Z.
 - Kodefiler: ruller du forbi linja som starter en funksjon, løkke eller klasse, blir den stående øverst i editoren, så du alltid ser hvor du er. Klikk på den for å hoppe dit. Kan slås av under **Kodehjelp** («Blokkstart øverst»).
+- Tegnevinduet: tekst kan **understrekes** med heltrukken eller **stiplet** strek (nøkkel og delnøkkel i ER) med de nye knappene «Understrek» og «Stiplet understrek» i panelet til høyre. Skrives også som `_tekst_` og `__tekst__`, så det virker linje for linje i klasser.
 
 ## 0.8.0 – 2026-10-05
 

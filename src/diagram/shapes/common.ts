@@ -22,24 +22,32 @@ const icon = (body: string) =>
   `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 export { icon as shapeIcon };
 
+/** How a line of text is underlined: `_solid_` or `__dashed__` (ER: key and partial key). */
+export type Underline = 'solid' | 'dashed';
+
 export interface StyledLine {
   text: string;
-  underline: boolean;
+  underline?: Underline;
   italic: boolean;
 }
 
 /**
  * Simple per-line markup, typed like Markdown: `_nøkkel_` is underlined (ER
- * keys, static members), `*Abstrakt*` is italic.
+ * keys, static members), `__delnøkkel__` has a dashed underline (partial key
+ * of a weak entity), `*Abstrakt*` is italic.
  */
 export function styledLine(line: string): StyledLine {
   let text = line.trim();
-  let underline = false;
+  let underline: Underline | undefined;
   let italic = false;
   for (let changed = true; changed && text.length > 2; ) {
     changed = false;
-    if (/^_.+_$/.test(text)) {
-      underline = true;
+    if (/^__.+__$/.test(text)) {
+      underline ??= 'dashed';
+      text = text.slice(2, -2);
+      changed = true;
+    } else if (/^_.+_$/.test(text)) {
+      underline ??= 'solid';
       text = text.slice(1, -1);
       changed = true;
     } else if (/^\*.+\*$/.test(text)) {
@@ -48,24 +56,41 @@ export function styledLine(line: string): StyledLine {
       changed = true;
     }
   }
-  return { text, underline, italic };
+  return underline ? { text, underline, italic } : { text, italic };
 }
 
-/** One <tspan> for a line, with its markup applied. */
-export function tspan(line: string, x: number, y: number, extra: SvgNode['attrs'] = {}): SvgNode {
-  const styled = styledLine(line);
-  return h(
-    'tspan',
-    {
-      x,
-      y,
-      'text-decoration': styled.underline ? 'underline' : undefined,
-      'font-style': styled.italic ? 'italic' : undefined,
-      ...extra,
-    },
-    [],
-    styled.text || ' ',
-  );
+/** The line written back with the given markup (inverse of `styledLine`). */
+export function markupLine({ text, underline, italic }: StyledLine): string {
+  if (!text) return text;
+  const inner = italic ? `*${text}*` : text;
+  return underline === 'solid' ? `_${inner}_` : underline === 'dashed' ? `__${inner}__` : inner;
+}
+
+/** How the text's non-empty lines are underlined: the same for all, or null if mixed/none. */
+export function textUnderline(text: string): Underline | null {
+  const kinds = new Set(text.split('\n').filter((l) => l.trim()).map((l) => styledLine(l).underline));
+  const [only] = kinds;
+  return kinds.size === 1 && only ? only : null;
+}
+
+/** Every non-empty line underlined the given way (null: no underline). */
+export function setUnderline(text: string, underline: Underline | null): string {
+  return text
+    .split('\n')
+    .map((line) => (line.trim() ? markupLine({ ...styledLine(line), underline: underline ?? undefined }) : line))
+    .join('\n');
+}
+
+let measureContext: CanvasRenderingContext2D | null | undefined;
+
+/** Width of a line of text in the drawing's font (estimated where there's no canvas, as in tests). */
+export function measureText(text: string, bold = false, italic = false): number {
+  if (measureContext === undefined) {
+    measureContext = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+  }
+  if (!measureContext) return text.length * drawingStyle.fontSize * 0.55;
+  measureContext.font = `${italic ? 'italic ' : ''}${bold ? '600 ' : ''}${drawingStyle.fontSize}px ${drawingStyle.font}`;
+  return measureContext.measureText(text).width;
 }
 
 export const textAttrs = {
@@ -74,19 +99,57 @@ export const textAttrs = {
   fill: drawingStyle.text,
 };
 
+export interface TextLine {
+  line: string;
+  x: number;
+  /** Middle of the line (the text uses `dominant-baseline: central`). */
+  y: number;
+  bold?: boolean;
+}
+
+/**
+ * Lines of text as one <text> with a <tspan> each, plus their underlines.
+ * Underlines are drawn as lines of their own rather than `text-decoration`,
+ * so dashed ones look the same in every program that shows the file.
+ */
+export function textBlock(lines: TextLine[], anchor: 'middle' | 'start'): SvgNode[] {
+  if (!lines.length) return [];
+  const underlines: SvgNode[] = [];
+  const spans = lines.map(({ line, x, y, bold }) => {
+    const styled = styledLine(line);
+    if (styled.underline && styled.text) {
+      const w = measureText(styled.text, bold, styled.italic);
+      const x1 = anchor === 'middle' ? x - w / 2 : x;
+      const uy = y + drawingStyle.fontSize * 0.5;
+      underlines.push(
+        h('line', {
+          x1,
+          y1: uy,
+          x2: x1 + w,
+          y2: uy,
+          stroke: drawingStyle.text,
+          'stroke-width': 1.5,
+          'stroke-dasharray': styled.underline === 'dashed' ? '4 3' : undefined,
+        }),
+      );
+    }
+    return h(
+      'tspan',
+      { x, y, 'font-style': styled.italic ? 'italic' : undefined, 'font-weight': bold ? 600 : undefined },
+      [],
+      styled.text || ' ',
+    );
+  });
+  return [h('text', { 'text-anchor': anchor, 'dominant-baseline': 'central', ...textAttrs }, spans), ...underlines];
+}
+
 /** The node's text, centred, one <tspan> per line. */
 export function label(node: DiagramNode): SvgNode[] {
   if (!node.text) return [];
   const lines = node.text.split('\n');
   const c = center(node);
   const firstY = c.y - ((lines.length - 1) * lineHeight) / 2;
-  return [
-    h(
-      'text',
-      { x: c.x, y: firstY, 'text-anchor': 'middle', 'dominant-baseline': 'central', ...textAttrs },
-      lines.map((line, i) => tspan(line, c.x, firstY + i * lineHeight)),
-    ),
-  ];
+  return textBlock(lines.map((line, i) => ({ line, x: c.x, y: firstY + i * lineHeight })), 'middle');
 }
 
 /** Stroke and fill of an outline (dashed if the node says so). */

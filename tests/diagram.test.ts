@@ -17,10 +17,12 @@ import {
 import { edgePresets, renderEdge } from '../src/diagram/edges';
 import { edgeEnds } from '../src/diagram/render';
 import { shapeFor } from '../src/diagram/shapes';
-import { styledLine } from '../src/diagram/shapes/common';
+import { setUnderline, styledLine, textUnderline } from '../src/diagram/shapes/common';
 import { absolutePoints, curveData, pathNodeFrom } from '../src/diagram/shapes/path';
 import { classSections } from '../src/diagram/shapes/umlClass';
 import { toSvgString } from '../src/diagram/svg';
+import { selectTool } from '../src/diagram/tools/select';
+import type { ToolContext } from '../src/diagram/tools/types';
 
 const box = (x: number, y: number, text = '') => ({ shape: 'box', x, y, w: 160, h: 80, text });
 
@@ -163,22 +165,59 @@ describe('lines', () => {
     expect(svg({ label: 'eier', fromLabel: '1' })).toContain('>eier</tspan>');
   });
 
+  it('can be double: two lines beside each other, kept when turned around', () => {
+    const svg = toSvgString(renderEdge({ head: 'none', tail: 'none', double: true }, { x: 0, y: 0 }, { x: 100, y: 0 }));
+    expect(svg.match(/<line /g)).toHaveLength(2);
+    expect(svg).toContain('y1="-2.5"');
+    expect(svg).toContain('y1="2.5"');
+    let d = addNode(addNode(emptyDiagram(), box(0, 0)).diagram, box(300, 0)).diagram;
+    d = updateEdge(connect(d, 'n1', 'n2').diagram, 'e1', { double: true });
+    expect(reverseEdge(d, 'e1').edges[0].double).toBe(true);
+  });
+
   it('are read back from files, bad values dropped', () => {
     const d = normalizeDiagram({
       nodes: [{ id: 'n1' }, { id: 'n2', double: true, dashed: 'yes' }],
-      edges: [{ id: 'e1', from: 'n1', to: 'n2', head: 'triangle', tail: 'bogus', label: '', toLabel: 'N' }],
+      edges: [
+        { id: 'e1', from: 'n1', to: 'n2', head: 'triangle', tail: 'bogus', label: '', toLabel: 'N' },
+        { id: 'e2', from: 'n2', to: 'n1', double: true },
+        { id: 'e3', from: 'n2', to: 'n1', double: 'yes' },
+      ],
     })!;
     expect(d.nodes[1]).toEqual({ id: 'n2', shape: 'box', x: 0, y: 0, w: 160, h: 80, text: '', double: true });
     expect(d.edges[0]).toEqual({ id: 'e1', from: 'n1', to: 'n2', head: 'triangle', toLabel: 'N' });
+    expect(d.edges[1]).toEqual({ id: 'e2', from: 'n2', to: 'n1', double: true });
+    expect(d.edges[2]).toEqual({ id: 'e3', from: 'n2', to: 'n1' });
   });
 });
 
 describe('text markup', () => {
   it('underlines and italicises whole lines', () => {
-    expect(styledLine('_personnr_')).toEqual({ text: 'personnr', underline: true, italic: false });
-    expect(styledLine('*Figur*')).toEqual({ text: 'Figur', underline: false, italic: true });
-    expect(styledLine('_*begge*_')).toEqual({ text: 'begge', underline: true, italic: true });
-    expect(styledLine('a_b_c')).toEqual({ text: 'a_b_c', underline: false, italic: false });
+    expect(styledLine('_personnr_')).toEqual({ text: 'personnr', underline: 'solid', italic: false });
+    expect(styledLine('__løpenr__')).toEqual({ text: 'løpenr', underline: 'dashed', italic: false });
+    expect(styledLine('*Figur*')).toEqual({ text: 'Figur', italic: true });
+    expect(styledLine('_*begge*_')).toEqual({ text: 'begge', underline: 'solid', italic: true });
+    expect(styledLine('*__begge__*')).toEqual({ text: 'begge', underline: 'dashed', italic: true });
+    expect(styledLine('a_b_c')).toEqual({ text: 'a_b_c', italic: false });
+    expect(styledLine('__')).toEqual({ text: '__', italic: false });
+  });
+
+  it('switches the underline of every line', () => {
+    expect(setUnderline('navn', 'solid')).toBe('_navn_');
+    expect(setUnderline('_navn_\n\n*nr*', 'dashed')).toBe('__navn__\n\n__*nr*__');
+    expect(setUnderline('__navn__', null)).toBe('navn');
+    expect(textUnderline('_a_\n_b_')).toBe('solid');
+    expect(textUnderline('_a_\n__b__')).toBeNull();
+    expect(textUnderline('a')).toBeNull();
+  });
+
+  it('draws underlines as lines under the text, dashed or not', () => {
+    const svg = (text: string) => toSvgString(shapeFor('ellipse').render({ id: 'n1', ...box(0, 0, text), shape: 'ellipse' }));
+    expect(svg('id')).not.toContain('<line');
+    expect(svg('_id_')).toContain('<line');
+    expect(svg('_id_')).not.toContain('stroke-dasharray');
+    expect(svg('__nr__')).toContain('stroke-dasharray="4 3"');
+    expect(svg('__nr__')).toContain('>nr</tspan>');
   });
 });
 
@@ -264,5 +303,61 @@ describe('snap points and line ends', () => {
     const line = { id: 'n2', ...pathNodeFrom([{ x: 0, y: 0 }, { x: 100, y: 0 }], false), head: 'arrow' as const };
     expect(toSvgString(shapeFor('path').render(line))).toContain('polygon');
     expect(toSvgString(shapeFor('path').render({ ...line, closed: true }))).not.toContain('polygon');
+  });
+
+  it('draws a double line as a wide stroke with a paper-coloured middle', () => {
+    const line = { id: 'n2', ...pathNodeFrom([{ x: 0, y: 0 }, { x: 100, y: 0 }], false), double: true };
+    const svg = toSvgString(shapeFor('path').render(line));
+    expect(svg).toContain('stroke-width="7"');
+    expect(svg).toContain('stroke="#fbfaf7" stroke-width="3"');
+  });
+});
+
+describe('Velg tool', () => {
+  const context = (diagram: Diagram) => {
+    const panned: [number, number][] = [];
+    let selection: ToolContext['selection'] = null;
+    const ctx: ToolContext = {
+      diagram,
+      get selection() {
+        return selection;
+      },
+      grid: 20,
+      tolerance: 10,
+      dragThreshold: 6,
+      handleSize: 14,
+      commit: () => {},
+      select: (s) => (selection = s),
+      editText: () => {},
+      setTool: () => {},
+      nodeAt: (p) => nodeAt(diagram, p, 10),
+      snapPoint: (p) => ({ point: p, anchored: false }),
+      edgeAt: () => null,
+      refresh: () => {},
+      panBy: (dx, dy) => panned.push([dx, dy]),
+    };
+    return { ctx, panned };
+  };
+
+  it('moves the view when dragging empty space, but not on a shaky click', () => {
+    const { ctx, panned } = context(twoBoxes());
+    selectTool.pointerDown(ctx, { x: 1000, y: 1000 });
+    selectTool.pointerMove!(ctx, { x: 1003, y: 1000 });
+    expect(panned).toEqual([]);
+    selectTool.pointerMove!(ctx, { x: 1050, y: 980 });
+    // The point that was grabbed stays under the pointer.
+    expect(panned).toEqual([[-50, 20]]);
+    expect(selectTool.busy!()).toBe(false);
+    selectTool.pointerUp!(ctx, { x: 1050, y: 980 });
+  });
+
+  it('counts dragging a figure as busy (the view scrolls at the edge)', () => {
+    const { ctx, panned } = context(twoBoxes());
+    selectTool.pointerDown(ctx, { x: 50, y: 50 });
+    selectTool.pointerMove!(ctx, { x: 90, y: 50 });
+    expect(selectTool.busy!()).toBe(true);
+    expect(panned).toEqual([]);
+    selectTool.pointerUp!(ctx, { x: 90, y: 50 });
+    expect(selectTool.busy!()).toBe(false);
   });
 });
