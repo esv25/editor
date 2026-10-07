@@ -26,7 +26,7 @@ import {
 } from './model';
 import { edgeEnds, renderDiagram } from './render';
 import { shapeFor, type Measure } from './shapes';
-import { drawingStyle, lineHeight, rectAnchors, styledLine } from './shapes/common';
+import { drawingStyle, lineHeight, measureText, rectAnchors, styledLine } from './shapes/common';
 import { h, toDom, type SvgNode } from './svg';
 import { arrowSource, newEdgeStyle } from './tools/arrow';
 import { selectTool } from './tools/select';
@@ -64,7 +64,6 @@ export class DiagramCanvas {
     finish: (save: boolean) => void;
   } | null = null;
   private frame = 0;
-  private measure = document.createElement('canvas').getContext('2d')!;
 
   constructor(
     private root: HTMLElement,
@@ -404,10 +403,7 @@ export class DiagramCanvas {
   /** Grow the figure (never shrink it) so the text fits, in whole grid steps. */
   private fitText(node: DiagramNode, text: string): { w: number; h: number } {
     const grid = getSettings().diagram.grid;
-    const measure: Measure = (line, bold) => {
-      this.measure.font = `${bold ? '600 ' : ''}${drawingStyle.fontSize}px ${drawingStyle.font}`;
-      return this.measure.measureText(line).width;
-    };
+    const measure: Measure = (line, bold) => measureText(line, bold);
     const shape = shapeFor(node.shape);
     const needed = shape.fit
       ? shape.fit(text, measure)

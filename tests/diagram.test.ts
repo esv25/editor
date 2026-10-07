@@ -17,7 +17,7 @@ import {
 import { edgePresets, renderEdge } from '../src/diagram/edges';
 import { edgeEnds } from '../src/diagram/render';
 import { shapeFor } from '../src/diagram/shapes';
-import { styledLine } from '../src/diagram/shapes/common';
+import { setUnderline, styledLine, textUnderline } from '../src/diagram/shapes/common';
 import { absolutePoints, curveData, pathNodeFrom } from '../src/diagram/shapes/path';
 import { classSections } from '../src/diagram/shapes/umlClass';
 import { toSvgString } from '../src/diagram/svg';
@@ -175,10 +175,31 @@ describe('lines', () => {
 
 describe('text markup', () => {
   it('underlines and italicises whole lines', () => {
-    expect(styledLine('_personnr_')).toEqual({ text: 'personnr', underline: true, italic: false });
-    expect(styledLine('*Figur*')).toEqual({ text: 'Figur', underline: false, italic: true });
-    expect(styledLine('_*begge*_')).toEqual({ text: 'begge', underline: true, italic: true });
-    expect(styledLine('a_b_c')).toEqual({ text: 'a_b_c', underline: false, italic: false });
+    expect(styledLine('_personnr_')).toEqual({ text: 'personnr', underline: 'solid', italic: false });
+    expect(styledLine('__løpenr__')).toEqual({ text: 'løpenr', underline: 'dashed', italic: false });
+    expect(styledLine('*Figur*')).toEqual({ text: 'Figur', italic: true });
+    expect(styledLine('_*begge*_')).toEqual({ text: 'begge', underline: 'solid', italic: true });
+    expect(styledLine('*__begge__*')).toEqual({ text: 'begge', underline: 'dashed', italic: true });
+    expect(styledLine('a_b_c')).toEqual({ text: 'a_b_c', italic: false });
+    expect(styledLine('__')).toEqual({ text: '__', italic: false });
+  });
+
+  it('switches the underline of every line', () => {
+    expect(setUnderline('navn', 'solid')).toBe('_navn_');
+    expect(setUnderline('_navn_\n\n*nr*', 'dashed')).toBe('__navn__\n\n__*nr*__');
+    expect(setUnderline('__navn__', null)).toBe('navn');
+    expect(textUnderline('_a_\n_b_')).toBe('solid');
+    expect(textUnderline('_a_\n__b__')).toBeNull();
+    expect(textUnderline('a')).toBeNull();
+  });
+
+  it('draws underlines as lines under the text, dashed or not', () => {
+    const svg = (text: string) => toSvgString(shapeFor('ellipse').render({ id: 'n1', ...box(0, 0, text), shape: 'ellipse' }));
+    expect(svg('id')).not.toContain('<line');
+    expect(svg('_id_')).toContain('<line');
+    expect(svg('_id_')).not.toContain('stroke-dasharray');
+    expect(svg('__nr__')).toContain('stroke-dasharray="4 3"');
+    expect(svg('__nr__')).toContain('>nr</tspan>');
   });
 });
 

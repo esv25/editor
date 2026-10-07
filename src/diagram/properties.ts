@@ -7,6 +7,7 @@
 import type { DiagramCanvas } from './canvas';
 import { edgePresets, presetIcon, sameStyle } from './edges';
 import { styleOf, type EdgeStyle } from './model';
+import { setUnderline, shapeIcon, textUnderline, type Underline } from './shapes/common';
 import { toSvgString } from './svg';
 import { newEdgeStyle, setNewEdgeStyle } from './tools/arrow';
 import { newLineStyle, setNewLineStyle } from './tools/line';
@@ -14,6 +15,9 @@ import { newLineStyle, setNewLineStyle } from './tools/line';
 export interface PropertiesBar {
   update(): void;
 }
+
+const underlineIcon = (kind: Underline) =>
+  shapeIcon(`<path d="M7 4v7a5 5 0 0 0 10 0V4"/><path d="M4 20h16"${kind === 'dashed' ? ' stroke-dasharray="3 3"' : ''}/>`);
 
 export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): PropertiesBar {
   let shownFor = '';
@@ -146,8 +150,25 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
         button('Glatt', 'Myk kurve gjennom punktene (av: rette streker)', () => canvas.updateSelectedNode({ smooth: canvas.selectedNode?.smooth === false ? undefined : false }), () => canvas.selectedNode?.smooth !== false);
         button('Lukket', 'Koble siste punkt tilbake til det første', () => canvas.updateSelectedNode({ closed: canvas.selectedNode?.closed ? undefined : true }), () => !!canvas.selectedNode?.closed);
       }
+      if (node.shape !== 'class') {
+        heading('Tekst');
+        const underlineButton = (kind: Underline, label: string, title: string) =>
+          button(
+            label,
+            title,
+            () => {
+              const text = canvas.selectedNode?.text ?? '';
+              if (!text.trim()) return canvas.editSelection();
+              canvas.updateSelectedNode({ text: setUnderline(text, textUnderline(text) === kind ? null : kind) });
+            },
+            () => textUnderline(canvas.selectedNode?.text ?? '') === kind,
+            underlineIcon(kind),
+          );
+        underlineButton('solid', 'Understrek', 'Heltrukken strek under teksten (nøkkel)');
+        underlineButton('dashed', 'Stiplet understrek', 'Stiplet strek under teksten (delnøkkel i en svak entitet)');
+      }
       if (node.shape === 'class') tip('«--» på egen linje deler klassen i navn, felt og metoder.');
-      tip('_tekst_ blir understreket (nøkkel, static). *tekst* blir kursiv.');
+      tip('_tekst_ blir understreket (nøkkel, static), __tekst__ stiplet understreket (delnøkkel). *tekst* blir kursiv.');
       return;
     }
 

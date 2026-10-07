@@ -251,7 +251,9 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   trenger), `distance` (klikk nær figuren; frihånd: nær streken), `multiline`/`placeholder`
   for tekstfeltet, `ownTool` (frihånd har eget verktøy). Ny type = ny fil + linje i
   `shapes/index.ts`; den får verktøyknapp automatisk. Tekstmarkering per linje
-  (`styledLine`): `_tekst_` understreket (ER-nøkkel, static), `*tekst*` kursiv.
+  (`styledLine`): `_tekst_` understreket (ER-nøkkel, static), `__tekst__` stiplet
+  understreket (delnøkkel), `*tekst*` kursiv; understreker tegnes som egne `<line>`-er (`textBlock`),
+  og knappene «Understrek»/«Stiplet understrek» setter markeringen på alle linjer.
   UML-klasse: én tekst der linjer med `--` deler i navn/felt/metoder (`classSections`).
   ER (Chen): entitet = boks, attributt = ellipse, relasjon = rombe, Linje + kardinalitet.
 - Verktøy (`tools/`, én fil per verktøy, `Tool`-grensesnittet i `tools/types.ts`;
