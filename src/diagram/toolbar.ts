@@ -15,6 +15,7 @@ const icons = {
   undo: shapeIcon('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),
   redo: shapeIcon('<path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>'),
   delete: shapeIcon('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'),
+  fit: shapeIcon('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'),
 };
 
 export function renderToolbar(
@@ -60,6 +61,7 @@ export function renderToolbar(
   button(zoomGroup, '−', 'Zoom ut (-)', null, () => canvas.zoomBy(1 / 1.25));
   const zoomLabel = button(zoomGroup, '100 %', 'Tilbake til 100 % (0)', null, () => canvas.zoomReset());
   button(zoomGroup, '+', 'Zoom inn (+)', null, () => canvas.zoomBy(1.25));
+  button(zoomGroup, 'Vis alt', 'Hele tegningen i bildet (Home)', icons.fit, () => canvas.zoomToFit());
 
   const right = group();
   right.classList.add('dg-right');

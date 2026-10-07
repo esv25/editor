@@ -259,7 +259,8 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   ER (Chen): entitet = boks, attributt = ellipse, relasjon = rombe, Linje + kardinalitet.
 - Verktøy (`tools/`, én fil per verktøy, `Tool`-grensesnittet i `tools/types.ts`;
   `pointerDown`/`pointerMove`/`pointerUp`, lerretet fanger pekeren mens knappen er nede):
-  Velg (klikk = velg, dra = flytt, dra hjørnehåndtaket = størrelse, Esc under dra = avbryt), ett plasseringsverktøy per figurtype (gjennomsiktig «spøkelse» følger pekeren),
+  Velg (klikk = velg, dra = flytt, dra hjørnehåndtaket = størrelse, dra tomt sted = flytt
+  visningen via `ctx.panBy`, Esc under dra = avbryt), ett plasseringsverktøy per figurtype (gjennomsiktig «spøkelse» følger pekeren),
   Strek (klikk start, klikk slutt → rett strek/pil hvor som helst; en frihåndsfigur med to
   punkter og `head`/`tail`; endene hekter seg på figurers hjørner/midtpunkter og andre
   streker via `ctx.snapPoint` og `ShapeType.anchors`, ellers et halvt rutenett), Frihånd (klikk punkter → glatt kurve; klikk første punkt = lukket; Enter/Esc = ferdig),
@@ -268,8 +269,11 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
 - `properties.ts`: panelet til høyre (fast bredde, så lerretet aldri flytter seg): linjetype,
   Snu og tekst ved start/midt/slutt for en valgt linje; Skriv tekst, Dobbel/Stiplet kant
   (og Glatt/Lukket for frihånd) for en figur; type for nye linjer når Pil er på.
-- `canvas.ts` (`DiagramCanvas`): tegner, zoom/panorering (viewBox), tastatur (Ctrl+pil = ny
-  tilkoblet figur, piltaster flytter, Enter skriver tekst, Delete, Ctrl+Z/Y), tekstfelt
+- `canvas.ts` (`DiagramCanvas`): tegner, zoom/panorering (viewBox; hjul, midtknapp-dra, piltaster
+  uten valgt figur, «Vis alt»/Home = `zoomToFit`). Mens noe er halvferdig (`Tool.busy`: figur som
+  dras, strek/pil/frihånd mellom klikkene) ruller visningen når pekeren hviler ved kanten
+  (`startEdgeScroll`, kort forsinkelse). Tastatur (Ctrl+pil = ny
+  tilkoblet figur, piltaster flytter valgt figur, Enter skriver tekst, Delete, Ctrl+Z/Y), tekstfelt
   over figuren eller midt på linja (figuren vokser så teksten får plass). I tekstfeltet
   beholder Esc det som er skrevet (Ctrl+Z angrer); i klasser er Enter ny linje og
   Ctrl+Enter/Esc ferdig.

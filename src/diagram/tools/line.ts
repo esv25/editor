@@ -79,4 +79,6 @@ export const lineTool: Tool = {
   reset() {
     start = null;
   },
+
+  busy: () => !!start,
 };
