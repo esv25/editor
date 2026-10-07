@@ -1,8 +1,9 @@
 /**
  * Velg: click a figure to select it; drag it to move it, drag its corner
- * handle to resize it (both snap to the grid). A press only becomes a drag
- * after the pointer has moved a little (`settings.diagram.dragThreshold`), so
- * a shaky click never moves anything. Esc while dragging puts it back.
+ * handle to resize it (both snap to the grid), drag empty space to move the
+ * view. A press only becomes a drag after the pointer has moved a little
+ * (`settings.diagram.dragThreshold`), so a shaky click never moves anything.
+ * Esc while dragging a figure puts it back.
  */
 import { findNode, snap, updateNode, type Point } from '../model';
 import { shapeIcon } from '../shapes/common';
@@ -11,7 +12,9 @@ import type { Tool, ToolContext } from './types';
 type Mode =
   | { kind: 'idle' }
   /** Button down on a figure (or its corner); `dragging` once it has moved far enough. */
-  | { kind: 'move' | 'resize'; id: string; start: Point; dx: number; dy: number; dragging: boolean };
+  | { kind: 'move' | 'resize'; id: string; start: Point; dx: number; dy: number; dragging: boolean }
+  /** Button down on empty space: dragging moves the view, holding `start` under the pointer. */
+  | { kind: 'pan'; start: Point; dragging: boolean };
 
 let mode: Mode = { kind: 'idle' };
 
@@ -26,7 +29,7 @@ function onHandle(ctx: ToolContext, p: Point): string | null {
 
 /** The figure's position or size with the pointer at `p`. */
 function change(ctx: ToolContext, p: Point) {
-  if (mode.kind === 'idle' || !mode.dragging) return null;
+  if (mode.kind === 'idle' || mode.kind === 'pan' || !mode.dragging) return null;
   if (mode.kind === 'move') return { x: snap(p.x - mode.dx, ctx.grid), y: snap(p.y - mode.dy, ctx.grid) };
   const node = findNode(ctx.diagram, mode.id);
   if (!node) return null;
@@ -41,13 +44,14 @@ export const selectTool: Tool = {
   icon: shapeIcon('<path d="m5 3 14 8-6 1.5L10 19z"/>'),
 
   hint(ctx) {
-    if (mode.kind === 'move' && mode.dragging) return 'Slipp der figuren skal stå · Esc: avbryt';
+    if (mode.kind === 'move' && mode.dragging) return 'Slipp der figuren skal stå (nær kanten ruller visningen) · Esc: avbryt';
     if (mode.kind === 'resize' && mode.dragging) return 'Slipp der hjørnet skal være · Esc: avbryt';
+    if (mode.kind === 'pan' && mode.dragging) return 'Dra for å flytte visningen · slipp når du ser det du vil';
     if (ctx.selection?.kind === 'node') {
       return 'Dra figuren for å flytte den · dra hjørnet: endre størrelse · Enter: skriv tekst · Ctrl+pil: ny figur ved siden av · Delete: slett';
     }
     if (ctx.selection?.kind === 'edge') return 'Velg type linje til høyre · Enter: tekst midt på · Delete: slett linja';
-    return 'Klikk på en figur for å velge den, dra for å flytte den – eller velg et verktøy for å tegne';
+    return 'Klikk på en figur for å velge den, dra for å flytte den · dra på et tomt sted (eller piltastene): flytt visningen';
   },
 
   pointerDown(ctx, p) {
@@ -64,19 +68,22 @@ export const selectTool: Tool = {
     }
     const edge = ctx.edgeAt(p);
     ctx.select(edge ? { kind: 'edge', id: edge.id } : null);
+    if (!edge) mode = { kind: 'pan', start: p, dragging: false };
   },
 
   pointerMove(ctx, p) {
-    if (mode.kind === 'idle' || mode.dragging) return;
-    if (Math.hypot(p.x - mode.start.x, p.y - mode.start.y) >= ctx.dragThreshold) {
+    if (mode.kind === 'idle') return;
+    if (!mode.dragging) {
+      if (Math.hypot(p.x - mode.start.x, p.y - mode.start.y) < ctx.dragThreshold) return;
       mode.dragging = true;
       ctx.refresh();
     }
+    if (mode.kind === 'pan') ctx.panBy(mode.start.x - p.x, mode.start.y - p.y);
   },
 
   pointerUp(ctx, p) {
     const done = change(ctx, p);
-    const id = mode.kind === 'idle' ? null : mode.id;
+    const id = mode.kind === 'move' || mode.kind === 'resize' ? mode.id : null;
     mode = { kind: 'idle' };
     if (done && id) ctx.commit(updateNode(ctx.diagram, id, done));
     else ctx.refresh();
@@ -84,6 +91,7 @@ export const selectTool: Tool = {
 
   preview(ctx, pointer) {
     if (!pointer || mode.kind === 'idle') return {};
+    if (mode.kind === 'pan') return mode.dragging ? { noHover: true } : {};
     const done = change(ctx, pointer);
     return done ? { diagram: updateNode(ctx.diagram, mode.id, done), noHover: true } : {};
   },
@@ -98,4 +106,6 @@ export const selectTool: Tool = {
   reset() {
     mode = { kind: 'idle' };
   },
+
+  busy: () => (mode.kind === 'move' || mode.kind === 'resize') && mode.dragging,
 };

@@ -8,6 +8,7 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 - **Angre og Gjør om** har fått egne knapper til venstre i verktøylinja (grå når det ikke er noe å angre). Angre virker som i Word: alt du skriver i ett strekk (også linjeskift) angres samlet, uansett hvor lenge du holder på. Et nytt angresteg begynner når du gjør noe annet – flytter markøren, sletter, limer inn, formaterer eller en liste fortsetter av seg selv. Gjør om virker også med Ctrl+Shift+Z.
 - Kodefiler: ruller du forbi linja som starter en funksjon, løkke eller klasse, blir den stående øverst i editoren, så du alltid ser hvor du er. Klikk på den for å hoppe dit. Kan slås av under **Kodehjelp** («Blokkstart øverst»).
+- Tegnevinduet: du kan **flytte deg rundt** i tegningen, så du ikke trenger å ha alt i bildet samtidig. Dra på et tomt sted (med Velg) for å flytte visningen, eller bruk piltastene når ingen figur er valgt (Shift: lengre). Drar du en figur, eller har begynt på en strek eller pil, og holder pekeren ved kanten, ruller tegningen den veien. **Vis alt** (Home) viser hele tegningen igjen. Midtknappen og musehjulet flytter også visningen.
 
 ## 0.8.0 – 2026-10-05
 
