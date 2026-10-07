@@ -169,6 +169,71 @@ html, body {
 .cm-codeblock-begin.cm-codeblock-end { border-radius: 6px; }
 .cm-codeblock-fence { color: var(--faint); }
 
+/* Tables: drawn, each cell edited in place (Markdown with aligned columns when markup is shown) */
+.cm-table-line {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  font-variant-ligatures: none;
+}
+.cm-table-delimiter { color: var(--faint); }
+.cm-table-widget {
+  padding: 6px 0 10px;
+  overflow-x: auto;
+}
+.cm-table-widget table {
+  border-collapse: collapse;
+  cursor: text;
+}
+.cm-table-widget th,
+.cm-table-widget td {
+  border: 1px solid var(--border);
+  padding: 4px 12px;
+  min-width: 3em;
+  height: 1.7em;
+  text-align: left;
+  vertical-align: top;
+}
+.cm-table-widget th {
+  background: var(--panel-bg);
+  font-weight: 600;
+}
+.cm-table-widget td:hover,
+.cm-table-widget th:hover { background: var(--math-hover-bg); }
+.cm-table-widget [data-editing] {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: var(--math-edit-bg);
+  white-space: pre-wrap;
+}
+/* Formulas: the answer, a faint mark that it's computed; letters/numbers while writing one */
+.cm-table-widget .cm-table-formula:not([data-editing]) { color: var(--accent); }
+.cm-table-widget .cm-table-error:not([data-editing]) { color: var(--diag-error); }
+.cm-table-widget [data-editing].cm-table-formula,
+.cm-table-show-refs [data-editing] { font-family: var(--font-mono); font-size: 0.9em; }
+.cm-table-widget .cm-table-ref { display: none; }
+.cm-table-widget .cm-table-ref-row { display: none; }
+.cm-table-show-refs .cm-table-ref-row { display: table-row; }
+.cm-table-show-refs .cm-table-ref {
+  display: table-cell;
+  min-width: 0;
+  height: auto;
+  padding: 1px 6px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: 600 12px var(--font-ui);
+  text-align: center;
+  vertical-align: middle;
+}
+.cm-table-show-refs td:not([data-editing]):hover,
+.cm-table-show-refs th[data-row]:not([data-editing]):hover {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  cursor: cell;
+}
+.cm-table-link { color: var(--accent); text-decoration: underline; }
+.cm-table-image { color: var(--muted); font-style: italic; }
+
 /* Images: a header (caption + buttons) replaces the Markdown, the picture is below */
 .cm-image-header {
   display: inline-flex;

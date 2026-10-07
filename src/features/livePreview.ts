@@ -42,6 +42,7 @@ function build(view: EditorView, hideMarkup: boolean): DecorationSet {
         const name = node.name;
         if (name === 'FencedCode' || name === 'CodeBlock') return false; // handled by codeBlocks
         if (name === 'InlineMath' || name === 'BlockMath') return false; // handled by math
+        if (name === 'Table') return false; // handled by tables (hidden marks would misalign the columns)
 
         const heading = /^(?:ATX|Setext)Heading(\d)$/.exec(name);
         if (heading) {

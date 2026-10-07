@@ -119,7 +119,7 @@ export const defaultSettings: Settings = {
     'heading.1', 'heading.2', 'heading.3', '|',
     'format.bold', 'format.italic', 'format.code', '|',
     'list.bullet', 'list.ordered', 'list.task', '|',
-    'codeblock.toggle', 'image.insert', 'diagram.new', '|',
+    'codeblock.toggle', 'table.insert', 'image.insert', 'diagram.new', '|',
     'math.inline', 'math.block', 'math.palette',
   ],
   diagram: { grid: 20, hitTolerance: 16, dragThreshold: 6, autosaveDelayMs: 500, toolKeys: {} },
