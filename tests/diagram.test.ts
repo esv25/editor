@@ -163,13 +163,29 @@ describe('lines', () => {
     expect(svg({ label: 'eier', fromLabel: '1' })).toContain('>eier</tspan>');
   });
 
+  it('can be double: two lines beside each other, kept when turned around', () => {
+    const svg = toSvgString(renderEdge({ head: 'none', tail: 'none', double: true }, { x: 0, y: 0 }, { x: 100, y: 0 }));
+    expect(svg.match(/<line /g)).toHaveLength(2);
+    expect(svg).toContain('y1="-2.5"');
+    expect(svg).toContain('y1="2.5"');
+    let d = addNode(addNode(emptyDiagram(), box(0, 0)).diagram, box(300, 0)).diagram;
+    d = updateEdge(connect(d, 'n1', 'n2').diagram, 'e1', { double: true });
+    expect(reverseEdge(d, 'e1').edges[0].double).toBe(true);
+  });
+
   it('are read back from files, bad values dropped', () => {
     const d = normalizeDiagram({
       nodes: [{ id: 'n1' }, { id: 'n2', double: true, dashed: 'yes' }],
-      edges: [{ id: 'e1', from: 'n1', to: 'n2', head: 'triangle', tail: 'bogus', label: '', toLabel: 'N' }],
+      edges: [
+        { id: 'e1', from: 'n1', to: 'n2', head: 'triangle', tail: 'bogus', label: '', toLabel: 'N' },
+        { id: 'e2', from: 'n2', to: 'n1', double: true },
+        { id: 'e3', from: 'n2', to: 'n1', double: 'yes' },
+      ],
     })!;
     expect(d.nodes[1]).toEqual({ id: 'n2', shape: 'box', x: 0, y: 0, w: 160, h: 80, text: '', double: true });
     expect(d.edges[0]).toEqual({ id: 'e1', from: 'n1', to: 'n2', head: 'triangle', toLabel: 'N' });
+    expect(d.edges[1]).toEqual({ id: 'e2', from: 'n2', to: 'n1', double: true });
+    expect(d.edges[2]).toEqual({ id: 'e3', from: 'n2', to: 'n1' });
   });
 });
 
@@ -285,5 +301,12 @@ describe('snap points and line ends', () => {
     const line = { id: 'n2', ...pathNodeFrom([{ x: 0, y: 0 }, { x: 100, y: 0 }], false), head: 'arrow' as const };
     expect(toSvgString(shapeFor('path').render(line))).toContain('polygon');
     expect(toSvgString(shapeFor('path').render({ ...line, closed: true }))).not.toContain('polygon');
+  });
+
+  it('draws a double line as a wide stroke with a paper-coloured middle', () => {
+    const line = { id: 'n2', ...pathNodeFrom([{ x: 0, y: 0 }, { x: 100, y: 0 }], false), double: true };
+    const svg = toSvgString(shapeFor('path').render(line));
+    expect(svg).toContain('stroke-width="7"');
+    expect(svg).toContain('stroke="#fbfaf7" stroke-width="3"');
   });
 });
