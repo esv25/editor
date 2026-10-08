@@ -284,7 +284,12 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
 - Verktøy (`tools/`, én fil per verktøy, `Tool`-grensesnittet i `tools/types.ts`;
   `pointerDown`/`pointerMove`/`pointerUp`, lerretet fanger pekeren mens knappen er nede):
   Velg (klikk = velg, dra = flytt, dra hjørnehåndtaket = størrelse, dra tomt sted = flytt
-  visningen via `ctx.panBy`, Esc under dra = avbryt), ett plasseringsverktøy per figurtype (gjennomsiktig «spøkelse» følger pekeren),
+  visningen via `ctx.panBy`, Esc under dra = avbryt; Shift/Ctrl+klikk legger til/tar bort, Shift+dra
+  tomt sted = marker område), Marker (samme kode, `makeSelectTool` i `select.ts`: hvert klikk legger
+  til/tar bort, dra tomt sted = marker alt rektangelet berører). Utvalget er en liste
+  (`ctx.selection: Selection[]`); dra en valgt figur, piltaster og Delete gjelder alle, mens tekst,
+  panelet og hjørnehåndtaket bare gjelder én (`canvas.single`). Ctrl+A velger alt.
+  Ett plasseringsverktøy per figurtype (gjennomsiktig «spøkelse» følger pekeren),
   Strek (klikk start, klikk slutt → rett strek/pil hvor som helst; en frihåndsfigur med to
   punkter og `head`/`tail`; endene hekter seg på figurers hjørner/midtpunkter og andre
   streker via `ctx.snapPoint` og `ShapeType.anchors`, ellers et halvt rutenett), Frihånd (klikk punkter → glatt kurve; klikk første punkt = lukket; Enter/Esc = ferdig),

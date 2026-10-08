@@ -113,6 +113,28 @@ export function updateNode(d: Diagram, id: string, patch: Partial<Omit<DiagramNo
   return { ...d, nodes: d.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)) };
 }
 
+/** Move several nodes by the same amount (their lines follow, since lines hang on node ids). */
+export function moveNodes(d: Diagram, ids: string[], dx: number, dy: number): Diagram {
+  if (!dx && !dy) return d;
+  const moving = new Set(ids);
+  return { ...d, nodes: d.nodes.map((n) => (moving.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)) };
+}
+
+/** Nodes that touch the rectangle (any corner order) – forgiving, so a rough drag catches them. */
+export function nodesInRect(d: Diagram, a: Point, b: Point): DiagramNode[] {
+  const left = Math.min(a.x, b.x);
+  const right = Math.max(a.x, b.x);
+  const top = Math.min(a.y, b.y);
+  const bottom = Math.max(a.y, b.y);
+  return d.nodes.filter((n) => n.x <= right && n.x + n.w >= left && n.y <= bottom && n.y + n.h >= top);
+}
+
+/** Lines with both ends among these nodes. */
+export function edgesBetween(d: Diagram, nodeIds: string[]): DiagramEdge[] {
+  const ids = new Set(nodeIds);
+  return d.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
+}
+
 /** Remove nodes and every arrow touching them. */
 export function removeNodes(d: Diagram, ids: string[]): Diagram {
   const gone = new Set(ids);

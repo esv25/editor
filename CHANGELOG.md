@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Tegnevinduet: **velg flere figurer** og flytt eller slett dem sammen. Det nye verktøyet **Marker** (tast M) lar deg klikke på figurer og linjer for å legge dem til eller ta dem bort, og dra over et tomt sted for å markere alt innenfor. Dra en av de valgte figurene for å flytte alle (linjene følger med), bruk piltastene, eller trykk Delete for å slette alle. I Velg virker Shift+klikk og Shift+dra på samme måte, og Ctrl+A velger alt.
+
 ## 0.9.0 – 2026-10-07
 
 - **Tabeller**: tabellknappen i verktøylinja setter inn en tabell. Den vises som en ekte tabell, og du skriver rett i cellene som i Word. Tab går til neste celle (og lager en ny rad etter den siste), Shift+Tab tilbake, Enter til raden under, og piltastene flytter mellom cellene og ut av tabellen. Enter på en tom nederste rad tar deg ut av tabellen. Høyreklikk (eller tabellknappen når du står i en tabell) for å legge til, flytte og slette rader og kolonner, og for å justere en kolonne til venstre, midten eller høyre. Fila er fortsatt vanlig Markdown, pent oppstilt.

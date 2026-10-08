@@ -8,6 +8,9 @@ import {
   emptyDiagram,
   nodeAt,
   normalizeDiagram,
+  edgesBetween,
+  moveNodes,
+  nodesInRect,
   removeNodes,
   reverseEdge,
   snap,
@@ -21,8 +24,8 @@ import { setUnderline, styledLine, textUnderline } from '../src/diagram/shapes/c
 import { absolutePoints, curveData, pathNodeFrom } from '../src/diagram/shapes/path';
 import { classSections } from '../src/diagram/shapes/umlClass';
 import { toSvgString } from '../src/diagram/svg';
-import { selectTool } from '../src/diagram/tools/select';
-import type { ToolContext } from '../src/diagram/tools/types';
+import { markTool, selectTool } from '../src/diagram/tools/select';
+import type { Selection, ToolContext } from '../src/diagram/tools/types';
 
 const box = (x: number, y: number, text = '') => ({ shape: 'box', x, y, w: 160, h: 80, text });
 
@@ -316,9 +319,12 @@ describe('snap points and line ends', () => {
 describe('Velg tool', () => {
   const context = (diagram: Diagram) => {
     const panned: [number, number][] = [];
-    let selection: ToolContext['selection'] = null;
+    let selection: ToolContext['selection'] = [];
+    const commits: Diagram[] = [];
     const ctx: ToolContext = {
-      diagram,
+      get diagram() {
+        return commits.at(-1) ?? diagram;
+      },
       get selection() {
         return selection;
       },
@@ -326,17 +332,17 @@ describe('Velg tool', () => {
       tolerance: 10,
       dragThreshold: 6,
       handleSize: 14,
-      commit: () => {},
-      select: (s) => (selection = s),
+      commit: (next) => commits.push(next),
+      select: (s) => (selection = s === null ? [] : Array.isArray(s) ? s : [s as Selection]),
       editText: () => {},
       setTool: () => {},
-      nodeAt: (p) => nodeAt(diagram, p, 10),
+      nodeAt: (p) => nodeAt(commits.at(-1) ?? diagram, p, 10),
       snapPoint: (p) => ({ point: p, anchored: false }),
       edgeAt: () => null,
       refresh: () => {},
       panBy: (dx, dy) => panned.push([dx, dy]),
     };
-    return { ctx, panned };
+    return { ctx, panned, commits };
   };
 
   it('moves the view when dragging empty space, but not on a shaky click', () => {
@@ -359,5 +365,72 @@ describe('Velg tool', () => {
     expect(panned).toEqual([]);
     selectTool.pointerUp!(ctx, { x: 90, y: 50 });
     expect(selectTool.busy!()).toBe(false);
+  });
+
+  const ids = (sel: readonly Selection[]) => sel.map((s) => `${s.kind}:${s.id}`);
+
+  it('Shift+click adds and takes away; a drag moves every selected figure together', () => {
+    const { ctx, commits } = context(twoBoxes());
+    selectTool.pointerDown(ctx, { x: 50, y: 50 });
+    selectTool.pointerUp!(ctx, { x: 50, y: 50 });
+    selectTool.pointerDown(ctx, { x: 450, y: 50 }, { add: true });
+    selectTool.pointerUp!(ctx, { x: 450, y: 50 });
+    expect(ids(ctx.selection)).toEqual(['node:n1', 'node:n2']);
+
+    // Plain drag on one of them moves both by the same (grid-snapped) amount.
+    selectTool.pointerDown(ctx, { x: 50, y: 50 });
+    selectTool.pointerMove!(ctx, { x: 90, y: 110 });
+    selectTool.pointerUp!(ctx, { x: 90, y: 110 });
+    expect(commits.at(-1)!.nodes.map((n) => [n.x, n.y])).toEqual([[40, 60], [340, 60]]);
+    expect(ctx.selection).toHaveLength(2);
+
+    // A plain click (no drag) on one of the group picks just that one.
+    selectTool.pointerDown(ctx, { x: 470, y: 90 });
+    selectTool.pointerUp!(ctx, { x: 470, y: 90 });
+    expect(ids(ctx.selection)).toEqual(['node:n2']);
+  });
+
+  it('Marker: clicks toggle without keys, and dragging empty space marks an area', () => {
+    const { ctx, panned } = context(twoBoxes());
+    markTool.pointerDown(ctx, { x: 50, y: 50 });
+    markTool.pointerUp!(ctx, { x: 50, y: 50 });
+    markTool.pointerDown(ctx, { x: 450, y: 50 });
+    markTool.pointerUp!(ctx, { x: 450, y: 50 });
+    expect(ids(ctx.selection)).toEqual(['node:n1', 'node:n2']);
+    markTool.pointerDown(ctx, { x: 50, y: 50 });
+    markTool.pointerUp!(ctx, { x: 50, y: 50 });
+    expect(ids(ctx.selection)).toEqual(['node:n2']);
+
+    ctx.select(null);
+    markTool.pointerDown(ctx, { x: -20, y: -20 });
+    markTool.pointerMove!(ctx, { x: 500, y: 30 });
+    expect(markTool.busy!()).toBe(true);
+    markTool.pointerUp!(ctx, { x: 500, y: 30 });
+    expect(panned).toEqual([]);
+    // Both figures and the line between them.
+    expect(ids(ctx.selection)).toEqual(['node:n1', 'node:n2', 'edge:e1']);
+  });
+
+  it('Esc while marking an area puts the old selection back', () => {
+    const { ctx } = context(twoBoxes());
+    ctx.select({ kind: 'node', id: 'n2' });
+    selectTool.pointerDown(ctx, { x: -20, y: -20 }, { add: true });
+    selectTool.pointerMove!(ctx, { x: 30, y: 30 });
+    expect(ids(ctx.selection)).toEqual(['node:n2', 'node:n1']);
+    expect(selectTool.cancel!(ctx)).toBe(true);
+    expect(ids(ctx.selection)).toEqual(['node:n2']);
+  });
+});
+
+describe('several figures', () => {
+  it('moves, finds in a rectangle and finds the lines between', () => {
+    const d = twoBoxes();
+    const moved = moveNodes(d, ['n1', 'n2'], 20, -40);
+    expect(moved.nodes.map((n) => [n.x, n.y])).toEqual([[20, -40], [320, -40]]);
+    expect(moveNodes(d, ['n1'], 0, 0)).toBe(d);
+    expect(nodesInRect(d, { x: 200, y: 100 }, { x: 150, y: 70 }).map((n) => n.id)).toEqual(['n1']);
+    expect(nodesInRect(d, { x: 170, y: 0 }, { x: 290, y: 80 })).toEqual([]);
+    expect(edgesBetween(d, ['n1']).length).toBe(0);
+    expect(edgesBetween(d, ['n1', 'n2']).map((e) => e.id)).toEqual(['e1']);
   });
 });

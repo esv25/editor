@@ -188,7 +188,15 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
       return;
     }
 
-    tip('Velg en figur eller en linje for å endre den.');
+    if (canvas.selection.length > 1) {
+      heading(`${canvas.selection.length} valgt`);
+      button('Slett alle', 'Slett alt som er valgt (Delete)', () => canvas.deleteSelection());
+      button('Fjern markeringen', 'Velg ingenting (Esc)', () => canvas.select(null));
+      tip('Dra en av de valgte figurene, eller bruk piltastene, for å flytte alle sammen.');
+      return;
+    }
+
+    tip('Velg en figur eller en linje for å endre den. Med Marker (eller Shift+klikk i Velg) kan du velge flere.');
   }
 
   const refresh = () => {
@@ -197,7 +205,7 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
 
   return {
     update() {
-      const key = `${canvas.tool.id}:${canvas.selection?.kind ?? ''}:${canvas.selection?.id ?? ''}`;
+      const key = `${canvas.tool.id}:${canvas.selection.map((s) => `${s.kind}:${s.id}`).join(',')}`;
       if (key !== shownFor) {
         shownFor = key;
         build();
