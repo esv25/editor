@@ -1,16 +1,18 @@
 /**
  * A tool per figure type: a ghost of the figure follows the pointer (snapped
- * to the grid), a click puts it there and starts typing its text. The tool
- * stays on, so several figures can be placed in a row.
+ * to the grid, or lined up with other figures), a click puts it there and
+ * starts typing its text. The tool stays on, so several figures can be placed in a row.
  */
-import { addNode, snap, type Point } from '../model';
+import { alignMove, guidesFor } from '../align';
+import { addNode, type Point } from '../model';
 import type { ShapeType } from '../shapes';
-import { toPreview } from './preview';
+import { guideMarks, toPreview } from './preview';
 import type { Tool, ToolContext } from './types';
 
 function placement(ctx: ToolContext, shape: ShapeType, p: Point) {
   const { w, h } = shape.defaultSize;
-  return { shape: shape.id, x: snap(p.x - w / 2, ctx.grid), y: snap(p.y - h / 2, ctx.grid), w, h, text: '' };
+  const at = alignMove(ctx.diagram, { x: p.x - w / 2, y: p.y - h / 2, w, h }, { grid: ctx.grid, tolerance: ctx.alignTolerance });
+  return { shape: shape.id, ...at, w, h, text: '' };
 }
 
 export function placeTool(shape: ShapeType): Tool {
@@ -37,7 +39,8 @@ export function placeTool(shape: ShapeType): Tool {
 
     preview(ctx, pointer) {
       if (!pointer || ctx.nodeAt(pointer)) return {};
-      return { overlay: [toPreview(shape.render({ id: 'ghost', ...placement(ctx, shape, pointer) }))] };
+      const ghost = { id: 'ghost', ...placement(ctx, shape, pointer) };
+      return { overlay: [toPreview(shape.render(ghost)), ...guideMarks(guidesFor(ctx.diagram, ghost), ctx.handleSize)] };
     },
   };
 }

@@ -6,7 +6,9 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
-- **Tegninger**: teksten i bokser, ellipser, romber og tekstfelt blir større når figuren har plass til den (opptil dobbelt så stor), så den er lettere å lese når tegningen vises mindre i et notat. Figurer av samme type og størrelse får lik tekststørrelse. Tekst ved linjene (som M og 1) er også litt større.
+- Tegnevinduet: figurer **stiller seg på linje** med hverandre. Når du drar, plasserer eller endrer størrelse på en figur og en kant eller midten kommer nær en annen figurs, hekter den seg på – en stiplet hjelpelinje viser hvilke figurer som står på linje.
+- Tegnevinduet: en **strek som starter eller slutter på et punkt** (hjørne eller midtpunkt) på en figur, sitter fast der og **følger med når figuren flyttes** eller endrer størrelse. Velger du streken, viser fylte prikker endene som sitter fast. Flytter du streken selv, løsner den (og hekter seg fast igjen der endene havner på et punkt).
+- Tegnevinduet: **større tekst** i figurene. Teksten i bokser, ellipser, romber og tekstfelt blir større når figuren har plass til den (opptil dobbelt så stor), så den er lettere å lese når tegningen vises mindre i et notat. Figurer av samme type og størrelse får lik tekststørrelse. Tekst ved linjene (som M og 1) er også litt større.
 
 ## 0.9.0 – 2026-10-07
 
