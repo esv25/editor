@@ -3,11 +3,13 @@
  * it starts, click where it ends. Near a figure's corner or side middle (or
  * another line's end) the point jumps there – shown by a ring – otherwise it
  * snaps to half the grid. The ends get the type chosen in the panel (Linje,
- * Pil, Arv …). It's a freehand figure with two points, so it moves, resizes
+ * Pil, Arv …), and goes straight or round a corner (also chosen in the
+ * panel). It's a freehand figure with two points, so it moves, resizes
  * and is deleted like any figure.
  */
 import { edgePresets, renderEdge } from '../edges';
 import { addNode, type EdgeStyle, type Point } from '../model';
+import { cornerPath } from '../routing';
 import { pathNodeFrom } from '../shapes/path';
 import { shapeIcon } from '../shapes/common';
 import { h, type SvgNode } from '../svg';
@@ -50,6 +52,7 @@ export const lineTool: Tool = {
       ...(style.tail !== 'none' ? { tail: style.tail } : {}),
       ...(style.dashed ? { dashed: true } : {}),
       ...(style.double ? { double: true } : {}),
+      ...(style.route ? { route: style.route } : {}),
     };
     const added = addNode(ctx.diagram, { ...pathNodeFrom([start.point, q.point], false), smooth: false, ...ends });
     start = null;
@@ -62,7 +65,7 @@ export const lineTool: Tool = {
     const end = ctx.snapPoint(pointer);
     const overlay: SvgNode[] = [];
     if (start) {
-      overlay.push(h('g', { class: 'dg-ghost' }, [renderEdge(style, start.point, end.point)]));
+      overlay.push(h('g', { class: 'dg-ghost' }, [renderEdge(style, cornerPath(start.point, end.point, style.route))]));
       if (start.anchored) overlay.push(anchorMark(ctx, start.point));
     }
     if (end.anchored) overlay.push(anchorMark(ctx, end.point));

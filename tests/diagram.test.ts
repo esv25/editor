@@ -15,7 +15,8 @@ import {
   type Diagram,
 } from '../src/diagram/model';
 import { edgePresets, renderEdge } from '../src/diagram/edges';
-import { edgeEnds } from '../src/diagram/render';
+import { edgePoints } from '../src/diagram/render';
+import { cornerPath, offsetPolyline, routeBetween, trim } from '../src/diagram/routing';
 import { shapeFor } from '../src/diagram/shapes';
 import { setUnderline, styledLine, textUnderline } from '../src/diagram/shapes/common';
 import { absolutePoints, curveData, pathNodeFrom } from '../src/diagram/shapes/path';
@@ -84,7 +85,7 @@ describe('diagram model', () => {
 describe('geometry', () => {
   it('ends arrows on the outlines', () => {
     const d = twoBoxes();
-    expect(edgeEnds(d, d.edges[0])).toEqual({ a: { x: 160, y: 40 }, b: { x: 300, y: 40 } });
+    expect(edgePoints(d, d.edges[0])).toEqual([{ x: 160, y: 40 }, { x: 300, y: 40 }]);
   });
 
   it('knows each shape’s outline', () => {
@@ -94,6 +95,74 @@ describe('geometry', () => {
     const corner = shapeFor('diamond').boundary(node, { x: 200, y: 100 });
     expect(corner.x).toBeCloseTo(150);
     expect(corner.y).toBeCloseTo(75);
+  });
+});
+
+describe('corners', () => {
+  const a = { x: 0, y: 0 };
+  const b = { x: 100, y: 60 };
+
+  it('go sideways first, up/down first, or not at all', () => {
+    expect(cornerPath(a, b, undefined)).toEqual([a, b]);
+    expect(cornerPath(a, b, 'hv')).toEqual([a, { x: 100, y: 0 }, b]);
+    expect(cornerPath(a, b, 'vh')).toEqual([a, { x: 0, y: 60 }, b]);
+    // Already straight: no corner.
+    expect(cornerPath(a, { x: 100, y: 0 }, 'vh')).toEqual([a, { x: 100, y: 0 }]);
+  });
+
+  it('take lines between figures round a corner, or across the gap', () => {
+    const at = (x: number, y: number) => ({ x, y, w: 100, h: 60 });
+    // Diagonally apart: one corner, outside both figures.
+    expect(routeBetween(at(0, 0), at(300, 200), 'hv')).toEqual([{ x: 50, y: 30 }, { x: 350, y: 30 }, { x: 350, y: 230 }]);
+    expect(routeBetween(at(0, 0), at(300, 200), 'vh')).toEqual([{ x: 50, y: 30 }, { x: 50, y: 230 }, { x: 350, y: 230 }]);
+    // Side by side but not level: out, a turn halfway across the gap, in.
+    expect(routeBetween(at(0, 0), at(300, 40), 'vh')).toEqual([
+      { x: 50, y: 30 },
+      { x: 200, y: 30 },
+      { x: 200, y: 70 },
+      { x: 350, y: 70 },
+    ]);
+    // One above the other.
+    expect(routeBetween(at(0, 0), at(20, 200), 'hv')).toEqual([
+      { x: 50, y: 30 },
+      { x: 50, y: 130 },
+      { x: 70, y: 130 },
+      { x: 70, y: 230 },
+    ]);
+    // Level: straight across.
+    expect(routeBetween(at(0, 0), at(300, 0), 'hv')).toEqual([{ x: 50, y: 30 }, { x: 350, y: 30 }]);
+  });
+
+  it('end on the outlines of the figures', () => {
+    let d = addNode(addNode(emptyDiagram(), box(0, 0)).diagram, box(300, 200)).diagram;
+    d = updateEdge(connect(d, 'n1', 'n2').diagram, 'e1', { route: 'hv' });
+    expect(edgePoints(d, d.edges[0])).toEqual([{ x: 160, y: 40 }, { x: 380, y: 40 }, { x: 380, y: 200 }]);
+    expect(reverseEdge(d, 'e1').edges[0].route).toBe('hv');
+    expect(normalizeDiagram(JSON.parse(JSON.stringify(d)))!.edges[0].route).toBe('hv');
+    expect(normalizeDiagram({ nodes: d.nodes, edges: [{ ...d.edges[0], route: 'diagonal' }] })!.edges[0].route).toBeUndefined();
+  });
+
+  it('are drawn with the arrow head along the last piece', () => {
+    const svg = toSvgString(renderEdge({ head: 'arrow', tail: 'none' }, [a, { x: 100, y: 0 }, b]));
+    expect(svg).toContain('<polyline');
+    // Arrow pointing straight down at (100, 60), line stopping 10 above it.
+    expect(svg).toContain('points="100,60 105.5,48 94.5,48"');
+    expect(svg).toContain('points="0,0 100,0 100,50"');
+  });
+
+  it('keep double lines apart round the corner', () => {
+    const line = [a, { x: 100, y: 0 }, b];
+    expect(offsetPolyline(line, 2.5)).toEqual([{ x: 0, y: 2.5 }, { x: 97.5, y: 2.5 }, { x: 97.5, y: 60 }]);
+    expect(trim(line, 10, 10)).toEqual([{ x: 10, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 50 }]);
+    expect(trim(line, 100, 70)).toBeNull();
+  });
+
+  it('turn a Strek round a corner', () => {
+    const node = { id: 'n', ...pathNodeFrom([a, b], false), smooth: false, route: 'vh' as const };
+    const svg = toSvgString(shapeFor('path').render(node));
+    expect(svg).toContain('d="M0,0 L0,60 L100,60"');
+    expect(shapeFor('path').distance!(node, { x: 0, y: 30 })).toBe(0);
+    expect(shapeFor('path').distance!(node, { x: 50, y: 30 })).toBe(30);
   });
 });
 
@@ -156,7 +225,7 @@ describe('lines', () => {
   });
 
   it('draw their end marks', () => {
-    const svg = (style: Parameters<typeof renderEdge>[0]) => toSvgString(renderEdge(style, { x: 0, y: 0 }, { x: 100, y: 0 }));
+    const svg = (style: Parameters<typeof renderEdge>[0]) => toSvgString(renderEdge(style, [{ x: 0, y: 0 }, { x: 100, y: 0 }]));
     expect(svg({ head: 'triangle', tail: 'none', dashed: true })).toContain('stroke-dasharray="8 6"');
     expect(svg({ head: 'triangle', tail: 'none', dashed: true })).toContain('fill="#ffffff"');
     expect(svg({ head: 'none', tail: 'none', dashed: false })).not.toContain('polygon');
@@ -166,7 +235,7 @@ describe('lines', () => {
   });
 
   it('can be double: two lines beside each other, kept when turned around', () => {
-    const svg = toSvgString(renderEdge({ head: 'none', tail: 'none', double: true }, { x: 0, y: 0 }, { x: 100, y: 0 }));
+    const svg = toSvgString(renderEdge({ head: 'none', tail: 'none', double: true }, [{ x: 0, y: 0 }, { x: 100, y: 0 }]));
     expect(svg.match(/<line /g)).toHaveLength(2);
     expect(svg).toContain('y1="-2.5"');
     expect(svg).toContain('y1="2.5"');

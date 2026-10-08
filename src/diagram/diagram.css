@@ -108,9 +108,9 @@ html, body {
 
 .dg-ghost { opacity: 0.45; pointer-events: none; }
 .dg-hover { fill: none; stroke: var(--dg-mark); stroke-opacity: 0.45; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.dg-hover-edge { stroke: var(--dg-mark); stroke-opacity: 0.35; stroke-width: 10; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.dg-hover-edge { stroke: var(--dg-mark); stroke-opacity: 0.35; stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .dg-selection { fill: none; stroke: var(--dg-mark); stroke-width: 2.5; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; }
-.dg-selection-edge { stroke: var(--dg-mark); stroke-opacity: 0.5; stroke-width: 10; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.dg-selection-edge { stroke: var(--dg-mark); stroke-opacity: 0.5; stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .dg-source { fill: var(--dg-mark); fill-opacity: 0.08; stroke: var(--dg-mark); stroke-width: 3; vector-effect: non-scaling-stroke; }
 .dg-freehand { fill: none; stroke: var(--dg-ink); stroke-opacity: 0.55; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .dg-point { fill: var(--dg-mark); }

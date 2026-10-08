@@ -3,10 +3,11 @@
  * lines chain – the target becomes the next start – so a linked list is just
  * click, click, click. Clicking empty space makes a new figure there and
  * connects it. Esc (or right click) ends the chain. New lines get the type
- * chosen in the properties bar (Pil, Linje, Arv …).
+ * chosen in the properties bar (Pil, Linje, Arv …, straight or with corners).
  */
 import { edgePresets, renderEdge } from '../edges';
-import { addNode, center, connect, findNode, snap, type EdgeStyle, type Point } from '../model';
+import { addNode, connect, findNode, snap, type EdgeStyle, type Point } from '../model';
+import { routeBetween } from '../routing';
 import { shapeFor } from '../shapes';
 import { shapeIcon } from '../shapes/common';
 import { toPreview } from './preview';
@@ -73,10 +74,13 @@ export const arrowTool: Tool = {
   preview(ctx, pointer) {
     const from = source ? findNode(ctx.diagram, source) : undefined;
     if (!from || !pointer) return {};
-    const target = ctx.nodeAt(pointer);
-    const end: Point = target && target.id !== from.id ? shapeFor(target.shape).boundary(target, center(from)) : pointer;
-    const start = shapeFor(from.shape).boundary(from, target ? center(target) : pointer);
-    return { overlay: [toPreview(renderEdge(style, start, end))] };
+    const found = ctx.nodeAt(pointer);
+    const target = found && found.id !== from.id ? found : null;
+    // Toward a figure: the line it will get. Else: to the pointer.
+    const way = routeBetween(from, target ?? { ...pointer, w: 0, h: 0 }, style.route);
+    const start = shapeFor(from.shape).boundary(from, way[1]);
+    const end: Point = target ? shapeFor(target.shape).boundary(target, way[way.length - 2]) : pointer;
+    return { overlay: [toPreview(renderEdge(style, [start, ...way.slice(1, -1), end]))] };
   },
 
   cancel(ctx) {

@@ -2,17 +2,26 @@
  * Diagram → SVG tree. Used for both the canvas and the saved file.
  */
 import { renderEdge } from './edges';
-import { center, findNode, type Diagram, type DiagramEdge, type Point } from './model';
+import { findNode, type Diagram, type DiagramEdge, type Point } from './model';
+import { routeBetween, simplify } from './routing';
 import { drawingStyle } from './shapes/common';
 import { shapeFor } from './shapes';
 import type { SvgNode } from './svg';
 
-/** Start and end of a line: where the line between the centres crosses each outline. */
-export function edgeEnds(d: Diagram, edge: DiagramEdge): { a: Point; b: Point } | null {
+/**
+ * The points a line goes through, from where it leaves one outline to where it
+ * meets the other. Straight: along the line between the centres. With corners:
+ * the first and last pieces still head for the centres, so the ends land on
+ * the outlines.
+ */
+export function edgePoints(d: Diagram, edge: DiagramEdge): Point[] | null {
   const from = findNode(d, edge.from);
   const to = findNode(d, edge.to);
   if (!from || !to) return null;
-  return { a: shapeFor(from.shape).boundary(from, center(to)), b: shapeFor(to.shape).boundary(to, center(from)) };
+  const way = routeBetween(from, to, edge.route);
+  const first = shapeFor(from.shape).boundary(from, way[1]);
+  const last = shapeFor(to.shape).boundary(to, way[way.length - 2]);
+  return simplify([first, ...way.slice(1, -1), last]);
 }
 
 export function renderDiagram(d: Diagram): SvgNode[] {
@@ -22,8 +31,8 @@ export function renderDiagram(d: Diagram): SvgNode[] {
   });
   const edges: SvgNode[] = [];
   for (const edge of d.edges) {
-    const ends = edgeEnds(d, edge);
-    if (ends) edges.push(renderEdge(edge, ends.a, ends.b, drawingStyle.stroke, { 'data-edge': edge.id }));
+    const points = edgePoints(d, edge);
+    if (points) edges.push(renderEdge(edge, points, drawingStyle.stroke, { 'data-edge': edge.id }));
   }
   // Lines on top, so their ends are never hidden by a figure.
   return [...nodes, ...edges];
