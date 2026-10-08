@@ -32,6 +32,15 @@ export interface DiagramNode {
   /** Freehand/Strek, when open: marks at the last and first point (arrow heads …). */
   head?: EndKind;
   tail?: EndKind;
+  /** Freehand/Strek, when open: the first/last point is fastened to a point of another figure and follows it. */
+  startAt?: AnchorRef;
+  endAt?: AnchorRef;
+}
+
+/** One of a figure's snap points (`ShapeType.anchors`, by index): a line end fastened there. */
+export interface AnchorRef {
+  node: string;
+  anchor: number;
 }
 
 /** What's drawn at an end of a line. */
@@ -113,12 +122,21 @@ export function updateNode(d: Diagram, id: string, patch: Partial<Omit<DiagramNo
   return { ...d, nodes: d.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)) };
 }
 
-/** Remove nodes and every arrow touching them. */
+/** Remove nodes and every arrow touching them. Lines fastened to them stay where they are. */
 export function removeNodes(d: Diagram, ids: string[]): Diagram {
   const gone = new Set(ids);
+  const loose = (n: DiagramNode): DiagramNode => {
+    if (!(n.startAt && gone.has(n.startAt.node)) && !(n.endAt && gone.has(n.endAt.node))) return n;
+    const { startAt, endAt, ...rest } = n;
+    return {
+      ...rest,
+      ...(startAt && !gone.has(startAt.node) ? { startAt } : {}),
+      ...(endAt && !gone.has(endAt.node) ? { endAt } : {}),
+    };
+  };
   return {
     ...d,
-    nodes: d.nodes.filter((n) => !gone.has(n.id)),
+    nodes: d.nodes.filter((n) => !gone.has(n.id)).map(loose),
     edges: d.edges.filter((e) => !gone.has(e.from) && !gone.has(e.to)),
   };
 }
@@ -272,9 +290,24 @@ export function normalizeDiagram(value: unknown): Diagram | null {
         smooth: n.smooth === false ? false : undefined,
         head: end(n.head),
         tail: end(n.tail),
+        startAt: n.startAt,
+        endAt: n.endAt,
       }),
     );
   const ids = new Set(nodes.map((n) => n.id));
+  const ref = (r: unknown, self: string): AnchorRef | undefined => {
+    const a = r as Partial<AnchorRef> | null;
+    return typeof a === 'object' && a !== null && typeof a.node === 'string' && a.node !== self && ids.has(a.node) &&
+      Number.isInteger(a.anchor) && a.anchor! >= 0
+      ? { node: a.node, anchor: a.anchor! }
+      : undefined;
+  };
+  for (const n of nodes) {
+    const [startAt, endAt] = [ref(n.startAt, n.id), ref(n.endAt, n.id)];
+    delete n.startAt;
+    delete n.endAt;
+    Object.assign(n, compact({ startAt, endAt }));
+  }
   const edges = v.edges
     .filter(
       (e): e is DiagramEdge =>

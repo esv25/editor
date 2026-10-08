@@ -4,6 +4,7 @@
  * a click means; figures (shapes/) decide how things look.
  */
 import { getSettings } from '../settings';
+import { anchorsOf, fastenedEnds, settleAnchors } from './attach';
 import { History } from './history';
 import {
   addNeighbor,
@@ -26,7 +27,7 @@ import {
 } from './model';
 import { edgeEnds, renderDiagram } from './render';
 import { shapeFor, type Measure } from './shapes';
-import { drawingStyle, lineHeight, measureText, rectAnchors, styledLine } from './shapes/common';
+import { drawingStyle, lineHeight, measureText, styledLine } from './shapes/common';
 import { h, toDom, type SvgNode } from './svg';
 import { arrowSource, newEdgeStyle } from './tools/arrow';
 import { selectTool } from './tools/select';
@@ -155,6 +156,9 @@ export class DiagramCanvas {
       get dragThreshold() {
         return getSettings().diagram.dragThreshold / canvas.zoom;
       },
+      get alignTolerance() {
+        return getSettings().diagram.alignTolerance / canvas.zoom;
+      },
       get handleSize() {
         return 14 / canvas.zoom;
       },
@@ -180,6 +184,8 @@ export class DiagramCanvas {
 
   commit(next: Diagram): void {
     if (next === this.diagram) return;
+    // Lines fastened to a figure follow it; a line that was drawn or moved fastens to what its ends now touch.
+    next = settleAnchors(this.diagram, next);
     this.history.record(this.diagram);
     this.diagram = next;
     this.changed();
@@ -276,7 +282,7 @@ export class DiagramCanvas {
     let best: Point | null = null;
     let bestDistance = Infinity;
     for (const n of this.diagram.nodes) {
-      for (const a of shapeFor(n.shape).anchors?.(n) ?? rectAnchors(n)) {
+      for (const a of anchorsOf(n)) {
         const distance = Math.hypot(a.x - p.x, a.y - p.y);
         if (distance <= reach && distance < bestDistance) {
           best = a;
@@ -651,7 +657,8 @@ export class DiagramCanvas {
 
   private draw(): void {
     const preview = this.tool.preview?.(this.context, this.pointer) ?? {};
-    const d = preview.diagram ?? this.diagram;
+    // While dragging, fastened lines follow along just as they will when it's dropped.
+    const d = preview.diagram ? settleAnchors(this.diagram, preview.diagram) : this.diagram;
     this.content.replaceChildren(...renderDiagram(d).map(toDom));
 
     const marks: SvgNode[] = [];
@@ -682,6 +689,8 @@ export class DiagramCanvas {
         const s = 14 / this.zoom;
         marks.push(h('rect', { x: n.x + n.w - s / 2, y: n.y + n.h - s / 2, width: s, height: s, rx: 3 / this.zoom, class: 'dg-handle' }));
       }
+      // A selected line's fastened ends: they follow the figure they're on.
+      for (const p of n ? fastenedEnds(n) : []) marks.push(h('circle', { cx: p.x, cy: p.y, r: 6 / this.zoom, class: 'dg-fastened' }));
     } else if (this.selection?.kind === 'edge') {
       const edge = d.edges.find((e) => e.id === this.selection!.id);
       if (edge) line(edge, 'dg-selection-edge');

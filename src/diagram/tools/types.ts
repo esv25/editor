@@ -15,6 +15,8 @@ export interface ToolContext {
   readonly tolerance: number;
   /** How far (drawing units) a press must move before it counts as a drag. */
   readonly dragThreshold: number;
+  /** How close (drawing units) edges must come to line up with another figure's (see align.ts). */
+  readonly alignTolerance: number;
   /** Size of on-screen handles in drawing units (so they stay the same size when zooming). */
   readonly handleSize: number;
   /** Replace the drawing (undoable, saved). */

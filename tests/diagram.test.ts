@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { alignMove, alignResize, guidesFor } from '../src/diagram/align';
+import { settleAnchors } from '../src/diagram/attach';
 import { exportSvg, isDiagramPath, parseDiagramSvg } from '../src/diagram/fileFormat';
 import { History } from '../src/diagram/history';
 import {
@@ -12,6 +14,7 @@ import {
   reverseEdge,
   snap,
   updateEdge,
+  updateNode,
   type Diagram,
 } from '../src/diagram/model';
 import { edgePresets, renderEdge } from '../src/diagram/edges';
@@ -325,6 +328,7 @@ describe('Velg tool', () => {
       grid: 20,
       tolerance: 10,
       dragThreshold: 6,
+      alignTolerance: 10,
       handleSize: 14,
       commit: () => {},
       select: (s) => (selection = s),
@@ -359,5 +363,103 @@ describe('Velg tool', () => {
     expect(panned).toEqual([]);
     selectTool.pointerUp!(ctx, { x: 90, y: 50 });
     expect(selectTool.busy!()).toBe(false);
+  });
+});
+
+describe('lining up', () => {
+  // A at (0,0) 160×80; an ellipse of 120×60 dragged near A's middle line.
+  const d = addNode(emptyDiagram(), box(0, 0, 'A')).diagram;
+  const options = { grid: 20, tolerance: 10 };
+
+  it('puts the middle on another figure’s middle when close, else on the grid', () => {
+    expect(alignMove(d, { x: 300, y: 13, w: 120, h: 60 }, options)).toEqual({ x: 300, y: 10 });
+    // Far from any line of A: just the grid.
+    expect(alignMove(d, { x: 300, y: 147, w: 120, h: 60 }, options)).toEqual({ x: 300, y: 140 });
+    // Tolerance 0: only exact matches, otherwise the grid.
+    expect(alignMove(d, { x: 300, y: 13, w: 120, h: 60 }, { ...options, tolerance: 0 })).toEqual({ x: 300, y: 20 });
+  });
+
+  it('lines up edges when resizing', () => {
+    const d2 = addNode(d, box(300, 200)).diagram;
+    // B's bottom edge dragged near A's middle (y = 40) – but that's above B, so the minimum wins.
+    expect(alignResize(d2, d2.nodes[1], { x: 465, y: 283 }, { ...options, min: 40 })).toEqual({ w: 160, h: 80 });
+    expect(alignResize(d2, d2.nodes[1], { x: 453, y: 291 }, { ...options, min: 40 })).toEqual({ w: 160, h: 100 });
+  });
+
+  it('shows guides through the figures that line up', () => {
+    const guides = guidesFor(d, { x: 300, y: 10, w: 120, h: 60 });
+    expect(guides).toEqual([{ x1: 0, y1: 40, x2: 420, y2: 40 }]);
+    expect(guidesFor(d, { x: 300, y: 300, w: 120, h: 60 })).toEqual([]);
+  });
+
+  it('ignores open lines and the figure itself', () => {
+    const withLine = addNode(d, { ...pathNodeFrom([{ x: 0, y: 47 }, { x: 100, y: 47 }], false) }).diagram;
+    expect(alignMove(withLine, { x: 300, y: 31, w: 120, h: 30 }, options)).toEqual({ x: 300, y: 25 });
+    expect(guidesFor(d, d.nodes[0], d.nodes[0].id)).toEqual([]);
+  });
+});
+
+describe('fastened line ends', () => {
+  // Box A at (0,0) 160×80 and box B at (300,0); a line from A's right middle to B's left middle.
+  const start = (): Diagram => {
+    let d = addNode(emptyDiagram(), box(0, 0, 'A')).diagram;
+    d = addNode(d, box(300, 0, 'B')).diagram;
+    const line = addNode(d, { ...pathNodeFrom([{ x: 160, y: 40 }, { x: 300, y: 40 }], false), head: 'arrow' }).diagram;
+    return settleAnchors(d, line);
+  };
+  const ends = (d: Diagram) => absolutePoints(d.nodes[2]);
+
+  it('fasten to the points they were drawn on', () => {
+    const d = start();
+    expect(d.nodes[2].startAt).toEqual({ node: 'n1', anchor: 4 });
+    expect(d.nodes[2].endAt).toEqual({ node: 'n2', anchor: 3 });
+  });
+
+  it('follow the figure when it moves or grows', () => {
+    let d = start();
+    d = settleAnchors(d, updateNode(d, 'n2', { x: 400, y: 100 }));
+    expect(ends(d)).toEqual([{ x: 160, y: 40 }, { x: 400, y: 140 }]);
+    d = settleAnchors(d, updateNode(d, 'n1', { h: 120 }));
+    expect(ends(d)).toEqual([{ x: 160, y: 60 }, { x: 400, y: 140 }]);
+    expect(d.nodes[2].head).toBe('arrow');
+  });
+
+  it('come loose when the line itself is moved, and fasten where they land', () => {
+    let d = start();
+    const line = d.nodes[2];
+    d = settleAnchors(d, updateNode(d, line.id, { y: line.y + 100 }));
+    expect(d.nodes[2].startAt).toBeUndefined();
+    expect(d.nodes[2].endAt).toBeUndefined();
+    d = settleAnchors(d, updateNode(d, 'n1', { x: -100 }));
+    expect(ends(d)).toEqual([{ x: 160, y: 140 }, { x: 300, y: 140 }]);
+    // Back onto A's bottom-right corner.
+    d = settleAnchors(d, updateNode(d, line.id, { x: 60, y: 80 }));
+    expect(d.nodes[2].startAt).toEqual({ node: 'n1', anchor: 7 });
+  });
+
+  it('stay where they are when the figure is deleted', () => {
+    const d = removeNodes(start(), ['n2']);
+    expect(d.nodes[1].startAt).toEqual({ node: 'n1', anchor: 4 });
+    expect(d.nodes[1].endAt).toBeUndefined();
+    expect(absolutePoints(d.nodes[1])).toEqual([{ x: 160, y: 40 }, { x: 300, y: 40 }]);
+  });
+
+  it('chain: a line fastened to another line’s end follows it too', () => {
+    let d = start();
+    const second = addNode(d, pathNodeFrom([{ x: 300, y: 40 }, { x: 300, y: 200 }], false)).diagram;
+    d = settleAnchors(d, second);
+    // Fastened to box B (figures win over the line ending at the same point).
+    expect(d.nodes[3].startAt).toEqual({ node: 'n2', anchor: 3 });
+    d = settleAnchors(d, updateNode(d, 'n2', { y: 40 }));
+    expect(absolutePoints(d.nodes[3])[0]).toEqual({ x: 300, y: 80 });
+    expect(ends(d)[1]).toEqual({ x: 300, y: 80 });
+  });
+
+  it('are kept in files, dangling ones dropped', () => {
+    const d = start();
+    expect(parseDiagramSvg(exportSvg(d))!.nodes[2]).toMatchObject({ startAt: { node: 'n1', anchor: 4 }, endAt: { node: 'n2', anchor: 3 } });
+    const bad = { ...d, nodes: d.nodes.map((n, i) => (i === 2 ? { ...n, startAt: { node: 'zz', anchor: 1 }, endAt: { node: 'n2', anchor: -1 } } : n)) };
+    expect(normalizeDiagram(bad)!.nodes[2]).not.toHaveProperty('startAt');
+    expect(normalizeDiagram(bad)!.nodes[2]).not.toHaveProperty('endAt');
   });
 });

@@ -62,6 +62,8 @@ export interface Settings {
     hitTolerance: number;
     /** How far (screen px) the pointer must move with the button down before it's a drag, not a click. */
     dragThreshold: number;
+    /** How close (screen px) a dragged figure's edge or middle must come to another's to line up with it (0 = only the grid). */
+    alignTolerance: number;
     /** Wait this long after a change before saving. */
     autosaveDelayMs: number;
     /** Tool id → the key that picks it ('' = none), overriding the tool's own. */
@@ -122,7 +124,7 @@ export const defaultSettings: Settings = {
     'codeblock.toggle', 'table.insert', 'image.insert', 'diagram.new', '|',
     'math.inline', 'math.block', 'math.palette',
   ],
-  diagram: { grid: 20, hitTolerance: 16, dragThreshold: 6, autosaveDelayMs: 500, toolKeys: {} },
+  diagram: { grid: 20, hitTolerance: 16, dragThreshold: 6, alignTolerance: 10, autosaveDelayMs: 500, toolKeys: {} },
   math: {
     palette: false,
     paletteAuto: true,
