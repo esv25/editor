@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- PDF, utskrift og Word: linjeskift inni et avsnitt beholdes nå, som i editoren, i stedet for at linjene flyter sammen.
+
 ## 0.9.2 – 2026-10-08
 
 - Tegnevinduet: en strek med hjørner som sitter fast på en figur, går nå et lite stykke rett ut fra figuren før den svinger, så den aldri går langs kanten av figuren.
