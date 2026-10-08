@@ -44,6 +44,8 @@ export interface DiagramNode {
 export interface AnchorRef {
   node: string;
   anchor: number;
+  /** Which way is out of the figure there (−1/0/1 per axis; both set at a corner). Lines with corners leave that way first. */
+  out?: Point;
 }
 
 /** What's drawn at an end of a line. */
@@ -304,11 +306,16 @@ export function normalizeDiagram(value: unknown): Diagram | null {
       }),
     );
   const ids = new Set(nodes.map((n) => n.id));
+  const step = (x: unknown) => x === -1 || x === 0 || x === 1;
+  const unit = (p: unknown) => {
+    const q = p as Partial<Point> | null;
+    return typeof q === 'object' && q !== null && step(q.x) && step(q.y) && (q.x !== 0 || q.y !== 0);
+  };
   const ref = (r: unknown, self: string): AnchorRef | undefined => {
     const a = r as Partial<AnchorRef> | null;
     return typeof a === 'object' && a !== null && typeof a.node === 'string' && a.node !== self && ids.has(a.node) &&
       Number.isInteger(a.anchor) && a.anchor! >= 0
-      ? { node: a.node, anchor: a.anchor! }
+      ? { node: a.node, anchor: a.anchor!, ...(unit(a.out) ? { out: { x: a.out!.x, y: a.out!.y } } : {}) }
       : undefined;
   };
   for (const n of nodes) {

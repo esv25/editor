@@ -21,7 +21,7 @@ const routed = (node: DiagramNode) => !!node.route && !node.closed && (node.poin
 /** The points the line goes through, corners included. */
 export function linePoints(node: DiagramNode): Point[] {
   const points = absolutePoints(node);
-  return routed(node) ? cornerPath(points[0], points[1], node.route) : points;
+  return routed(node) ? cornerPath(points[0], points[1], node.route, node.startAt?.out, node.endAt?.out) : points;
 }
 
 /** Drawn as a curve (a line with corners never is). */
