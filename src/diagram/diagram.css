@@ -116,6 +116,8 @@ html, body {
 .dg-point { fill: var(--dg-mark); }
 .dg-point-first { fill: var(--dg-white); stroke: var(--dg-mark); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .dg-anchor { fill: var(--dg-mark); fill-opacity: 0.15; stroke: var(--dg-mark); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.dg-fastened { fill: var(--dg-mark); stroke: var(--dg-white); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.dg-guide { stroke: var(--dg-mark); stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 .dg-handle { fill: var(--dg-white); stroke: var(--dg-mark); stroke-width: 2; vector-effect: non-scaling-stroke; }
 
 .dg-text-input {

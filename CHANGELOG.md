@@ -6,6 +6,9 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Tegnevinduet: figurer **stiller seg på linje** med hverandre. Når du drar, plasserer eller endrer størrelse på en figur og en kant eller midten kommer nær en annen figurs, hekter den seg på – en stiplet hjelpelinje viser hvilke figurer som står på linje.
+- Tegnevinduet: en **strek som starter eller slutter på et punkt** (hjørne eller midtpunkt) på en figur, sitter fast der og **følger med når figuren flyttes** eller endrer størrelse. Velger du streken, viser fylte prikker endene som sitter fast. Flytter du streken selv, løsner den (og hekter seg fast igjen der endene havner på et punkt).
+
 ## 0.9.0 – 2026-10-07
 
 - **Tabeller**: tabellknappen i verktøylinja setter inn en tabell. Den vises som en ekte tabell, og du skriver rett i cellene som i Word. Tab går til neste celle (og lager en ny rad etter den siste), Shift+Tab tilbake, Enter til raden under, og piltastene flytter mellom cellene og ut av tabellen. Enter på en tom nederste rad tar deg ut av tabellen. Høyreklikk (eller tabellknappen når du står i en tabell) for å legge til, flytte og slette rader og kolonner, og for å justere en kolonne til venstre, midten eller høyre. Fila er fortsatt vanlig Markdown, pent oppstilt.
