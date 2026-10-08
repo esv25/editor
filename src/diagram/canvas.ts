@@ -25,7 +25,8 @@ import {
   type Direction,
   type Point,
 } from './model';
-import { edgeEnds, fontSizes, renderDiagram } from './render';
+import { edgePoints, fontSizes, renderDiagram } from './render';
+import { pointAlong, polylineLength } from './routing';
 import { shapeFor, type Measure } from './shapes';
 import { drawingStyle, lineHeight, measureText, styledLine } from './shapes/common';
 import { h, toDom, type SvgNode } from './svg';
@@ -260,9 +261,10 @@ export class DiagramCanvas {
     let best: DiagramEdge | null = null;
     let bestDistance = Infinity;
     for (const edge of this.diagram.edges) {
-      const ends = edgeEnds(this.diagram, edge);
-      if (!ends) continue;
-      const distance = distanceToSegment(p, ends.a, ends.b);
+      const points = edgePoints(this.diagram, edge);
+      if (!points) continue;
+      let distance = Infinity;
+      for (let i = 1; i < points.length; i++) distance = Math.min(distance, distanceToSegment(p, points[i - 1], points[i]));
       if (distance <= reach && distance < bestDistance) {
         best = edge;
         bestDistance = distance;
@@ -358,9 +360,9 @@ export class DiagramCanvas {
       align: 'center',
       place: () => {
         const current = this.diagram.edges.find((e) => e.id === edgeId);
-        const ends = current && edgeEnds(this.diagram, current);
-        if (!ends) return null;
-        const mid = { x: (ends.a.x + ends.b.x) / 2, y: (ends.a.y + ends.b.y) / 2 };
+        const points = current && edgePoints(this.diagram, current);
+        if (!points) return null;
+        const mid = pointAlong(points, polylineLength(points) / 2);
         return { x: mid.x - 90, y: mid.y - 20, w: 180, h: 40 };
       },
       save: (label) => this.commit(updateEdge(this.diagram, edgeId, { label: label.trim() || undefined })),
@@ -673,8 +675,8 @@ export class DiagramCanvas {
       return n;
     };
     const line = (edge: DiagramEdge, cls: string) => {
-      const ends = edgeEnds(d, edge);
-      if (ends) marks.push(h('line', { x1: ends.a.x, y1: ends.a.y, x2: ends.b.x, y2: ends.b.y, class: cls }));
+      const points = edgePoints(d, edge);
+      if (points) marks.push(h('polyline', { points: points.map((p) => `${p.x},${p.y}`).join(' '), fill: 'none', class: cls }));
     };
 
     if (!preview.noHover && this.pointer && !this.editing) {

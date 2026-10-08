@@ -6,6 +6,7 @@
 import { distanceToSegment, type DiagramNode, type Point } from '../model';
 import { h } from '../svg';
 import { endMark } from '../edges';
+import { cornerPath } from '../routing';
 import { DOUBLE_GAP, drawingStyle, label, outline, rectBoundary, shapeIcon } from './common';
 import type { ShapeType } from './types';
 
@@ -13,6 +14,18 @@ import type { ShapeType } from './types';
 export function absolutePoints(node: DiagramNode): Point[] {
   return (node.points ?? []).map((p) => ({ x: node.x + p.x * node.w, y: node.y + p.y * node.h }));
 }
+
+/** Strek with corners: an open line between two points can go round a corner instead of slanting. */
+const routed = (node: DiagramNode) => !!node.route && !node.closed && (node.points?.length ?? 0) === 2;
+
+/** The points the line goes through, corners included. */
+export function linePoints(node: DiagramNode): Point[] {
+  const points = absolutePoints(node);
+  return routed(node) ? cornerPath(points[0], points[1], node.route) : points;
+}
+
+/** Drawn as a curve (a line with corners never is). */
+const isSmooth = (node: DiagramNode) => node.smooth !== false && !routed(node);
 
 /** A figure for points clicked on the canvas. */
 export function pathNodeFrom(points: Point[], closed: boolean): Omit<DiagramNode, 'id'> {
@@ -66,8 +79,8 @@ export function curveData(points: Point[], closed: boolean, smooth: boolean): st
 
 /** The curve as many short straight pieces (for clicking near it). */
 function sample(node: DiagramNode): Point[] {
-  const points = absolutePoints(node);
-  if (node.smooth === false || points.length < 3) return node.closed ? [...points, points[0]] : points;
+  const points = linePoints(node);
+  if (!isSmooth(node) || points.length < 3) return node.closed ? [...points, points[0]] : points;
   const out: Point[] = [points[0]];
   for (const [p0, c1, c2, p1] of bezierSegments(points, !!node.closed)) {
     for (let k = 1; k <= 8; k++) {
@@ -100,7 +113,7 @@ export const path: ShapeType = {
   defaultSize: { w: 120, h: 80 },
   ownTool: true,
   render: (node) => {
-    const points = absolutePoints(node);
+    const points = linePoints(node);
     const marks = [];
     if (!node.closed && points.length >= 2) {
       // Ends point along the last piece of the line.
@@ -109,7 +122,7 @@ export const path: ShapeType = {
       if (node.head && node.head !== 'none') marks.push(...endMark(node.head, b, Math.atan2(b.y - a.y, b.x - a.x), drawingStyle.stroke).marks);
       if (node.tail && node.tail !== 'none') marks.push(...endMark(node.tail, d, Math.atan2(d.y - c.y, d.x - c.x), drawingStyle.stroke).marks);
     }
-    const d = curveData(points, !!node.closed, node.smooth !== false);
+    const d = curveData(points, !!node.closed, isSmooth(node));
     const stroke = { 'stroke-linecap': node.double ? 'butt' : 'round', 'stroke-linejoin': 'round' };
     return h('g', {}, [
       h('path', {
@@ -127,8 +140,13 @@ export const path: ShapeType = {
       ...label(node),
     ]);
   },
-  // A line's own points: other lines can start where this one ends.
-  anchors: absolutePoints,
+  // A line's own points: other lines can start where this one ends. A corner comes last, so the
+  // points keep their numbers (line ends fastened here refer to them by index, see attach.ts).
+  anchors(node) {
+    const points = absolutePoints(node);
+    const line = linePoints(node);
+    return line.length > points.length ? [...points, line[1]] : points;
+  },
   boundary: rectBoundary,
   distance(node, p) {
     const points = sample(node);

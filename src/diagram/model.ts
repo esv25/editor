@@ -3,6 +3,7 @@
  * Plain data, changed only through the pure functions here, so every change
  * is a new Diagram (easy undo, easy to test).
  */
+import { routes, type Route } from './routing';
 
 export interface Point {
   x: number;
@@ -32,6 +33,8 @@ export interface DiagramNode {
   /** Freehand/Strek, when open: marks at the last and first point (arrow heads …). */
   head?: EndKind;
   tail?: EndKind;
+  /** Strek (two points, open): corners instead of a slant (see routing.ts). */
+  route?: Route;
   /** Freehand/Strek, when open: the first/last point is fastened to a point of another figure and follows it. */
   startAt?: AnchorRef;
   endAt?: AnchorRef;
@@ -54,6 +57,8 @@ export interface EdgeStyle {
   dashed: boolean;
   /** Two parallel lines (ER: total participation). Not part of the presets – it's a toggle of its own. */
   double?: boolean;
+  /** Corners instead of a slant. Also not part of the presets. */
+  route?: Route;
 }
 
 export const defaultEdgeStyle: EdgeStyle = { head: 'arrow', tail: 'none', dashed: false };
@@ -67,6 +72,7 @@ export interface DiagramEdge {
   tail?: EndKind;
   dashed?: boolean;
   double?: boolean;
+  route?: Route;
   /** Text in the middle of the line. */
   label?: string;
   /** Text near each end (multiplicity, cardinality: «1», «0..*», «N»). */
@@ -80,6 +86,7 @@ export const styleOf = (e: DiagramEdge): EdgeStyle => ({
   tail: e.tail ?? defaultEdgeStyle.tail,
   dashed: e.dashed ?? defaultEdgeStyle.dashed,
   ...(e.double ? { double: true } : {}),
+  ...(e.route ? { route: e.route } : {}),
 });
 
 export interface Diagram {
@@ -266,6 +273,7 @@ export function normalizeDiagram(value: unknown): Diagram | null {
   const flag = (x: unknown) => (x === true ? true : undefined);
   const ends: EndKind[] = ['none', 'arrow', 'open', 'triangle', 'diamond', 'filledDiamond'];
   const end = (x: unknown) => (ends.includes(x as EndKind) ? (x as EndKind) : undefined);
+  const route = (x: unknown) => (routes.includes(x as Route) ? (x as Route) : undefined);
   // Optional fields are only kept when set, so files stay small and tidy.
   const compact = <T extends object>(o: T): T =>
     Object.fromEntries(Object.entries(o).filter(([, value]) => value !== undefined)) as T;
@@ -290,6 +298,7 @@ export function normalizeDiagram(value: unknown): Diagram | null {
         smooth: n.smooth === false ? false : undefined,
         head: end(n.head),
         tail: end(n.tail),
+        route: route(n.route),
         startAt: n.startAt,
         endAt: n.endAt,
       }),
@@ -322,6 +331,7 @@ export function normalizeDiagram(value: unknown): Diagram | null {
         tail: end(e.tail),
         dashed: typeof e.dashed === 'boolean' ? e.dashed : undefined,
         double: flag(e.double),
+        route: route(e.route),
         label: str(e.label),
         fromLabel: str(e.fromLabel),
         toLabel: str(e.toLabel),

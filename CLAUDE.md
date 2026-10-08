@@ -264,8 +264,11 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   (addNode, connect, updateEdge, reverseEdge, addNeighbor, nodeAt med toleranse …). Noder kan
   ha `double`/`dashed` kant; frihånd har `points` som brøkdeler av boksen (så flytting og
   størrelse virker som for andre figurer). Linjer har `head`/`tail` (`EndKind`), `dashed`, `double`
-  (to parallelle streker; ikke del av forhåndsvalgene, men en egen bryter som beholdes ved typebytte)
-  og tekst `label`/`fromLabel`/`toLabel`. `normalizeDiagram` tar bare med gyldige felt.
+  (to parallelle streker; ikke del av forhåndsvalgene, men en egen bryter som beholdes ved typebytte),
+  `route` (hjørner: `'hv'` sidelengs først, `'vh'` opp/ned først, ingen = rett; også på Strek med to punkter)
+  og tekst `label`/`fromLabel`/`toLabel`. `routing.ts`: veien en linje tar (`routeBetween` for figurer –
+  ett hjørne når de står på skrå, ellers ut–sving midt i mellomrommet–inn; `cornerPath` for Strek) og
+  polylinjehjelpere; `edgePoints` i `render.ts` gir punktene fra omriss til omriss. `normalizeDiagram` tar bare med gyldige felt.
   `history.ts` angrer med øyeblikksbilder. `svg.ts`: `SvgNode`-tre → DOM (lerretet) eller
   tekst (fila), så det man ser er det som lagres. `render.ts`: diagram → SvgNode.
 - `attach.ts`: strekender som sitter fast. En åpen frihånd/Strek har `startAt`/`endAt` (`AnchorRef`: figur-id +
