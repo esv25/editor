@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- **Tegninger**: teksten i bokser, ellipser, romber og tekstfelt blir større når figuren har plass til den (opptil dobbelt så stor), så den er lettere å lese når tegningen vises mindre i et notat. Figurer av samme type og størrelse får lik tekststørrelse. Tekst ved linjene (som M og 1) er også litt større.
+
 ## 0.9.0 – 2026-10-07
 
 - **Tabeller**: tabellknappen i verktøylinja setter inn en tabell. Den vises som en ekte tabell, og du skriver rett i cellene som i Word. Tab går til neste celle (og lager en ny rad etter den siste), Shift+Tab tilbake, Enter til raden under, og piltastene flytter mellom cellene og ut av tabellen. Enter på en tom nederste rad tar deg ut av tabellen. Høyreklikk (eller tabellknappen når du står i en tabell) for å legge til, flytte og slette rader og kolonner, og for å justere en kolonne til venstre, midten eller høyre. Fila er fortsatt vanlig Markdown, pent oppstilt.

@@ -15,7 +15,7 @@ import {
   type Diagram,
 } from '../src/diagram/model';
 import { edgePresets, renderEdge } from '../src/diagram/edges';
-import { edgeEnds } from '../src/diagram/render';
+import { edgeEnds, fontSizes } from '../src/diagram/render';
 import { shapeFor } from '../src/diagram/shapes';
 import { setUnderline, styledLine, textUnderline } from '../src/diagram/shapes/common';
 import { absolutePoints, curveData, pathNodeFrom } from '../src/diagram/shapes/path';
@@ -218,6 +218,34 @@ describe('text markup', () => {
     expect(svg('_id_')).not.toContain('stroke-dasharray');
     expect(svg('__nr__')).toContain('stroke-dasharray="4 3"');
     expect(svg('__nr__')).toContain('>nr</tspan>');
+  });
+});
+
+describe('text size', () => {
+  const sizesOf = (...nodes: { shape: string; text: string; w?: number }[]) => {
+    let d = emptyDiagram();
+    for (const n of nodes) d = addNode(d, { ...box(0, 0, n.text), shape: n.shape, w: n.w ?? 160 }).diagram;
+    return d.nodes.map((n) => fontSizes(d).get(n.id));
+  };
+
+  it('grows where the figure has room, up to a limit', () => {
+    expect(sizesOf({ shape: 'box', text: 'Navn' })).toEqual([32]);
+    expect(sizesOf({ shape: 'box', text: 'En ganske lang tekst her med mer' })).toEqual([16]);
+    expect(sizesOf({ shape: 'class', text: 'Person' })).toEqual([undefined]);
+  });
+
+  it('is the same for figures of the same type and size', () => {
+    const [a, b, c] = sizesOf({ shape: 'ellipse', text: 'Navn' }, { shape: 'ellipse', text: 'Personnummer' }, { shape: 'ellipse', text: 'Navn', w: 240 });
+    expect(a).toBe(b);
+    expect(a).toBeGreaterThan(16);
+    expect(a).toBeLessThan(32);
+    expect(c).toBe(32);
+  });
+
+  it('draws the text at that size', () => {
+    const node = { id: 'n1', ...box(0, 0, '_id_') };
+    expect(toSvgString(shapeFor('box').render(node, 24))).toContain('font-size="24"');
+    expect(toSvgString(shapeFor('box').render(node))).toContain('font-size="16"');
   });
 });
 

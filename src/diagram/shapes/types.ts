@@ -19,8 +19,8 @@ export interface ShapeType {
   /** Tool shortcut (single key, shown in the tooltip). */
   key: string;
   defaultSize: { w: number; h: number };
-  /** Draw the figure, text included. */
-  render(node: DiagramNode): SvgNode;
+  /** Draw the figure, text included (at `fontSize` if given; see `textRoom`). */
+  render(node: DiagramNode, fontSize?: number): SvgNode;
   /** Where a line from the figure's centre toward `p` crosses its outline (arrows start/end here). */
   boundary(node: DiagramNode, p: Point): Point;
   /** Enter makes a new line while typing (Ctrl+Enter or Esc finishes). Default: Enter finishes. */
@@ -29,6 +29,11 @@ export interface ShapeType {
   placeholder?: string;
   /** The size the text needs (default: centred lines plus padding). */
   fit?(text: string, measure: Measure): { w: number; h: number };
+  /**
+   * How many times larger a text block of w×h (at the normal font size) could
+   * be drawn and still fit inside the figure. Without it the text keeps its size.
+   */
+  textRoom?(node: DiagramNode, w: number, h: number): number;
   /** Distance from `p` to the figure, for clicking (default: to its bounding box). */
   distance?(node: DiagramNode, p: Point): number;
   /** Points that lines snap to (default: corners and side middles of the box). */
