@@ -198,10 +198,17 @@ function table(node: SyntaxNode, text: string): Block {
 
 // --- Inline content ------------------------------------------------------------------
 
-/** Plain text between syntax nodes: line breaks inside a paragraph are spaces. */
+/**
+ * Plain text between syntax nodes. A line break inside a paragraph stays a line break
+ * (as the editor shows it, and as in Obsidian), not a space as in strict CommonMark.
+ */
 function plain(raw: string): Inline[] {
-  const t = raw.replace(/[ \t]*\n[ \t>]*/g, ' ');
-  return t ? [{ t: 'text', text: t }] : [];
+  const out: Inline[] = [];
+  raw.split(/[ \t]*\n[ \t>]*/).forEach((line, i) => {
+    if (i > 0) out.push({ t: 'break' });
+    if (line) out.push({ t: 'text', text: line });
+  });
+  return out;
 }
 
 function inlinesOf(parent: SyntaxNode, text: string, from = parent.from, to = parent.to): Inline[] {
@@ -293,9 +300,11 @@ function merge(items: Inline[]): Inline[] {
   return out;
 }
 
-/** Strip leading/trailing whitespace of a block's content. */
+/** Strip leading/trailing whitespace and line breaks of a block's content. */
 function trimInlines(items: Inline[]): Inline[] {
   const out = [...items];
+  while (out[0]?.t === 'break') out.shift();
+  while (out[out.length - 1]?.t === 'break') out.pop();
   const first = out[0];
   if (first?.t === 'text') out[0] = { t: 'text', text: first.text.trimStart() };
   const last = out[out.length - 1];

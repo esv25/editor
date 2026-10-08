@@ -10,6 +10,7 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 - Tegnevinduet: nye knapper «Større tekst» og «Mindre tekst» gjør teksten større i hele tegningen, så den er lett å lese også i PDF. Figurer som trenger mer plass, vokser, og strekene følger med.
 - Tegninger: korte tekster blir så store som figuren har plass til (før fikk like figurer samme størrelse som den lengste teksten).
 - Tegninger: understreken under nøkler ligger nå under bokstavene i stedet for å gå gjennom dem, og den stiplede streken under delnøkler er tydeligere.
+- PDF, utskrift og Word: linjeskift inni et avsnitt beholdes nå, som i editoren, i stedet for at linjene flyter sammen.
 
 ## 0.9.2 – 2026-10-08
 
