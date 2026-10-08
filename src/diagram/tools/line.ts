@@ -8,6 +8,7 @@
  * corner (also chosen in the panel). It's a freehand figure with two points,
  * so it moves, resizes and is deleted like any figure.
  */
+import { anchorAt } from '../attach';
 import { edgePresets, renderEdge } from '../edges';
 import { addNode, type EdgeStyle, type Point } from '../model';
 import { cornerPath } from '../routing';
@@ -62,11 +63,13 @@ export const lineTool: Tool = {
   },
 
   preview(ctx, pointer) {
+    // Fastened to a figure, a line with corners goes straight out of it first – as it will once drawn.
+    const outAt = (q: { point: Point; anchored: boolean }) => (q.anchored ? anchorAt(ctx.diagram, '', q.point)?.out : undefined);
     if (!pointer) return { noHover: true };
     const end = ctx.snapPoint(pointer);
     const overlay: SvgNode[] = [];
     if (start) {
-      overlay.push(h('g', { class: 'dg-ghost' }, [renderEdge(style, cornerPath(start.point, end.point, style.route))]));
+      overlay.push(h('g', { class: 'dg-ghost' }, [renderEdge(style, cornerPath(start.point, end.point, style.route, outAt(start), outAt(end)))]));
       if (start.anchored) overlay.push(anchorMark(ctx, start.point));
     }
     if (end.anchored) overlay.push(anchorMark(ctx, end.point));

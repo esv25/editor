@@ -267,7 +267,8 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   (to parallelle streker; ikke del av forhåndsvalgene, men en egen bryter som beholdes ved typebytte),
   `route` (hjørner: `'hv'` sidelengs først, `'vh'` opp/ned først, ingen = rett; også på Strek med to punkter)
   og tekst `label`/`fromLabel`/`toLabel`. `routing.ts`: veien en linje tar (`routeBetween` for figurer –
-  ett hjørne når de står på skrå, ellers ut–sving midt i mellomrommet–inn; `cornerPath` for Strek) og
+  ett hjørne når de står på skrå, ellers ut–sving midt i mellomrommet–inn; `cornerPath` for Strek, som først går `STUB` rett ut av figuren der en ende sitter fast – retningen
+  ligger i `AnchorRef.out`) og
   polylinjehjelpere; `edgePoints` i `render.ts` gir punktene fra omriss til omriss. `normalizeDiagram` tar bare med gyldige felt.
   `history.ts` angrer med øyeblikksbilder. `svg.ts`: `SvgNode`-tre → DOM (lerretet) eller
   tekst (fila), så det man ser er det som lagres. `render.ts`: diagram → SvgNode.

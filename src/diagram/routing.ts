@@ -35,11 +35,39 @@ export function simplify(points: Point[]): Point[] {
   return out;
 }
 
-/** A line from a to b: straight, or with one corner. */
-export function cornerPath(a: Point, b: Point, route: Route | undefined): Point[] {
-  if (route === 'hv') return simplify([a, { x: b.x, y: a.y }, b]);
-  if (route === 'vh') return simplify([a, { x: a.x, y: b.y }, b]);
-  return simplify([a, b]);
+/** How far a line with corners goes straight out of a figure before it turns. */
+export const STUB = 20;
+
+/** The line doubles back on itself somewhere (a spike). */
+function doublesBack(points: Point[]): boolean {
+  for (let i = 2; i < points.length; i++) {
+    const [a, b, c] = [points[i - 2], points[i - 1], points[i]];
+    const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    if (Math.abs(cross) < 1e-9) return true;
+  }
+  return false;
+}
+
+/**
+ * A line from a to b: straight, or with corners. An end on a figure has
+ * `out`, the way out of the figure there: the line first goes `STUB` straight
+ * out (at a figure's corner: along the axis the route takes there), so it
+ * never runs along the figure's side. In between, one corner as chosen – or
+ * the other way round if that would make the line double back.
+ */
+export function cornerPath(a: Point, b: Point, route: Route | undefined, outA?: Point, outB?: Point): Point[] {
+  if (!route) return simplify([a, b]);
+  // At a corner of a figure both axes lead out: take the one the route leaves (or arrives) along.
+  const along = (out: Point | undefined, axis: 'x' | 'y') =>
+    !out ? null : out.x && out.y ? (axis === 'x' ? { x: out.x, y: 0 } : { x: 0, y: out.y }) : out;
+  const dirA = along(outA, route === 'hv' ? 'x' : 'y');
+  const dirB = along(outB, route === 'hv' ? 'y' : 'x');
+  const s0 = dirA ? { x: a.x + dirA.x * STUB, y: a.y + dirA.y * STUB } : a;
+  const s1 = dirB ? { x: b.x + dirB.x * STUB, y: b.y + dirB.y * STUB } : b;
+  const sideways = { x: s1.x, y: s0.y };
+  const upDown = { x: s0.x, y: s1.y };
+  const ways = (route === 'hv' ? [sideways, upDown] : [upDown, sideways]).map((c) => simplify([a, s0, c, s1, b]));
+  return ways.find((w) => !doublesBack(w)) ?? ways[0];
 }
 
 /**

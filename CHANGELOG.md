@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Tegnevinduet: en strek med hjørner som sitter fast på en figur, går nå et lite stykke rett ut fra figuren før den svinger, så den aldri går langs kanten av figuren.
+
 ## 0.9.1 – 2026-10-08
 
 - Tegnevinduet: figurer **stiller seg på linje** med hverandre. Når du drar, plasserer eller endrer størrelse på en figur og en kant eller midten kommer nær en annen figurs, hekter den seg på – en stiplet hjelpelinje viser hvilke figurer som står på linje.

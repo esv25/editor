@@ -29,14 +29,24 @@ export function fastenedEnds(n: DiagramNode): Point[] {
   return [n.startAt ? points[0] : null, n.endAt ? points[points.length - 1] : null].filter((p): p is Point => !!p);
 }
 
+/** Which way is out of figure `n` at its point `p`: away from the middle, per axis (a side middle has one axis, a corner both). */
+function outward(n: DiagramNode, p: Point): Point | undefined {
+  const axis = (d: number, size: number) => (Math.abs(d) < size * 0.01 ? 0 : Math.sign(d));
+  const out = { x: axis(p.x - (n.x + n.w / 2), n.w), y: axis(p.y - (n.y + n.h / 2), n.h) };
+  return out.x || out.y ? out : undefined;
+}
+
 /** The snap point of another figure at `p`, if any. Figures win over lines (so a box carries both lines meeting at its corner). */
-function anchorAt(d: Diagram, self: string, p: Point): AnchorRef | undefined {
+export function anchorAt(d: Diagram, self: string, p: Point): AnchorRef | undefined {
   let found: AnchorRef | undefined;
   for (const n of d.nodes) {
     if (n.id === self) continue;
     const index = anchorsOf(n).findIndex((a) => same(a, p));
     if (index < 0) continue;
-    if (n.shape !== 'path') return { node: n.id, anchor: index };
+    if (n.shape !== 'path') {
+      const out = outward(n, p);
+      return { node: n.id, anchor: index, ...(out ? { out } : {}) };
+    }
     found ??= { node: n.id, anchor: index };
   }
   return found;

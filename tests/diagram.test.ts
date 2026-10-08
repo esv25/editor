@@ -116,6 +116,21 @@ describe('corners', () => {
     expect(cornerPath(a, { x: 100, y: 0 }, 'vh')).toEqual([a, { x: 100, y: 0 }]);
   });
 
+  it('go a little straight out of a figure first', () => {
+    const right = { x: 1, y: 0 };
+    // Out of a right side, then up/down as chosen, then across.
+    expect(cornerPath(a, b, 'vh', right)).toEqual([a, { x: 20, y: 0 }, { x: 20, y: 60 }, b]);
+    // Into a left side: arrives from the left, 20 before the end.
+    expect(cornerPath(a, b, 'vh', right, { x: -1, y: 0 })).toEqual([a, { x: 20, y: 0 }, { x: 20, y: 60 }, b]);
+    expect(cornerPath(a, b, 'hv', right, { x: -1, y: 0 })).toEqual([a, { x: 80, y: 0 }, { x: 80, y: 60 }, b]);
+    // A figure's top-right corner, up/down first: up out of the figure, across, down – not back through it.
+    expect(cornerPath(a, b, 'vh', { x: 1, y: -1 })).toEqual([a, { x: 0, y: -20 }, { x: 100, y: -20 }, b]);
+    // Never doubles back: out to the right, end to the left – turns right after the short piece.
+    expect(cornerPath(a, { x: -100, y: 60 }, 'hv', right)).toEqual([a, { x: 20, y: 0 }, { x: 20, y: 60 }, { x: -100, y: 60 }]);
+    // Free ends (not on a figure): no extra piece.
+    expect(cornerPath(a, b, 'vh')).toEqual([a, { x: 0, y: 60 }, b]);
+  });
+
   it('take lines between figures round a corner, or across the gap', () => {
     const at = (x: number, y: number) => ({ x, y, w: 100, h: 60 });
     // Diagonally apart: one corner, outside both figures.
@@ -581,8 +596,8 @@ describe('fastened line ends', () => {
 
   it('fasten to the points they were drawn on', () => {
     const d = start();
-    expect(d.nodes[2].startAt).toEqual({ node: 'n1', anchor: 4 });
-    expect(d.nodes[2].endAt).toEqual({ node: 'n2', anchor: 3 });
+    expect(d.nodes[2].startAt).toEqual({ node: 'n1', anchor: 4, out: { x: 1, y: 0 } });
+    expect(d.nodes[2].endAt).toEqual({ node: 'n2', anchor: 3, out: { x: -1, y: 0 } });
   });
 
   it('follow the figure when it moves or grows', () => {
@@ -604,12 +619,12 @@ describe('fastened line ends', () => {
     expect(ends(d)).toEqual([{ x: 160, y: 140 }, { x: 300, y: 140 }]);
     // Back onto A's bottom-right corner.
     d = settleAnchors(d, updateNode(d, line.id, { x: 60, y: 80 }));
-    expect(d.nodes[2].startAt).toEqual({ node: 'n1', anchor: 7 });
+    expect(d.nodes[2].startAt).toEqual({ node: 'n1', anchor: 7, out: { x: 1, y: 1 } });
   });
 
   it('stay where they are when the figure is deleted', () => {
     const d = removeNodes(start(), ['n2']);
-    expect(d.nodes[1].startAt).toEqual({ node: 'n1', anchor: 4 });
+    expect(d.nodes[1].startAt).toEqual({ node: 'n1', anchor: 4, out: { x: 1, y: 0 } });
     expect(d.nodes[1].endAt).toBeUndefined();
     expect(absolutePoints(d.nodes[1])).toEqual([{ x: 160, y: 40 }, { x: 300, y: 40 }]);
   });
@@ -619,7 +634,7 @@ describe('fastened line ends', () => {
     const second = addNode(d, pathNodeFrom([{ x: 300, y: 40 }, { x: 300, y: 200 }], false)).diagram;
     d = settleAnchors(d, second);
     // Fastened to box B (figures win over the line ending at the same point).
-    expect(d.nodes[3].startAt).toEqual({ node: 'n2', anchor: 3 });
+    expect(d.nodes[3].startAt).toEqual({ node: 'n2', anchor: 3, out: { x: -1, y: 0 } });
     d = settleAnchors(d, updateNode(d, 'n2', { y: 40 }));
     expect(absolutePoints(d.nodes[3])[0]).toEqual({ x: 300, y: 80 });
     expect(ends(d)[1]).toEqual({ x: 300, y: 80 });
@@ -638,9 +653,21 @@ describe('fastened line ends', () => {
     expect(absolutePoints(d.nodes[2])[0]).toEqual({ x: 620, y: 0 });
   });
 
+  it('with corners, go straight out of the figure before turning', () => {
+    // From A's right middle (160,40) to B's left middle, B moved down: out of A, across, into B.
+    let d = start();
+    d = settleAnchors(d, updateNode(d, 'n3', { route: 'vh' }));
+    d = settleAnchors(d, updateNode(d, 'n2', { y: 100 }));
+    const line = shapeFor('path').anchors!(d.nodes[2]);
+    expect(toSvgString(shapeFor('path').render(d.nodes[2]))).toContain('d="M160,40 L180,40 L180,140 L300,140"');
+    expect(line.slice(0, 2)).toEqual([{ x: 160, y: 40 }, { x: 300, y: 140 }]);
+    d = settleAnchors(d, updateNode(d, 'n3', { route: 'hv' }));
+    expect(toSvgString(shapeFor('path').render(d.nodes[2]))).toContain('d="M160,40 L280,40 L280,140 L300,140"');
+  });
+
   it('are kept in files, dangling ones dropped', () => {
     const d = start();
-    expect(parseDiagramSvg(exportSvg(d))!.nodes[2]).toMatchObject({ startAt: { node: 'n1', anchor: 4 }, endAt: { node: 'n2', anchor: 3 } });
+    expect(parseDiagramSvg(exportSvg(d))!.nodes[2]).toMatchObject({ startAt: { node: 'n1', anchor: 4, out: { x: 1, y: 0 } }, endAt: { node: 'n2', anchor: 3, out: { x: -1, y: 0 } } });
     const bad = { ...d, nodes: d.nodes.map((n, i) => (i === 2 ? { ...n, startAt: { node: 'zz', anchor: 1 }, endAt: { node: 'n2', anchor: -1 } } : n)) };
     expect(normalizeDiagram(bad)!.nodes[2]).not.toHaveProperty('startAt');
     expect(normalizeDiagram(bad)!.nodes[2]).not.toHaveProperty('endAt');
