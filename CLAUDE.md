@@ -288,8 +288,14 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   for tekstfeltet, `ownTool` (frihånd har eget verktøy). Ny type = ny fil + linje i
   `shapes/index.ts`; den får verktøyknapp automatisk. Tekstmarkering per linje
   (`styledLine`): `_tekst_` understreket (ER-nøkkel, static), `__tekst__` stiplet
-  understreket (delnøkkel), `*tekst*` kursiv; understreker tegnes som egne `<line>`-er (`textBlock`),
-  og knappene «Understrek»/«Stiplet understrek» setter markeringen på alle linjer.
+  understreket (delnøkkel), `*tekst*` kursiv; understreker tegnes som egne `<line>`-er (`textBlock`,
+  under nedstrekene, tykkelse og stipler følger skriftstørrelsen), og knappene
+  «Understrek»/«Stiplet understrek» setter markeringen på alle linjer.
+  Tekststørrelse (`fontSizes` i `render.ts`): hver figur får så stor tekst som den har plass til
+  (`textRoom`), fra tegningens tekststørrelse opp til `MAX_TEXT_SCALE` ganger den. Tegningens
+  tekststørrelse (`Diagram.textSize`, `textSize.ts`) styres med «Mindre/Større tekst» i verktøylinja;
+  oppover vokser figurer rundt midten (to rutenett-steg om gangen) til teksten får plass, og løse
+  strekender som ligger på et festepunkt festes først (`fastenLooseEnds`) så de følger med.
   UML-klasse: én tekst der linjer med `--` deler i navn/felt/metoder (`classSections`).
   ER (Chen): entitet = boks, attributt = ellipse, relasjon = rombe, Linje + kardinalitet.
 - Verktøy (`tools/`, én fil per verktøy, `Tool`-grensesnittet i `tools/types.ts`;

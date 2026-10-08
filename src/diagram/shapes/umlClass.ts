@@ -12,7 +12,7 @@
  * italic, and «stereotype» lines in the name part aren't bold.
  */
 import { h, type SvgNode } from '../svg';
-import { lineHeight, outline, rectBoundary, shapeIcon, styledLine, textBlock } from './common';
+import { drawingStyle, lineHeight, outline, rectBoundary, shapeIcon, styledLine, textBlock } from './common';
 import type { ShapeType } from './types';
 
 const PAD_X = 10;
@@ -39,7 +39,8 @@ export function classSections(text: string): string[][] {
   return trimmed;
 }
 
-const sectionHeight = (lines: string[]) => (lines.length ? lines.length * lineHeight + 2 * PAD_Y : EMPTY);
+/** Height of a compartment, with the text `scale` times the normal size. */
+const sectionHeight = (lines: string[], scale = 1) => (lines.length ? lines.length * lineHeight * scale + 2 * PAD_Y : EMPTY);
 const isStereotype = (line: string) => /^\s*(«|<<)/.test(line);
 
 export const umlClass: ShapeType = {
@@ -52,15 +53,17 @@ export const umlClass: ShapeType = {
   multiline: true,
   placeholder: 'Navn\n--\n- felt: Type\n--\n+ metode(): Type',
 
-  fit(text, measure) {
+  fit(text, measure, scale = 1) {
     const sections = classSections(text);
     const widths = sections.flatMap((lines, i) =>
-      lines.map((line) => measure(styledLine(line).text, i === 0 && !isStereotype(line)) + 2 * PAD_X + (i === 0 ? 16 : 0)),
+      lines.map((line) => measure(styledLine(line).text, i === 0 && !isStereotype(line)) * scale + 2 * PAD_X + (i === 0 ? 16 : 0)),
     );
-    return { w: Math.max(0, ...widths), h: sections.reduce((sum, lines) => sum + sectionHeight(lines), 0) };
+    return { w: Math.max(0, ...widths), h: sections.reduce((sum, lines) => sum + sectionHeight(lines, scale), 0) };
   },
 
-  render(node) {
+  render(node, fontSize = drawingStyle.fontSize) {
+    const scale = fontSize / drawingStyle.fontSize;
+    const step = lineHeight * scale;
     const sections = classSections(node.text);
     const parts: SvgNode[] = [h('rect', { x: node.x, y: node.y, width: node.w, height: node.h, ...outline(node) })];
     const bottom = node.y + node.h;
@@ -72,11 +75,12 @@ export const umlClass: ShapeType = {
       const x = name ? node.x + node.w / 2 : node.x + PAD_X;
       parts.push(
         ...textBlock(
-          lines.map((line, j) => ({ line, x, y: top + PAD_Y + lineHeight / 2 + j * lineHeight, bold: name && !isStereotype(line) })),
+          lines.map((line, j) => ({ line, x, y: top + PAD_Y + step / 2 + j * step, bold: name && !isStereotype(line) })),
           name ? 'middle' : 'start',
+          fontSize,
         ),
       );
-      top += sectionHeight(lines);
+      top += sectionHeight(lines, scale);
     });
     return h('g', {}, parts);
   },

@@ -28,9 +28,10 @@ import {
 } from './model';
 import { edgePoints, fontSizes, renderDiagram } from './render';
 import { pointAlong, polylineLength } from './routing';
-import { shapeFor, type Measure } from './shapes';
-import { drawingStyle, lineHeight, measureText, styledLine } from './shapes/common';
+import { shapeFor } from './shapes';
+import { drawingStyle } from './shapes/common';
 import { h, toDom, type SvgNode } from './svg';
+import { setTextSize, stepTextSize, textNeeds, textScale } from './textSize';
 import { arrowSource, newEdgeStyle } from './tools/arrow';
 import { isSelectingTool, markTool, selectTool } from './tools/select';
 import { toolFor, toolKey, tools, type Selection, type Tool, type ToolContext } from './tools';
@@ -450,23 +451,27 @@ export class DiagramCanvas {
       width: `${rect.w * this.zoom}px`,
       // Room to type more lines in a class.
       height: `${Math.max(rect.h, this.editing.multiline ? 160 : 0) * this.zoom}px`,
-      fontSize: `${(this.editing.fontSize?.() ?? drawingStyle.fontSize) * this.zoom}px`,
+      fontSize: `${(this.editing.fontSize?.() ?? drawingStyle.fontSize * textScale(this.diagram)) * this.zoom}px`,
     });
   }
 
   /** Grow the figure (never shrink it) so the text fits, in whole grid steps. */
   private fitText(node: DiagramNode, text: string): { w: number; h: number } {
     const grid = getSettings().diagram.grid;
-    const measure: Measure = (line, bold) => measureText(line, bold);
-    const shape = shapeFor(node.shape);
-    const needed = shape.fit
-      ? shape.fit(text, measure)
-      : {
-          w: Math.max(0, ...text.split('\n').map((line) => measure(styledLine(line).text))) + 32,
-          h: text.split('\n').length * lineHeight + 24,
-        };
+    const needed = textNeeds({ shape: node.shape, text }, textScale(this.diagram));
     const up = (v: number) => Math.ceil(v / grid) * grid;
     return { w: Math.max(node.w, up(needed.w)), h: Math.max(node.h, up(needed.h)) };
+  }
+
+  /** The drawing's text size (1 = normal). */
+  get textScale(): number {
+    return textScale(this.diagram);
+  }
+
+  /** «Større tekst» (1) / «Mindre tekst» (−1): the whole drawing's text a step larger or smaller. */
+  stepTextSize(dir: 1 | -1): void {
+    const size = stepTextSize(textScale(this.diagram), dir);
+    if (size !== null) this.commit(setTextSize(this.diagram, size, getSettings().diagram.grid));
   }
 
   // --- View ---------------------------------------------------------------

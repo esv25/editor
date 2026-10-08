@@ -268,10 +268,13 @@ html, body {
   height: auto;
   border-radius: 4px;
 }
-/* Drawings open in the drawing window on double-click. */
-.cm-image-drawing { cursor: pointer; }
-.cm-image-drawing img { box-shadow: 0 0 0 1px var(--border); }
-.cm-image-drawing:hover img { box-shadow: 0 0 0 2px var(--accent); }
+/* Drawings open in the drawing window on double-click. A wide one may grow past
+   the text column, up to the editor's width (--drawing-room), centred on the column,
+   and taller than other pictures: shrunk to fit the screen, its text would be tiny. */
+.cm-image.cm-image-drawing { flex: 1 0 100%; min-width: 0; display: flex; justify-content: center; }
+.cm-drawing-frame { flex: none; min-width: 100%; width: max-content; }
+.cm-image-drawing img { max-width: var(--drawing-room, 100vw); max-height: none; cursor: pointer; box-shadow: 0 0 0 1px var(--border); }
+.cm-image-drawing img:hover { box-shadow: 0 0 0 2px var(--accent); }
 .cm-image-notice {
   display: flex;
   flex-direction: column;
