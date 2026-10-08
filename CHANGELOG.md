@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+## 0.9.2 – 2026-10-08
+
 - Tegnevinduet: en strek med hjørner som sitter fast på en figur, går nå et lite stykke rett ut fra figuren før den svinger, så den aldri går langs kanten av figuren.
 
 ## 0.9.1 – 2026-10-08
