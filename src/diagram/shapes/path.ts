@@ -112,7 +112,7 @@ export const path: ShapeType = {
   key: 'f',
   defaultSize: { w: 120, h: 80 },
   ownTool: true,
-  render: (node) => {
+  render: (node, fontSize) => {
     const points = linePoints(node);
     const marks = [];
     if (!node.closed && points.length >= 2) {
@@ -137,7 +137,7 @@ export const path: ShapeType = {
         ? [h('path', { d, ...outline(node), fill: 'none', ...stroke, stroke: drawingStyle.paper, 'stroke-width': DOUBLE_GAP - drawingStyle.strokeWidth })]
         : []),
       ...marks,
-      ...label(node),
+      ...label(node, fontSize),
     ]);
   },
   // A line's own points: other lines can start where this one ends. A corner comes last, so the

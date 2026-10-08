@@ -28,6 +28,7 @@ import { setUnderline, styledLine, textUnderline } from '../src/diagram/shapes/c
 import { absolutePoints, curveData, pathNodeFrom } from '../src/diagram/shapes/path';
 import { classSections } from '../src/diagram/shapes/umlClass';
 import { toSvgString } from '../src/diagram/svg';
+import { growForText, setTextSize, stepTextSize, textScale } from '../src/diagram/textSize';
 import { markTool, selectTool } from '../src/diagram/tools/select';
 import type { Selection, ToolContext } from '../src/diagram/tools/types';
 
@@ -306,7 +307,7 @@ describe('text markup', () => {
     expect(svg('id')).not.toContain('<line');
     expect(svg('_id_')).toContain('<line');
     expect(svg('_id_')).not.toContain('stroke-dasharray');
-    expect(svg('__nr__')).toContain('stroke-dasharray="4 3"');
+    expect(svg('__nr__')).toMatch(/stroke-dasharray="[\d.]+ [\d.]+"/);
     expect(svg('__nr__')).toContain('>nr</tspan>');
   });
 });
@@ -324,12 +325,19 @@ describe('text size', () => {
     expect(sizesOf({ shape: 'class', text: 'Person' })).toEqual([undefined]);
   });
 
-  it('is the same for figures of the same type and size', () => {
-    const [a, b, c] = sizesOf({ shape: 'ellipse', text: 'Navn' }, { shape: 'ellipse', text: 'Personnummer' }, { shape: 'ellipse', text: 'Navn', w: 240 });
-    expect(a).toBe(b);
-    expect(a).toBeGreaterThan(16);
-    expect(a).toBeLessThan(32);
-    expect(c).toBe(32);
+  it('is as large as each figure has room for, so short texts stay readable', () => {
+    const [short, long] = sizesOf({ shape: 'ellipse', text: 'Navn' }, { shape: 'ellipse', text: 'Personnummer' });
+    expect(short).toBe(32);
+    expect(long).toBeGreaterThan(16);
+    expect(long).toBeLessThan(32);
+  });
+
+  it("follows the drawing's text size, never smaller", () => {
+    let d = addNode(emptyDiagram(), { ...box(0, 0, 'En ganske lang tekst her med mer'), shape: 'box' }).diagram;
+    d = addNode(d, { ...box(200, 0, 'Person'), shape: 'class' }).diagram;
+    const big = { ...d, textSize: 1.5 };
+    expect([...fontSizes(big).values()]).toEqual([24, 24]);
+    expect(toSvgString(shapeFor('class').render(big.nodes[1], 24))).toContain('font-size="24"');
   });
 
   it('draws the text at that size', () => {
@@ -671,5 +679,53 @@ describe('fastened line ends', () => {
     const bad = { ...d, nodes: d.nodes.map((n, i) => (i === 2 ? { ...n, startAt: { node: 'zz', anchor: 1 }, endAt: { node: 'n2', anchor: -1 } } : n)) };
     expect(normalizeDiagram(bad)!.nodes[2]).not.toHaveProperty('startAt');
     expect(normalizeDiagram(bad)!.nodes[2]).not.toHaveProperty('endAt');
+  });
+});
+
+describe('drawing text size', () => {
+  it('steps up and down between the sizes, and stops at the ends', () => {
+    expect(stepTextSize(1, 1)).toBe(1.25);
+    expect(stepTextSize(1.25, -1)).toBe(1);
+    expect(stepTextSize(1, -1)).toBeNull();
+    expect(stepTextSize(2, 1)).toBeNull();
+  });
+
+  it('grows figures around their middle (on the grid) when the text needs room', () => {
+    const node = { id: 'n1', shape: 'ellipse', x: 0, y: 0, w: 160, h: 80, text: '_Personnummer_' };
+    const grown = growForText(node, 1.5, 20);
+    expect(grown.w).toBeGreaterThan(160);
+    expect(grown.x + grown.w / 2).toBe(80);
+    expect(grown.y + grown.h / 2).toBe(40);
+    expect(Number.isInteger(grown.x / 20)).toBe(true);
+    // Short text already fits: unchanged.
+    expect(growForText({ ...node, text: 'Navn' }, 1.5, 20)).toEqual({ ...node, text: 'Navn' });
+  });
+
+  it('is stored in the drawing, and going down keeps the figures', () => {
+    let d = addNode(emptyDiagram(), { ...box(0, 0, 'Personnummer'), shape: 'ellipse' }).diagram;
+    const up = setTextSize(d, 1.5, 20);
+    expect(textScale(up)).toBe(1.5);
+    expect(up.nodes[0].w).toBeGreaterThan(160);
+    const down = setTextSize(up, 1, 20);
+    expect(down.textSize).toBeUndefined();
+    expect(down.nodes).toEqual(up.nodes);
+    expect(parseDiagramSvg(exportSvg(up))?.textSize).toBe(1.5);
+    expect(parseDiagramSvg(exportSvg(d))).not.toHaveProperty('textSize');
+  });
+
+  it('keeps lines that end on a growing figure ending on it', () => {
+    let d = addNode(emptyDiagram(), { ...box(0, 0, 'Personnummer'), shape: 'ellipse' }).diagram;
+    // A loose line (drawn before ends could be fastened) from the ellipse's right middle.
+    d = addNode(d, { ...pathNodeFrom([{ x: 160, y: 40 }, { x: 300, y: 40 }], false), shape: 'path', text: '' }).diagram;
+    const up = setTextSize(d, 1.5, 20);
+    const [ellipse, line] = up.nodes;
+    expect(absolutePoints(line)[0]).toEqual({ x: ellipse.x + ellipse.w, y: 40 });
+    expect(absolutePoints(line)[1]).toEqual({ x: 300, y: 40 });
+  });
+
+  it('makes texts on lines larger too', () => {
+    const svg = (scale: number) => toSvgString(renderEdge({ fromLabel: '1' }, [{ x: 0, y: 0 }, { x: 200, y: 0 }], '#000', {}, scale));
+    expect(svg(1)).toContain('font-size="18"');
+    expect(svg(1.5)).toContain('font-size="27"');
   });
 });

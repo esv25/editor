@@ -6,7 +6,7 @@
  * resolve against the document's folder.
  */
 import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state';
-import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
+import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { getSettings, updateSettings } from '../../settings';
 import { storage } from '../../storage';
@@ -220,12 +220,18 @@ function renderImage(view: EditorView, dest: string): HTMLElement {
     view.requestMeasure();
   });
   img.addEventListener('error', () => fail('Kunne ikke vise bildet'));
-  box.append(img);
   const drawing = drawingPath(dest);
   if (drawing) {
+    // Drawings may be wider than the text column (see `drawingRoom`): the frame centres them.
     box.classList.add('cm-image-drawing');
+    const frame = document.createElement('div');
+    frame.className = 'cm-drawing-frame';
+    frame.append(img);
+    box.append(frame);
     img.title = 'Dobbeltklikk for å redigere tegningen';
-    box.addEventListener('dblclick', () => imageContext.openDrawing?.(drawing));
+    img.addEventListener('dblclick', () => imageContext.openDrawing?.(drawing));
+  } else {
+    box.append(img);
   }
   imageUrl(source).then(
     (url) => (img.src = url),
@@ -312,6 +318,29 @@ function imageField(headers: boolean) {
   });
 }
 
+/**
+ * Drawings are often wide, and squeezed into the text column their text gets
+ * tiny. They may use the editor's whole width instead: `--drawing-room` is
+ * the width inside the content's side padding.
+ */
+const drawingRoom = ViewPlugin.fromClass(
+  class {
+    observer: ResizeObserver;
+    constructor(view: EditorView) {
+      // Reports the size at once and after every change (window, side panel …).
+      this.observer = new ResizeObserver(() => {
+        const style = getComputedStyle(view.contentDOM);
+        const pad = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+        view.scrollDOM.style.setProperty('--drawing-room', `${Math.max(0, view.scrollDOM.clientWidth - pad)}px`);
+      });
+      this.observer.observe(view.scrollDOM);
+    }
+    destroy() {
+      this.observer.disconnect();
+    }
+  },
+);
+
 // One instance each, so reconfiguring (settings changes) keeps the drawn pictures.
 const withHeaders = imageField(true);
 const withMarkup = imageField(false);
@@ -359,7 +388,7 @@ const imageIcon =
 
 export const images: Feature = {
   id: 'images',
-  extension: (settings) => (settings.hideMarkup ? withHeaders : withMarkup),
+  extension: (settings) => [settings.hideMarkup ? withHeaders : withMarkup, drawingRoom],
   commands: [
     {
       id: 'image.insert',

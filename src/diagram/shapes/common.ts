@@ -18,7 +18,7 @@ export const drawingStyle = {
 
 export const lineHeight = drawingStyle.fontSize * drawingStyle.lineHeight;
 
-/** How much larger than `drawingStyle.fontSize` a figure's text may grow when there's room. */
+/** How much larger than the drawing's text size (normally `drawingStyle.fontSize`) a figure's text may grow when there's room. */
 export const MAX_TEXT_SCALE = 2;
 
 /** Width and height of the text's lines at the normal font size. */
@@ -137,7 +137,11 @@ export function textBlock(lines: TextLine[], anchor: 'middle' | 'start', fontSiz
     if (styled.underline && styled.text) {
       const w = measureText(styled.text, bold, styled.italic) * scale;
       const x1 = anchor === 'middle' ? x - w / 2 : x;
-      const uy = y + fontSize * 0.5;
+      // Below the descenders (g, j, p, y reach 0.52em under the middle), so the line never
+      // runs into the letters; thickness and dashes follow the text, so they stay visible
+      // when the drawing is printed small.
+      const uy = y + fontSize * 0.6;
+      const unit = (k: number) => Math.round(fontSize * k * 10) / 10;
       underlines.push(
         h('line', {
           x1,
@@ -145,8 +149,8 @@ export function textBlock(lines: TextLine[], anchor: 'middle' | 'start', fontSiz
           x2: x1 + w,
           y2: uy,
           stroke: drawingStyle.text,
-          'stroke-width': 1.5,
-          'stroke-dasharray': styled.underline === 'dashed' ? '4 3' : undefined,
+          'stroke-width': Math.max(1, unit(0.06)),
+          'stroke-dasharray': styled.underline === 'dashed' ? `${unit(0.45)} ${unit(0.3)}` : undefined,
         }),
       );
     }

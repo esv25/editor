@@ -2,6 +2,7 @@
  * Turns an image source into something an <img> can show. Files on disk are
  * read through the storage layer and cached as blob URLs (per path).
  */
+import { exportSvg, isDiagramPath, parseDiagramSvg } from '../../diagram/fileFormat';
 import { storage } from '../../storage';
 import { imageMime, type ImageSource } from '../util/imagePath';
 
@@ -23,8 +24,9 @@ export function imageUrl(source: ImageSource): Promise<string> {
   if (!url) {
     const read = storage.readBinary;
     if (!read) return Promise.reject(new Error('Bilder fra disk vises bare i skrivebordsappen'));
-    url = read(source.path).then(
-      (bytes) => URL.createObjectURL(new Blob([bytes as Uint8Array<ArrayBuffer>], { type: imageMime(source.path) })),
+    const path = source.path;
+    url = read(path).then(
+      (bytes) => URL.createObjectURL(new Blob([redrawn(path, bytes) ?? (bytes as Uint8Array<ArrayBuffer>)], { type: imageMime(path) })),
       () => {
         throw new Error('Fant ikke bildet');
       },
@@ -33,6 +35,17 @@ export function imageUrl(source: ImageSource): Promise<string> {
     cache.set(key, url);
   }
   return url;
+}
+
+/**
+ * A drawing drawn again from the data in it, so pictures saved by an older
+ * version look like the drawing window shows them now (larger text …).
+ * Null for other images and SVGs that aren't ours.
+ */
+function redrawn(path: string, bytes: Uint8Array): string | null {
+  if (!isDiagramPath(path)) return null;
+  const diagram = parseDiagramSvg(new TextDecoder().decode(bytes));
+  return diagram ? exportSvg(diagram) : null;
 }
 
 export function knownSize(key: string) {

@@ -68,8 +68,8 @@ export function endMark(kind: EndKind, tip: Point, angle: number, color: string)
 }
 
 /** A small text with a paper-coloured backdrop, so it stays readable over lines. */
-function tag(text: string, at: Point): SvgNode {
-  const size = drawingStyle.fontSize + 2;
+function tag(text: string, at: Point, scale: number): SvgNode {
+  const size = Math.round((drawingStyle.fontSize + 2) * scale);
   const lines = text.split('\n');
   const width = Math.max(...lines.map((l) => l.length)) * size * 0.58 + 8;
   const height = lines.length * size * drawingStyle.lineHeight + 4;
@@ -85,10 +85,10 @@ function tag(text: string, at: Point): SvgNode {
 }
 
 /** Where an end text goes: a little along the line from the end, and off to one side. */
-function endTagPosition(end: Point, toward: Point): Point {
+function endTagPosition(end: Point, toward: Point, scale: number): Point {
   const angle = Math.atan2(toward.y - end.y, toward.x - end.x);
-  const along = 26;
-  const side = 16;
+  const along = 26 * scale;
+  const side = 16 * scale;
   return {
     x: end.x + along * Math.cos(angle) + side * Math.sin(angle),
     y: end.y + along * Math.sin(angle) - side * Math.cos(angle),
@@ -96,7 +96,14 @@ function endTagPosition(end: Point, toward: Point): Point {
 }
 
 /** Draw a line through `points` (from `from` to `to`) with the edge's marks and texts. */
-export function renderEdge(edge: Partial<DiagramEdge>, points: Point[], color: string = drawingStyle.stroke, extra: SvgNode['attrs'] = {}): SvgNode {
+export function renderEdge(
+  edge: Partial<DiagramEdge>,
+  points: Point[],
+  color: string = drawingStyle.stroke,
+  extra: SvgNode['attrs'] = {},
+  /** The drawing's text size (its texts grow with it). */
+  textScale = 1,
+): SvgNode {
   const style = styleOf({ id: '', from: '', to: '', ...edge });
   const pts = simplify(points);
   if (pts.length < 2) return h('g', extra, []);
@@ -127,9 +134,9 @@ export function renderEdge(edge: Partial<DiagramEdge>, points: Point[], color: s
     }
   }
   parts.push(...head.marks, ...tail.marks);
-  if (edge.label) parts.push(tag(edge.label, pointAlong(pts, polylineLength(pts) / 2)));
-  if (edge.fromLabel) parts.push(tag(edge.fromLabel, endTagPosition(a, pts[1])));
-  if (edge.toLabel) parts.push(tag(edge.toLabel, endTagPosition(b, pts[pts.length - 2])));
+  if (edge.label) parts.push(tag(edge.label, pointAlong(pts, polylineLength(pts) / 2), textScale));
+  if (edge.fromLabel) parts.push(tag(edge.fromLabel, endTagPosition(a, pts[1], textScale), textScale));
+  if (edge.toLabel) parts.push(tag(edge.toLabel, endTagPosition(b, pts[pts.length - 2], textScale), textScale));
   return h('g', extra, parts);
 }
 

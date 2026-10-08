@@ -95,6 +95,8 @@ export interface Diagram {
   version: 1;
   nodes: DiagramNode[];
   edges: DiagramEdge[];
+  /** Text in the whole drawing this many times the normal size (see textSize.ts; unset = 1). */
+  textSize?: number;
 }
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -366,5 +368,6 @@ export function normalizeDiagram(value: unknown): Diagram | null {
         toLabel: str(e.toLabel),
       }),
     );
-  return { version: 1, nodes, edges };
+  const textSize = num(v.textSize, 1);
+  return { version: 1, nodes, edges, ...(textSize > 1 && textSize <= 4 ? { textSize } : {}) };
 }

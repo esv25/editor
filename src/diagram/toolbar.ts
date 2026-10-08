@@ -4,6 +4,7 @@
  */
 import type { DiagramCanvas } from './canvas';
 import { shapeIcon } from './shapes/common';
+import { stepTextSize } from './textSize';
 import { toolKey, tools } from './tools';
 
 export interface Toolbar {
@@ -16,6 +17,8 @@ const icons = {
   redo: shapeIcon('<path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>'),
   delete: shapeIcon('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'),
   fit: shapeIcon('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'),
+  textSmaller: shapeIcon('<path d="M4 18 9 6l5 12M5.7 14h6.6M16 12h5"/>'),
+  textLarger: shapeIcon('<path d="M4 18 9 6l5 12M5.7 14h6.6M16 12h5M18.5 9.5v5"/>'),
 };
 
 export function renderToolbar(
@@ -63,6 +66,17 @@ export function renderToolbar(
   button(zoomGroup, '+', 'Zoom inn (+)', null, () => canvas.zoomBy(1.25));
   button(zoomGroup, 'Vis alt', 'Hele tegningen i bildet (Home)', icons.fit, () => canvas.zoomToFit());
 
+  // The drawing's text size: drawings are often shown small (in notes, on paper).
+  const textGroup = group();
+  const smaller = button(textGroup, 'Mindre tekst', 'Mindre tekst i hele tegningen', icons.textSmaller, () => canvas.stepTextSize(-1));
+  const larger = button(
+    textGroup,
+    'Større tekst',
+    'Større tekst i hele tegningen (figurene vokser der teksten trenger plass)',
+    icons.textLarger,
+    () => canvas.stepTextSize(1),
+  );
+
   const right = group();
   right.classList.add('dg-right');
   const status = document.createElement('span');
@@ -85,6 +99,11 @@ export function renderToolbar(
       }
       deleteButton.disabled = !canvas.selection.length;
       zoomLabel.querySelector('span')!.textContent = `${canvas.zoomPercent} %`;
+      const textPercent = `Tekst nå: ${Math.round(canvas.textScale * 100)} %`;
+      smaller.disabled = stepTextSize(canvas.textScale, -1) === null;
+      larger.disabled = stepTextSize(canvas.textScale, 1) === null;
+      smaller.title = `Mindre tekst i hele tegningen (${textPercent})`;
+      larger.title = `Større tekst i hele tegningen – figurene vokser der teksten trenger plass (${textPercent})`;
       saveButton.hidden = !actions.canSaveAs();
       hint.textContent = canvas.hint;
     },

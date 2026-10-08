@@ -81,6 +81,24 @@ export function followAnchors(d: Diagram): Diagram {
 }
 
 /**
+ * Fasten the loose ends of lines that sit on a snap point anyway (lines drawn
+ * before ends could be fastened), so they follow when figures change size.
+ */
+export function fastenLooseEnds(d: Diagram): Diagram {
+  let changed = false;
+  const nodes = d.nodes.map((n) => {
+    if (!isOpenLine(n) || (n.startAt && n.endAt)) return n;
+    const points = absolutePoints(n);
+    const startAt = n.startAt ?? anchorAt(d, n.id, points[0]);
+    const endAt = n.endAt ?? anchorAt(d, n.id, points[points.length - 1]);
+    if (startAt === n.startAt && endAt === n.endAt) return n;
+    changed = true;
+    return { ...n, ...(startAt ? { startAt } : {}), ...(endAt ? { endAt } : {}) };
+  });
+  return changed ? { ...d, nodes } : d;
+}
+
+/**
  * `next` after a change from `prev` (already settled): lines that were drawn,
  * moved or resized themselves are fastened to the snap points their ends now
  * sit on; then every fastened end follows its figure.

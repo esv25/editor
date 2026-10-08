@@ -27,8 +27,8 @@ export interface ShapeType {
   multiline?: boolean;
   /** Grey example text in the empty text field. */
   placeholder?: string;
-  /** The size the text needs (default: centred lines plus padding). */
-  fit?(text: string, measure: Measure): { w: number; h: number };
+  /** The size the text needs (default: centred lines plus padding); `scale`: the drawing's text size. */
+  fit?(text: string, measure: Measure, scale?: number): { w: number; h: number };
   /**
    * How many times larger a text block of w×h (at the normal font size) could
    * be drawn and still fit inside the figure. Without it the text keeps its size.
