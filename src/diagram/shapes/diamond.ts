@@ -19,13 +19,18 @@ export const diamond: ShapeType = {
   icon: shapeIcon('<path d="M12 4 21 12 12 20 3 12z"/>'),
   key: 'r',
   defaultSize: { w: 160, h: 100 },
-  render: (node) =>
+  render: (node, fontSize) =>
     h('g', {}, [
       h('polygon', { points: corners(node), 'stroke-linejoin': 'round', ...outline(node) }),
       ...(node.double ? [h('polygon', { points: corners(node, DOUBLE_GAP), 'stroke-linejoin': 'round', ...innerOutline(node) })] : []),
-      ...label(node),
+      ...label(node, fontSize),
     ]),
   anchors: sideAnchors,
+  // The corners of the text block (plus a margin) on the sides of the rhombus.
+  textRoom: (node, w, h) => {
+    const inset = node.double ? 4 * DOUBLE_GAP : 0;
+    return 1 / ((w + 8) / (node.w - inset) + (h * 0.8) / (node.h - inset));
+  },
   boundary: (node, p) => {
     const c = center(node);
     const dx = p.x - c.x;

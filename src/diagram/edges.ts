@@ -69,7 +69,7 @@ export function endMark(kind: EndKind, tip: Point, angle: number, color: string)
 
 /** A small text with a paper-coloured backdrop, so it stays readable over lines. */
 function tag(text: string, at: Point): SvgNode {
-  const size = drawingStyle.fontSize - 2;
+  const size = drawingStyle.fontSize + 2;
   const lines = text.split('\n');
   const width = Math.max(...lines.map((l) => l.length)) * size * 0.58 + 8;
   const height = lines.length * size * drawingStyle.lineHeight + 4;
@@ -88,7 +88,7 @@ function tag(text: string, at: Point): SvgNode {
 function endTagPosition(end: Point, toward: Point): Point {
   const angle = Math.atan2(toward.y - end.y, toward.x - end.x);
   const along = 26;
-  const side = 14;
+  const side = 16;
   return {
     x: end.x + along * Math.cos(angle) + side * Math.sin(angle),
     y: end.y + along * Math.sin(angle) - side * Math.cos(angle),

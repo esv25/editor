@@ -25,7 +25,7 @@ import {
   type Direction,
   type Point,
 } from './model';
-import { edgePoints, renderDiagram } from './render';
+import { edgePoints, fontSizes, renderDiagram } from './render';
 import { pointAlong, polylineLength } from './routing';
 import { shapeFor, type Measure } from './shapes';
 import { drawingStyle, lineHeight, measureText, styledLine } from './shapes/common';
@@ -71,6 +71,7 @@ export class DiagramCanvas {
   private editing: {
     textarea: HTMLTextAreaElement;
     place: () => { x: number; y: number; w: number; h: number } | null;
+    fontSize?: () => number | undefined;
     multiline: boolean;
     finish: (save: boolean) => void;
   } | null = null;
@@ -340,6 +341,7 @@ export class DiagramCanvas {
       placeholder: shape.placeholder ?? '',
       align: shape.multiline ? 'left' : 'center',
       place: () => findNode(this.diagram, nodeId) ?? null,
+      fontSize: () => fontSizes(this.diagram).get(nodeId),
       save: (text) => {
         const current = findNode(this.diagram, nodeId);
         if (current) this.commit(updateNode(this.diagram, nodeId, { text, ...this.fitText(current, text) }));
@@ -373,6 +375,8 @@ export class DiagramCanvas {
     placeholder: string;
     align: 'left' | 'center';
     place: () => { x: number; y: number; w: number; h: number } | null;
+    /** The text's size in the drawing (default: the normal size). */
+    fontSize?: () => number | undefined;
     save: (text: string) => void;
   }): void {
     this.finishEditing(true);
@@ -402,7 +406,7 @@ export class DiagramCanvas {
       }
     });
     textarea.addEventListener('blur', () => finish(true));
-    this.editing = { textarea, place: field.place, multiline: field.multiline, finish };
+    this.editing = { textarea, place: field.place, fontSize: field.fontSize, multiline: field.multiline, finish };
     this.positionTextarea();
     textarea.focus();
     textarea.select();
@@ -423,7 +427,7 @@ export class DiagramCanvas {
       width: `${rect.w * this.zoom}px`,
       // Room to type more lines in a class.
       height: `${Math.max(rect.h, this.editing.multiline ? 160 : 0) * this.zoom}px`,
-      fontSize: `${drawingStyle.fontSize * this.zoom}px`,
+      fontSize: `${(this.editing.fontSize?.() ?? drawingStyle.fontSize) * this.zoom}px`,
     });
   }
 
