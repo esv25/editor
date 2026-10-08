@@ -17,10 +17,31 @@ describe('parseDocument', () => {
           { t: 'strong', children: [{ t: 'text', text: 'fet' }] },
           { t: 'text', text: ' og ' },
           { t: 'code', text: 'kode' },
-          { t: 'text', text: ' som fortsetter.' },
+          { t: 'break' },
+          { t: 'text', text: 'som fortsetter.' },
         ],
       },
     ]);
+  });
+
+  it('keeps single line breaks inside paragraphs, lists and quotes', () => {
+    expect(parseDocument('Menneske(A, B)  \nNøkkel: {A}\nFremmed: (B)')).toEqual([
+      {
+        t: 'para',
+        children: [
+          { t: 'text', text: 'Menneske(A, B)' },
+          { t: 'break' },
+          { t: 'text', text: 'Nøkkel: {A}' },
+          { t: 'break' },
+          { t: 'text', text: 'Fremmed: (B)' },
+        ],
+      },
+    ]);
+    const [list] = parseDocument('- en\n  to');
+    expect(list).toMatchObject({ t: 'list', items: [{ blocks: [{ t: 'para', children: [{ text: 'en' }, { t: 'break' }, { text: 'to' }] }] }] });
+    const [quote] = parseDocument('> en\n> to');
+    expect(quote).toMatchObject({ t: 'quote', blocks: [{ t: 'para', children: [{ text: 'en' }, { t: 'break' }, { text: 'to' }] }] });
+    expect(parseDocument('Tittel\n===')).toEqual([{ t: 'heading', level: 1, children: [{ t: 'text', text: 'Tittel' }] }]);
   });
 
   it('reads math, links, images, escapes and entities', () => {
