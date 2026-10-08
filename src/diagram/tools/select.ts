@@ -3,16 +3,20 @@
  * figure moves together), drag the corner handle of a lone figure to resize
  * it (all snap to the grid). A press only becomes a drag after the pointer
  * has moved a little (`settings.diagram.dragThreshold`), so a shaky click
- * never moves anything. Esc while dragging puts things back.
+ * never moves anything. Edges and middles line up with other figures' when
+ * close (align.ts; a group lines up as one box). Esc while dragging puts
+ * things back.
  *
  * - Velg: a click selects just that; Shift/Ctrl+click adds or takes away;
  *   dragging empty space moves the view (Shift/Ctrl+drag: mark an area).
  * - Marker: every click adds or takes away (no keys to hold), and dragging
  *   empty space marks everything the rectangle touches.
  */
-import { edgesBetween, findNode, moveNodes, nodesInRect, snap, updateNode, type Point } from '../model';
+import { alignMove, alignResize, guidesFor, type Box } from '../align';
+import { edgesBetween, findNode, moveNodes, nodesInRect, updateNode, type Diagram, type Point } from '../model';
 import { h } from '../svg';
 import { shapeIcon } from '../shapes/common';
+import { guideMarks } from './preview';
 import { sameItem, type PointerKeys, type Selection, type Tool, type ToolContext } from './types';
 
 type Mode =
@@ -35,6 +39,18 @@ const toggle = (ctx: ToolContext, item: Selection) =>
   ctx.select(has(ctx.selection, item) ? ctx.selection.filter((s) => !sameItem(s, item)) : [...ctx.selection, item]);
 
 const selectedNodeIds = (ctx: ToolContext) => ctx.selection.filter((s) => s.kind === 'node').map((s) => s.id);
+
+/** The box around these figures (what lines up when they're dragged together). */
+function boxOf(d: Diagram, ids: string[]): Box | null {
+  const nodes = d.nodes.filter((n) => ids.includes(n.id));
+  if (!nodes.length) return null;
+  const x = Math.min(...nodes.map((n) => n.x));
+  const y = Math.min(...nodes.map((n) => n.y));
+  return { x, y, w: Math.max(...nodes.map((n) => n.x + n.w)) - x, h: Math.max(...nodes.map((n) => n.y + n.h)) - y };
+}
+
+/** The drawing without these figures: what the moving ones line up with. */
+const without = (d: Diagram, ids: string[]): Diagram => ({ ...d, nodes: d.nodes.filter((n) => !ids.includes(n.id)) });
 
 /** The bottom-right corner of the selected figure (only when it's alone), if `p` is on it. */
 function onHandle(ctx: ToolContext, p: Point): string | null {
@@ -61,23 +77,20 @@ function selectionHint(ctx: ToolContext, marking: boolean): string | null {
 function makeSelectTool(tool: { id: string; name: string; key: string; icon: string; marking: boolean }): Tool {
   let mode: Mode = { kind: 'idle' };
 
-  /** The drawing with the drag so far applied, or null if nothing has moved. */
-  const change = (ctx: ToolContext, p: Point) => {
+  /** The drawing with the drag so far applied and the box that moved (for guides), or null if nothing has moved. */
+  const change = (ctx: ToolContext, p: Point): { diagram: Diagram; box: Box; ignore: string[] } | null => {
+    const options = { grid: ctx.grid, tolerance: ctx.alignTolerance };
     if (mode.kind === 'move' && mode.dragging) {
-      const grabbed = findNode(ctx.diagram, mode.grab);
-      if (!grabbed) return null;
-      const dx = snap(p.x - mode.dx, ctx.grid) - grabbed.x;
-      const dy = snap(p.y - mode.dy, ctx.grid) - grabbed.y;
-      return moveNodes(ctx.diagram, mode.ids, dx, dy);
+      const box = boxOf(ctx.diagram, mode.ids);
+      if (!box) return null;
+      const to = alignMove(without(ctx.diagram, mode.ids), { ...box, x: p.x - mode.dx, y: p.y - mode.dy }, options);
+      return { diagram: moveNodes(ctx.diagram, mode.ids, to.x - box.x, to.y - box.y), box: { ...box, ...to }, ignore: mode.ids };
     }
     if (mode.kind === 'resize' && mode.dragging) {
       const node = findNode(ctx.diagram, mode.id);
       if (!node) return null;
-      const min = ctx.grid * 2;
-      return updateNode(ctx.diagram, mode.id, {
-        w: Math.max(min, snap(p.x - node.x, ctx.grid)),
-        h: Math.max(min, snap(p.y - node.y, ctx.grid)),
-      });
+      const size = alignResize(ctx.diagram, node, p, { ...options, ignore: node.id, min: ctx.grid * 2 });
+      return { diagram: updateNode(ctx.diagram, mode.id, size), box: { ...node, ...size }, ignore: [node.id] };
     }
     return null;
   };
@@ -95,9 +108,10 @@ function makeSelectTool(tool: { id: string; name: string; key: string; icon: str
   };
 
   const startMove = (ctx: ToolContext, p: Point, grab: string, onClick?: () => void) => {
-    const node = findNode(ctx.diagram, grab)!;
-    const ids = selectedNodeIds(ctx);
-    mode = { kind: 'move', grab, ids: ids.includes(grab) ? ids : [grab], start: p, dx: p.x - node.x, dy: p.y - node.y, dragging: false, onClick };
+    const selected = selectedNodeIds(ctx);
+    const ids = selected.includes(grab) ? selected : [grab];
+    const box = boxOf(ctx.diagram, ids)!;
+    mode = { kind: 'move', grab, ids, start: p, dx: p.x - box.x, dy: p.y - box.y, dragging: false, onClick };
   };
 
   return {
@@ -108,7 +122,7 @@ function makeSelectTool(tool: { id: string; name: string; key: string; icon: str
 
     hint(ctx) {
       if (mode.kind === 'move' && mode.dragging) {
-        return `Slipp der ${mode.ids.length > 1 ? 'figurene' : 'figuren'} skal stå (nær kanten ruller visningen) · Esc: avbryt`;
+        return `Slipp der ${mode.ids.length > 1 ? 'figurene' : 'figuren'} skal stå – en strek viser når den står på linje med en annen · nær kanten ruller visningen · Esc: avbryt`;
       }
       if (mode.kind === 'resize' && mode.dragging) return 'Slipp der hjørnet skal være · Esc: avbryt';
       if (mode.kind === 'pan' && mode.dragging) return 'Dra for å flytte visningen · slipp når du ser det du vil';
@@ -184,7 +198,7 @@ function makeSelectTool(tool: { id: string; name: string; key: string; icon: str
       const done = change(ctx, p);
       const click = mode.kind === 'move' && !mode.dragging ? mode.onClick : undefined;
       mode = { kind: 'idle' };
-      if (done) ctx.commit(done);
+      if (done) ctx.commit(done.diagram);
       else if (click) click();
       else ctx.refresh();
     },
@@ -199,7 +213,9 @@ function makeSelectTool(tool: { id: string; name: string; key: string; icon: str
         return { noHover: true, overlay: [h('rect', { ...rect, class: 'dg-area' })] };
       }
       const done = change(ctx, pointer);
-      return done ? { diagram: done, noHover: true } : {};
+      if (!done) return {};
+      const guides = guidesFor(without(done.diagram, done.ignore), done.box);
+      return { diagram: done.diagram, noHover: true, overlay: guideMarks(guides, ctx.handleSize) };
     },
 
     cancel(ctx) {

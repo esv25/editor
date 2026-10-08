@@ -11,16 +11,21 @@ export const ellipse: ShapeType = {
   icon: shapeIcon('<ellipse cx="12" cy="12" rx="9" ry="6.5"/>'),
   key: 'e',
   defaultSize: { w: 160, h: 80 },
-  render: (node) => {
+  render: (node, fontSize) => {
     const c = center(node);
     const g = DOUBLE_GAP;
     return h('g', {}, [
       h('ellipse', { cx: c.x, cy: c.y, rx: node.w / 2, ry: node.h / 2, ...outline(node) }),
       ...(node.double ? [h('ellipse', { cx: c.x, cy: c.y, rx: node.w / 2 - g, ry: node.h / 2 - g, ...innerOutline(node) })] : []),
-      ...label(node),
+      ...label(node, fontSize),
     ]);
   },
   anchors: sideAnchors,
+  // The corners of the text block (plus a margin) on the ellipse.
+  textRoom: (node, w, h) => {
+    const inset = node.double ? 2 * DOUBLE_GAP : 0;
+    return 1 / Math.hypot((w + 8) / (node.w - inset), (h * 0.8) / (node.h - inset));
+  },
   boundary: (node, p) => {
     const c = center(node);
     const dx = p.x - c.x;

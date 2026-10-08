@@ -4,6 +4,7 @@
  * a click means; figures (shapes/) decide how things look.
  */
 import { getSettings } from '../settings';
+import { anchorsOf, fastenedEnds, settleAnchors } from './attach';
 import { History } from './history';
 import {
   addNeighbor,
@@ -25,9 +26,10 @@ import {
   type Direction,
   type Point,
 } from './model';
-import { edgeEnds, renderDiagram } from './render';
+import { edgePoints, fontSizes, renderDiagram } from './render';
+import { pointAlong, polylineLength } from './routing';
 import { shapeFor, type Measure } from './shapes';
-import { drawingStyle, lineHeight, measureText, rectAnchors, styledLine } from './shapes/common';
+import { drawingStyle, lineHeight, measureText, styledLine } from './shapes/common';
 import { h, toDom, type SvgNode } from './svg';
 import { arrowSource, newEdgeStyle } from './tools/arrow';
 import { isSelectingTool, markTool, selectTool } from './tools/select';
@@ -71,6 +73,7 @@ export class DiagramCanvas {
   private editing: {
     textarea: HTMLTextAreaElement;
     place: () => { x: number; y: number; w: number; h: number } | null;
+    fontSize?: () => number | undefined;
     multiline: boolean;
     finish: (save: boolean) => void;
   } | null = null;
@@ -157,6 +160,9 @@ export class DiagramCanvas {
       get dragThreshold() {
         return getSettings().diagram.dragThreshold / canvas.zoom;
       },
+      get alignTolerance() {
+        return getSettings().diagram.alignTolerance / canvas.zoom;
+      },
       get handleSize() {
         return 14 / canvas.zoom;
       },
@@ -182,6 +188,8 @@ export class DiagramCanvas {
 
   commit(next: Diagram): void {
     if (next === this.diagram) return;
+    // Lines fastened to a figure follow it; a line that was drawn or moved fastens to what its ends now touch.
+    next = settleAnchors(this.diagram, next);
     this.history.record(this.diagram);
     this.diagram = next;
     this.changed();
@@ -274,9 +282,10 @@ export class DiagramCanvas {
     let best: DiagramEdge | null = null;
     let bestDistance = Infinity;
     for (const edge of this.diagram.edges) {
-      const ends = edgeEnds(this.diagram, edge);
-      if (!ends) continue;
-      const distance = distanceToSegment(p, ends.a, ends.b);
+      const points = edgePoints(this.diagram, edge);
+      if (!points) continue;
+      let distance = Infinity;
+      for (let i = 1; i < points.length; i++) distance = Math.min(distance, distanceToSegment(p, points[i - 1], points[i]));
       if (distance <= reach && distance < bestDistance) {
         best = edge;
         bestDistance = distance;
@@ -297,7 +306,7 @@ export class DiagramCanvas {
     let best: Point | null = null;
     let bestDistance = Infinity;
     for (const n of this.diagram.nodes) {
-      for (const a of shapeFor(n.shape).anchors?.(n) ?? rectAnchors(n)) {
+      for (const a of anchorsOf(n)) {
         const distance = Math.hypot(a.x - p.x, a.y - p.y);
         if (distance <= reach && distance < bestDistance) {
           best = a;
@@ -355,6 +364,7 @@ export class DiagramCanvas {
       placeholder: shape.placeholder ?? '',
       align: shape.multiline ? 'left' : 'center',
       place: () => findNode(this.diagram, nodeId) ?? null,
+      fontSize: () => fontSizes(this.diagram).get(nodeId),
       save: (text) => {
         const current = findNode(this.diagram, nodeId);
         if (current) this.commit(updateNode(this.diagram, nodeId, { text, ...this.fitText(current, text) }));
@@ -373,9 +383,9 @@ export class DiagramCanvas {
       align: 'center',
       place: () => {
         const current = this.diagram.edges.find((e) => e.id === edgeId);
-        const ends = current && edgeEnds(this.diagram, current);
-        if (!ends) return null;
-        const mid = { x: (ends.a.x + ends.b.x) / 2, y: (ends.a.y + ends.b.y) / 2 };
+        const points = current && edgePoints(this.diagram, current);
+        if (!points) return null;
+        const mid = pointAlong(points, polylineLength(points) / 2);
         return { x: mid.x - 90, y: mid.y - 20, w: 180, h: 40 };
       },
       save: (label) => this.commit(updateEdge(this.diagram, edgeId, { label: label.trim() || undefined })),
@@ -388,6 +398,8 @@ export class DiagramCanvas {
     placeholder: string;
     align: 'left' | 'center';
     place: () => { x: number; y: number; w: number; h: number } | null;
+    /** The text's size in the drawing (default: the normal size). */
+    fontSize?: () => number | undefined;
     save: (text: string) => void;
   }): void {
     this.finishEditing(true);
@@ -417,7 +429,7 @@ export class DiagramCanvas {
       }
     });
     textarea.addEventListener('blur', () => finish(true));
-    this.editing = { textarea, place: field.place, multiline: field.multiline, finish };
+    this.editing = { textarea, place: field.place, fontSize: field.fontSize, multiline: field.multiline, finish };
     this.positionTextarea();
     textarea.focus();
     textarea.select();
@@ -438,7 +450,7 @@ export class DiagramCanvas {
       width: `${rect.w * this.zoom}px`,
       // Room to type more lines in a class.
       height: `${Math.max(rect.h, this.editing.multiline ? 160 : 0) * this.zoom}px`,
-      fontSize: `${drawingStyle.fontSize * this.zoom}px`,
+      fontSize: `${(this.editing.fontSize?.() ?? drawingStyle.fontSize) * this.zoom}px`,
     });
   }
 
@@ -675,7 +687,8 @@ export class DiagramCanvas {
 
   private draw(): void {
     const preview = this.tool.preview?.(this.context, this.pointer) ?? {};
-    const d = preview.diagram ?? this.diagram;
+    // While dragging, fastened lines follow along just as they will when it's dropped.
+    const d = preview.diagram ? settleAnchors(this.diagram, preview.diagram) : this.diagram;
     this.content.replaceChildren(...renderDiagram(d).map(toDom));
 
     const marks: SvgNode[] = [];
@@ -686,8 +699,8 @@ export class DiagramCanvas {
       return n;
     };
     const line = (edge: DiagramEdge, cls: string) => {
-      const ends = edgeEnds(d, edge);
-      if (ends) marks.push(h('line', { x1: ends.a.x, y1: ends.a.y, x2: ends.b.x, y2: ends.b.y, class: cls }));
+      const points = edgePoints(d, edge);
+      if (points) marks.push(h('polyline', { points: points.map((p) => `${p.x},${p.y}`).join(' '), fill: 'none', class: cls }));
     };
 
     if (!preview.noHover && this.pointer && !this.editing) {
@@ -701,7 +714,9 @@ export class DiagramCanvas {
     const source = this.tool.id === 'arrow' ? arrowSource() : null;
     if (source) outline(source, 'dg-source');
     for (const sel of this.selection) {
-      if (sel.kind === 'node') outline(sel.id, 'dg-selection');
+      const n = sel.kind === 'node' ? outline(sel.id, 'dg-selection') : undefined;
+      // A selected line's fastened ends: they follow the figure they're on.
+      for (const p of n ? fastenedEnds(n) : []) marks.push(h('circle', { cx: p.x, cy: p.y, r: 6 / this.zoom, class: 'dg-fastened' }));
       const edge = sel.kind === 'edge' && d.edges.find((e) => e.id === sel.id);
       if (edge) line(edge, 'dg-selection-edge');
     }

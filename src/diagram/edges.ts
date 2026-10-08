@@ -1,9 +1,10 @@
 /**
  * Lines between figures: their end marks (arrow heads, UML triangles and
- * diamonds), dashes, double lines, and texts at the ends and in the middle. The presets
+ * diamonds), corners, dashes, double lines, and texts at the ends and in the middle. The presets
  * are the one-click choices in the properties bar.
  */
 import { styleOf, type DiagramEdge, type EdgeStyle, type EndKind, type Point } from './model';
+import { offsetPolyline, pointAlong, polylineLength, simplify, trim } from './routing';
 import { DOUBLE_GAP, drawingStyle } from './shapes/common';
 import { h, type SvgNode } from './svg';
 
@@ -68,7 +69,7 @@ export function endMark(kind: EndKind, tip: Point, angle: number, color: string)
 
 /** A small text with a paper-coloured backdrop, so it stays readable over lines. */
 function tag(text: string, at: Point): SvgNode {
-  const size = drawingStyle.fontSize - 2;
+  const size = drawingStyle.fontSize + 2;
   const lines = text.split('\n');
   const width = Math.max(...lines.map((l) => l.length)) * size * 0.58 + 8;
   const height = lines.length * size * drawingStyle.lineHeight + 4;
@@ -87,52 +88,54 @@ function tag(text: string, at: Point): SvgNode {
 function endTagPosition(end: Point, toward: Point): Point {
   const angle = Math.atan2(toward.y - end.y, toward.x - end.x);
   const along = 26;
-  const side = 14;
+  const side = 16;
   return {
     x: end.x + along * Math.cos(angle) + side * Math.sin(angle),
     y: end.y + along * Math.sin(angle) - side * Math.cos(angle),
   };
 }
 
-/** Draw a line from a (at `from`) to b (at `to`) with the edge's marks and texts. */
-export function renderEdge(edge: Partial<DiagramEdge>, a: Point, b: Point, color: string = drawingStyle.stroke, extra: SvgNode['attrs'] = {}): SvgNode {
+/** Draw a line through `points` (from `from` to `to`) with the edge's marks and texts. */
+export function renderEdge(edge: Partial<DiagramEdge>, points: Point[], color: string = drawingStyle.stroke, extra: SvgNode['attrs'] = {}): SvgNode {
   const style = styleOf({ id: '', from: '', to: '', ...edge });
-  const angle = Math.atan2(b.y - a.y, b.x - a.x);
-  const head = endMark(style.head, b, angle, color);
-  const tail = endMark(style.tail, a, angle + Math.PI, color);
-  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  const pts = simplify(points);
+  if (pts.length < 2) return h('g', extra, []);
+  const [a, b] = [pts[0], pts[pts.length - 1]];
+  const direction = (from: Point, to: Point) => Math.atan2(to.y - from.y, to.x - from.x);
+  // Each end mark points along the piece of line it sits on.
+  const head = endMark(style.head, b, direction(pts[pts.length - 2], b), color);
+  const tail = endMark(style.tail, a, direction(pts[1], a), color);
   const parts: SvgNode[] = [];
-  if (length > head.inset + tail.inset) {
-    const start = { x: a.x + tail.inset * Math.cos(angle), y: a.y + tail.inset * Math.sin(angle) };
-    const end = { x: b.x - head.inset * Math.cos(angle), y: b.y - head.inset * Math.sin(angle) };
+  const line = trim(pts, tail.inset, head.inset);
+  if (line) {
+    const stroke = {
+      stroke: color,
+      'stroke-width': drawingStyle.strokeWidth,
+      'stroke-linecap': style.dashed || style.double ? 'butt' : 'round',
+      'stroke-linejoin': style.double ? 'miter' : 'round',
+      'stroke-dasharray': style.dashed ? '8 6' : undefined,
+    };
     // A double line is two lines, half the gap to each side of the middle.
     const offsets = style.double ? [-DOUBLE_GAP / 2, DOUBLE_GAP / 2] : [0];
     for (const offset of offsets) {
-      const [dx, dy] = [-offset * Math.sin(angle), offset * Math.cos(angle)];
+      const [p, q, ...more] = offset ? offsetPolyline(line, offset) : line;
       parts.push(
-        h('line', {
-          x1: start.x + dx,
-          y1: start.y + dy,
-          x2: end.x + dx,
-          y2: end.y + dy,
-          stroke: color,
-          'stroke-width': drawingStyle.strokeWidth,
-          'stroke-linecap': style.dashed || style.double ? 'butt' : 'round',
-          'stroke-dasharray': style.dashed ? '8 6' : undefined,
-        }),
+        more.length
+          ? h('polyline', { points: [p, q, ...more].map((r) => `${r.x},${r.y}`).join(' '), fill: 'none', ...stroke })
+          : h('line', { x1: p.x, y1: p.y, x2: q.x, y2: q.y, ...stroke }),
       );
     }
   }
   parts.push(...head.marks, ...tail.marks);
-  if (edge.label) parts.push(tag(edge.label, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }));
-  if (edge.fromLabel) parts.push(tag(edge.fromLabel, endTagPosition(a, b)));
-  if (edge.toLabel) parts.push(tag(edge.toLabel, endTagPosition(b, a)));
+  if (edge.label) parts.push(tag(edge.label, pointAlong(pts, polylineLength(pts) / 2)));
+  if (edge.fromLabel) parts.push(tag(edge.fromLabel, endTagPosition(a, pts[1])));
+  if (edge.toLabel) parts.push(tag(edge.toLabel, endTagPosition(b, pts[pts.length - 2])));
   return h('g', extra, parts);
 }
 
 /** A small picture of a preset, for its button. */
 export function presetIcon(style: EdgeStyle): SvgNode {
   return h('svg', { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 56 20', width: 42, height: 15 }, [
-    renderEdge(style, { x: 3, y: 10 }, { x: 53, y: 10 }, 'currentColor'),
+    renderEdge(style, [{ x: 3, y: 10 }, { x: 53, y: 10 }], 'currentColor'),
   ]);
 }

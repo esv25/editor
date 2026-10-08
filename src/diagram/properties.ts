@@ -1,12 +1,13 @@
 /**
  * The properties panel on the right: one-click choices for what's
- * selected (line type, texts at the ends, double/dashed outline …), or for
+ * selected (line type, corners, texts at the ends, double/dashed outline …), or for
  * new lines while the Pil tool is on. Everything is a button or a text field
  * – nothing needs precise pointing.
  */
 import type { DiagramCanvas } from './canvas';
 import { edgePresets, presetIcon, sameStyle } from './edges';
 import { styleOf, type EdgeStyle } from './model';
+import type { Route } from './routing';
 import { setUnderline, shapeIcon, textUnderline, type Underline } from './shapes/common';
 import { toSvgString } from './svg';
 import { newEdgeStyle, setNewEdgeStyle } from './tools/arrow';
@@ -76,9 +77,9 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
     bar.append(el);
   };
 
-  /** The line types, then «Dobbel linje» (kept when the type changes). */
+  /** The line types, then «Dobbel linje» (it and the corners are kept when the type changes). */
   const presetButtons = (current: () => EdgeStyle, choose: (style: EdgeStyle) => void) => {
-    const withDouble = (style: EdgeStyle, double: boolean): EdgeStyle => ({ ...style, double: double || undefined });
+    const withDouble = (style: EdgeStyle, double: boolean): EdgeStyle => ({ ...style, double: double || undefined, route: current().route });
     for (const preset of edgePresets) {
       button(preset.name, preset.title, () => choose(withDouble(preset.style, !!current().double)), () => sameStyle(current(), preset.style), toSvgString(presetIcon(preset.style)));
     }
@@ -89,6 +90,19 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
       () => !!current().double,
       toSvgString(presetIcon({ head: 'none', tail: 'none', dashed: false, double: true })),
     );
+  };
+
+  /** Straight (may slant) or with a corner: sideways first, or up/down first. */
+  const routeButtons = (current: () => Route | undefined, choose: (route: Route | undefined) => void) => {
+    heading('Hjørner');
+    const choices: [Route | undefined, string, string, string][] = [
+      [undefined, 'Rett', 'Rett strek, på skrå om den må', '<path d="M5 19 19 5"/>'],
+      ['hv', 'Sidelengs først', 'Først til høyre eller venstre, så opp eller ned – aldri på skrå', '<path d="M5 19h14V5"/>'],
+      ['vh', 'Opp/ned først', 'Først opp eller ned, så til høyre eller venstre – aldri på skrå', '<path d="M5 19V5h14"/>'],
+    ];
+    for (const [route, label, title, icon] of choices) {
+      button(label, title, () => choose(route), () => current() === route, shapeIcon(icon));
+    }
   };
 
   function build(): void {
@@ -107,6 +121,13 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
         },
       );
       button('Snu', 'Snu linja (start og slutt bytter plass)', () => canvas.reverseSelectedEdge());
+      routeButtons(
+        () => canvas.selectedEdge?.route,
+        (route) => {
+          setNewEdgeStyle({ ...newEdgeStyle(), route });
+          canvas.updateSelectedEdge({ route });
+        },
+      );
       heading('Tekst');
       field('Ved start', 'f.eks. 1', () => canvas.selectedEdge?.fromLabel ?? '', (v) => canvas.updateSelectedEdge({ fromLabel: v || undefined }));
       field('Midt på', 'tekst', () => canvas.selectedEdge?.label ?? '', (v) => canvas.updateSelectedEdge({ label: v || undefined }));
@@ -121,7 +142,14 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
         setNewLineStyle(style);
         refresh();
       });
-      tip('Nær et hjørne eller et midtpunkt på en figur hekter streken seg fast der (en ring viser det).');
+      routeButtons(
+        () => newLineStyle().route,
+        (route) => {
+          setNewLineStyle({ ...newLineStyle(), route });
+          refresh();
+        },
+      );
+      tip('Nær et hjørne eller et midtpunkt på en figur hekter streken seg fast der (en ring viser det), og følger med når figuren flyttes.');
       return;
     }
 
@@ -131,6 +159,13 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
         setNewEdgeStyle(style);
         refresh();
       });
+      routeButtons(
+        () => newEdgeStyle().route,
+        (route) => {
+          setNewEdgeStyle({ ...newEdgeStyle(), route });
+          refresh();
+        },
+      );
       return;
     }
 
@@ -149,7 +184,7 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
         heading('Ender');
         const ends = (): EdgeStyle => {
           const n = canvas.selectedNode;
-          return { head: n?.head ?? 'none', tail: n?.tail ?? 'none', dashed: !!n?.dashed, double: n?.double };
+          return { head: n?.head ?? 'none', tail: n?.tail ?? 'none', dashed: !!n?.dashed, double: n?.double, route: n?.route };
         };
         presetButtons(ends, (style) =>
           canvas.updateSelectedNode({
@@ -159,6 +194,8 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
             double: style.double || undefined,
           }),
         );
+        // A Strek (two points) can go round a corner.
+        if (node.points?.length === 2) routeButtons(() => canvas.selectedNode?.route, (route) => canvas.updateSelectedNode({ route }));
       }
       if (node.shape === 'path') {
         heading('Strek');
@@ -183,6 +220,7 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
         underlineButton('solid', 'Understrek', 'Heltrukken strek under teksten (nøkkel)');
         underlineButton('dashed', 'Stiplet understrek', 'Stiplet strek under teksten (delnøkkel i en svak entitet)');
       }
+      if (openLine) tip('En ende på et hjørne eller midtpunkt sitter fast (fylt prikk) og følger figuren når den flyttes. Flytt streken selv for å løsne den.');
       if (node.shape === 'class') tip('«--» på egen linje deler klassen i navn, felt og metoder.');
       tip('_tekst_ blir understreket (nøkkel, static), __tekst__ stiplet understreket (delnøkkel). *tekst* blir kursiv.');
       return;

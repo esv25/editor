@@ -3,6 +3,7 @@
  * Plain data, changed only through the pure functions here, so every change
  * is a new Diagram (easy undo, easy to test).
  */
+import { routes, type Route } from './routing';
 
 export interface Point {
   x: number;
@@ -32,6 +33,17 @@ export interface DiagramNode {
   /** Freehand/Strek, when open: marks at the last and first point (arrow heads …). */
   head?: EndKind;
   tail?: EndKind;
+  /** Strek (two points, open): corners instead of a slant (see routing.ts). */
+  route?: Route;
+  /** Freehand/Strek, when open: the first/last point is fastened to a point of another figure and follows it. */
+  startAt?: AnchorRef;
+  endAt?: AnchorRef;
+}
+
+/** One of a figure's snap points (`ShapeType.anchors`, by index): a line end fastened there. */
+export interface AnchorRef {
+  node: string;
+  anchor: number;
 }
 
 /** What's drawn at an end of a line. */
@@ -45,6 +57,8 @@ export interface EdgeStyle {
   dashed: boolean;
   /** Two parallel lines (ER: total participation). Not part of the presets – it's a toggle of its own. */
   double?: boolean;
+  /** Corners instead of a slant. Also not part of the presets. */
+  route?: Route;
 }
 
 export const defaultEdgeStyle: EdgeStyle = { head: 'arrow', tail: 'none', dashed: false };
@@ -58,6 +72,7 @@ export interface DiagramEdge {
   tail?: EndKind;
   dashed?: boolean;
   double?: boolean;
+  route?: Route;
   /** Text in the middle of the line. */
   label?: string;
   /** Text near each end (multiplicity, cardinality: «1», «0..*», «N»). */
@@ -71,6 +86,7 @@ export const styleOf = (e: DiagramEdge): EdgeStyle => ({
   tail: e.tail ?? defaultEdgeStyle.tail,
   dashed: e.dashed ?? defaultEdgeStyle.dashed,
   ...(e.double ? { double: true } : {}),
+  ...(e.route ? { route: e.route } : {}),
 });
 
 export interface Diagram {
@@ -135,12 +151,21 @@ export function edgesBetween(d: Diagram, nodeIds: string[]): DiagramEdge[] {
   return d.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
 }
 
-/** Remove nodes and every arrow touching them. */
+/** Remove nodes and every arrow touching them. Lines fastened to them stay where they are. */
 export function removeNodes(d: Diagram, ids: string[]): Diagram {
   const gone = new Set(ids);
+  const loose = (n: DiagramNode): DiagramNode => {
+    if (!(n.startAt && gone.has(n.startAt.node)) && !(n.endAt && gone.has(n.endAt.node))) return n;
+    const { startAt, endAt, ...rest } = n;
+    return {
+      ...rest,
+      ...(startAt && !gone.has(startAt.node) ? { startAt } : {}),
+      ...(endAt && !gone.has(endAt.node) ? { endAt } : {}),
+    };
+  };
   return {
     ...d,
-    nodes: d.nodes.filter((n) => !gone.has(n.id)),
+    nodes: d.nodes.filter((n) => !gone.has(n.id)).map(loose),
     edges: d.edges.filter((e) => !gone.has(e.from) && !gone.has(e.to)),
   };
 }
@@ -270,6 +295,7 @@ export function normalizeDiagram(value: unknown): Diagram | null {
   const flag = (x: unknown) => (x === true ? true : undefined);
   const ends: EndKind[] = ['none', 'arrow', 'open', 'triangle', 'diamond', 'filledDiamond'];
   const end = (x: unknown) => (ends.includes(x as EndKind) ? (x as EndKind) : undefined);
+  const route = (x: unknown) => (routes.includes(x as Route) ? (x as Route) : undefined);
   // Optional fields are only kept when set, so files stay small and tidy.
   const compact = <T extends object>(o: T): T =>
     Object.fromEntries(Object.entries(o).filter(([, value]) => value !== undefined)) as T;
@@ -294,9 +320,25 @@ export function normalizeDiagram(value: unknown): Diagram | null {
         smooth: n.smooth === false ? false : undefined,
         head: end(n.head),
         tail: end(n.tail),
+        route: route(n.route),
+        startAt: n.startAt,
+        endAt: n.endAt,
       }),
     );
   const ids = new Set(nodes.map((n) => n.id));
+  const ref = (r: unknown, self: string): AnchorRef | undefined => {
+    const a = r as Partial<AnchorRef> | null;
+    return typeof a === 'object' && a !== null && typeof a.node === 'string' && a.node !== self && ids.has(a.node) &&
+      Number.isInteger(a.anchor) && a.anchor! >= 0
+      ? { node: a.node, anchor: a.anchor! }
+      : undefined;
+  };
+  for (const n of nodes) {
+    const [startAt, endAt] = [ref(n.startAt, n.id), ref(n.endAt, n.id)];
+    delete n.startAt;
+    delete n.endAt;
+    Object.assign(n, compact({ startAt, endAt }));
+  }
   const edges = v.edges
     .filter(
       (e): e is DiagramEdge =>
@@ -311,6 +353,7 @@ export function normalizeDiagram(value: unknown): Diagram | null {
         tail: end(e.tail),
         dashed: typeof e.dashed === 'boolean' ? e.dashed : undefined,
         double: flag(e.double),
+        route: route(e.route),
         label: str(e.label),
         fromLabel: str(e.fromLabel),
         toLabel: str(e.toLabel),

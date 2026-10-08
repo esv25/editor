@@ -18,6 +18,22 @@ export const drawingStyle = {
 
 export const lineHeight = drawingStyle.fontSize * drawingStyle.lineHeight;
 
+/** How much larger than `drawingStyle.fontSize` a figure's text may grow when there's room. */
+export const MAX_TEXT_SCALE = 2;
+
+/** Width and height of the text's lines at the normal font size. */
+export function textExtent(text: string): { w: number; h: number } {
+  const lines = text.split('\n');
+  const w = Math.max(
+    0,
+    ...lines.map((line) => {
+      const styled = styledLine(line);
+      return measureText(styled.text, false, styled.italic);
+    }),
+  );
+  return { w, h: lines.length * lineHeight };
+}
+
 const icon = (body: string) =>
   `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 export { icon as shapeIcon };
@@ -112,15 +128,16 @@ export interface TextLine {
  * Underlines are drawn as lines of their own rather than `text-decoration`,
  * so dashed ones look the same in every program that shows the file.
  */
-export function textBlock(lines: TextLine[], anchor: 'middle' | 'start'): SvgNode[] {
+export function textBlock(lines: TextLine[], anchor: 'middle' | 'start', fontSize = drawingStyle.fontSize): SvgNode[] {
   if (!lines.length) return [];
+  const scale = fontSize / drawingStyle.fontSize;
   const underlines: SvgNode[] = [];
   const spans = lines.map(({ line, x, y, bold }) => {
     const styled = styledLine(line);
     if (styled.underline && styled.text) {
-      const w = measureText(styled.text, bold, styled.italic);
+      const w = measureText(styled.text, bold, styled.italic) * scale;
       const x1 = anchor === 'middle' ? x - w / 2 : x;
-      const uy = y + drawingStyle.fontSize * 0.5;
+      const uy = y + fontSize * 0.5;
       underlines.push(
         h('line', {
           x1,
@@ -140,16 +157,26 @@ export function textBlock(lines: TextLine[], anchor: 'middle' | 'start'): SvgNod
       styled.text || ' ',
     );
   });
-  return [h('text', { 'text-anchor': anchor, 'dominant-baseline': 'central', ...textAttrs }, spans), ...underlines];
+  return [
+    h('text', { 'text-anchor': anchor, 'dominant-baseline': 'central', ...textAttrs, 'font-size': fontSize }, spans),
+    ...underlines,
+  ];
 }
 
 /** The node's text, centred, one <tspan> per line. */
-export function label(node: DiagramNode): SvgNode[] {
+export function label(node: DiagramNode, fontSize = drawingStyle.fontSize): SvgNode[] {
   if (!node.text) return [];
   const lines = node.text.split('\n');
   const c = center(node);
-  const firstY = c.y - ((lines.length - 1) * lineHeight) / 2;
-  return textBlock(lines.map((line, i) => ({ line, x: c.x, y: firstY + i * lineHeight })), 'middle');
+  const step = fontSize * drawingStyle.lineHeight;
+  const firstY = c.y - ((lines.length - 1) * step) / 2;
+  return textBlock(lines.map((line, i) => ({ line, x: c.x, y: firstY + i * step })), 'middle', fontSize);
+}
+
+/** `textRoom` for rectangular figures: room for the text plus a small margin. */
+export function rectTextRoom(node: DiagramNode, w: number, h: number): number {
+  const inset = node.double ? 2 * DOUBLE_GAP : 0;
+  return Math.min((node.w - inset) / (w + 16), (node.h - inset) / (h + 8));
 }
 
 /** Stroke and fill of an outline (dashed if the node says so). */

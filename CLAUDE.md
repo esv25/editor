@@ -264,10 +264,20 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   (addNode, connect, updateEdge, reverseEdge, addNeighbor, nodeAt med toleranse …). Noder kan
   ha `double`/`dashed` kant; frihånd har `points` som brøkdeler av boksen (så flytting og
   størrelse virker som for andre figurer). Linjer har `head`/`tail` (`EndKind`), `dashed`, `double`
-  (to parallelle streker; ikke del av forhåndsvalgene, men en egen bryter som beholdes ved typebytte)
-  og tekst `label`/`fromLabel`/`toLabel`. `normalizeDiagram` tar bare med gyldige felt.
+  (to parallelle streker; ikke del av forhåndsvalgene, men en egen bryter som beholdes ved typebytte),
+  `route` (hjørner: `'hv'` sidelengs først, `'vh'` opp/ned først, ingen = rett; også på Strek med to punkter)
+  og tekst `label`/`fromLabel`/`toLabel`. `routing.ts`: veien en linje tar (`routeBetween` for figurer –
+  ett hjørne når de står på skrå, ellers ut–sving midt i mellomrommet–inn; `cornerPath` for Strek) og
+  polylinjehjelpere; `edgePoints` i `render.ts` gir punktene fra omriss til omriss. `normalizeDiagram` tar bare med gyldige felt.
   `history.ts` angrer med øyeblikksbilder. `svg.ts`: `SvgNode`-tre → DOM (lerretet) eller
   tekst (fila), så det man ser er det som lagres. `render.ts`: diagram → SvgNode.
+- `attach.ts`: strekender som sitter fast. En åpen frihånd/Strek har `startAt`/`endAt` (`AnchorRef`: figur-id +
+  indeks i `ShapeType.anchors`). `settleAnchors(før, etter)` kjøres i `canvas.commit` og på forhåndsvisningen:
+  streker som selv ble tegnet/flyttet hektes fast der endene står på et punkt (figurer foran streker), deretter
+  følger alle faste ender figuren sin (`followAnchors`, også i kjede). `removeNodes` løsner ender på slettede figurer.
+- `align.ts`: på linje. `alignMove`/`alignResize` hekter kant eller midte på andre figurers innenfor
+  `settings.diagram.alignTolerance` (skjerm-px, 0 = bare rutenett), ellers rutenettet; `guidesFor` gir
+  hjelpelinjene (Velg og plasseringsverktøyene viser dem). Åpne streker teller ikke.
 - `edges.ts`: tegning av linjer (pilspiss, åpen pil, tom trekant, rute/fylt rute, stiplet,
   tekst ved endene og midt på) og `edgePresets` – ettklikksvalgene Pil, Linje, Arv,
   Implementerer, Avhengighet, Aggregering, Komposisjon.
