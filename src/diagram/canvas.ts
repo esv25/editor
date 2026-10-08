@@ -12,6 +12,7 @@ import {
   distanceToRect,
   distanceToSegment,
   findNode,
+  moveNodes,
   nodeAt,
   removeEdges,
   removeNodes,
@@ -31,7 +32,7 @@ import { shapeFor, type Measure } from './shapes';
 import { drawingStyle, lineHeight, measureText, styledLine } from './shapes/common';
 import { h, toDom, type SvgNode } from './svg';
 import { arrowSource, newEdgeStyle } from './tools/arrow';
-import { selectTool } from './tools/select';
+import { isSelectingTool, markTool, selectTool } from './tools/select';
 import { toolFor, toolKey, tools, type Selection, type Tool, type ToolContext } from './tools';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -53,7 +54,8 @@ export interface CanvasOptions {
 
 export class DiagramCanvas {
   diagram: Diagram;
-  selection: Selection | null = null;
+  /** Everything selected; most features work on one (`single`), moving and deleting on all. */
+  selection: Selection[] = [];
   tool: Tool = selectTool;
   zoom = 1;
   private pan: Point = { x: -40, y: -40 };
@@ -194,10 +196,8 @@ export class DiagramCanvas {
   }
 
   private changed(): void {
-    const sel = this.selection;
-    if (sel && !(sel.kind === 'node' ? findNode(this.diagram, sel.id) : this.diagram.edges.some((e) => e.id === sel.id))) {
-      this.selection = null;
-    }
+    const exists = (s: Selection) => (s.kind === 'node' ? !!findNode(this.diagram, s.id) : this.diagram.edges.some((e) => e.id === s.id));
+    if (!this.selection.every(exists)) this.selection = this.selection.filter(exists);
     this.options.onChange(this.diagram);
     this.refresh();
   }
@@ -220,29 +220,51 @@ export class DiagramCanvas {
     this.changed();
   }
 
-  select(selection: Selection | null): void {
-    this.selection = selection;
+  select(selection: Selection | readonly Selection[] | null): void {
+    this.selection = selection === null ? [] : Array.isArray(selection) ? [...selection] : [selection as Selection];
     this.refresh();
+  }
+
+  /** The one selected thing, or null when nothing or several are selected. */
+  get single(): Selection | null {
+    return this.selection.length === 1 ? this.selection[0] : null;
+  }
+
+  /** Ctrl+A: every figure and line (in Velg, or Marker if that's on). */
+  selectAll(): void {
+    if (!isSelectingTool(this.tool)) this.setTool('select');
+    this.select([
+      ...this.diagram.nodes.map((n) => ({ kind: 'node' as const, id: n.id })),
+      ...this.diagram.edges.map((e) => ({ kind: 'edge' as const, id: e.id })),
+    ]);
+  }
+
+  private selectedIds(kind: Selection['kind']): string[] {
+    return this.selection.filter((s) => s.kind === kind).map((s) => s.id);
   }
 
   setTool(id: string): void {
     this.finishEditing(true);
     this.tool.reset?.();
+    const from = this.tool;
     this.tool = toolFor(id);
     this.tool.reset?.();
+    // Marker adds to the selection: start clean unless coming from Velg (where the selection was chosen on purpose).
+    if (this.tool === markTool && !isSelectingTool(from)) this.selection = [];
     this.refresh();
   }
 
+  /** Delete everything selected (lines on deleted figures go too). */
   deleteSelection(): void {
-    const sel = this.selection;
-    if (!sel) return;
-    this.commit(sel.kind === 'node' ? removeNodes(this.diagram, [sel.id]) : removeEdges(this.diagram, [sel.id]));
+    if (!this.selection.length) return;
+    this.commit(removeEdges(removeNodes(this.diagram, this.selectedIds('node')), this.selectedIds('edge')));
   }
 
   /** Ctrl+arrow: a new connected figure in that direction, ready for typing. */
   addNeighbor(dir: Direction): void {
-    if (this.selection?.kind !== 'node') return;
-    const added = addNeighbor(this.diagram, this.selection.id, dir, getSettings().diagram.grid, newEdgeStyle());
+    const sel = this.single;
+    if (sel?.kind !== 'node') return;
+    const added = addNeighbor(this.diagram, sel.id, dir, getSettings().diagram.grid, newEdgeStyle());
     if (!added) return;
     this.commit(added.diagram);
     this.select({ kind: 'node', id: added.id });
@@ -250,10 +272,9 @@ export class DiagramCanvas {
     this.editText(added.id);
   }
 
+  /** Arrow keys: move every selected figure. */
   private nudge(dx: number, dy: number): void {
-    if (this.selection?.kind !== 'node') return;
-    const node = findNode(this.diagram, this.selection.id);
-    if (node) this.commit(updateNode(this.diagram, node.id, { x: node.x + dx, y: node.y + dy }));
+    this.commit(moveNodes(this.diagram, this.selectedIds('node'), dx, dy));
   }
 
   edgeAt(p: Point): DiagramEdge | null {
@@ -300,16 +321,18 @@ export class DiagramCanvas {
 
   /** Enter / double click / «Skriv tekst»: edit the selected figure's or line's text. */
   editSelection(): void {
-    if (this.selection?.kind === 'node') this.editText(this.selection.id);
-    else if (this.selection?.kind === 'edge') this.editEdgeLabel(this.selection.id);
+    const sel = this.single;
+    if (sel?.kind === 'node') this.editText(sel.id);
+    else if (sel?.kind === 'edge') this.editEdgeLabel(sel.id);
   }
 
   get selectedNode(): DiagramNode | null {
-    return this.selection?.kind === 'node' ? (findNode(this.diagram, this.selection.id) ?? null) : null;
+    const sel = this.single;
+    return sel?.kind === 'node' ? (findNode(this.diagram, sel.id) ?? null) : null;
   }
 
   get selectedEdge(): DiagramEdge | null {
-    const sel = this.selection;
+    const sel = this.single;
     return sel?.kind === 'edge' ? (this.diagram.edges.find((e) => e.id === sel.id) ?? null) : null;
   }
 
@@ -587,7 +610,7 @@ export class DiagramCanvas {
     const p = this.toDrawing(e);
     this.pointer = p;
     this.lastPointer = { clientX: e.clientX, clientY: e.clientY, buttons: e.buttons };
-    this.tool.pointerDown(this.context, p);
+    this.tool.pointerDown(this.context, p, { add: e.shiftKey || e.ctrlKey || e.metaKey });
     this.startEdgeScroll();
     this.refresh();
   }
@@ -606,7 +629,7 @@ export class DiagramCanvas {
 
   escape(): void {
     if (this.tool.cancel?.(this.context)) return;
-    if (this.tool !== selectTool) this.setTool('select');
+    if (!isSelectingTool(this.tool)) this.setTool('select');
     else this.select(null);
   }
 
@@ -624,8 +647,9 @@ export class DiagramCanvas {
     else if (mod && key.toLowerCase() === 'z' && !e.shiftKey) this.undo();
     else if (mod && (key.toLowerCase() === 'y' || (key.toLowerCase() === 'z' && e.shiftKey))) this.redo();
     else if (mod && key.toLowerCase() === 's') this.options.onSave();
+    else if (mod && key.toLowerCase() === 'a') this.selectAll();
     else if (mod && arrows[key]) this.addNeighbor(arrows[key]);
-    else if (arrows[key] && this.selection?.kind === 'node') {
+    else if (arrows[key] && this.selectedIds('node').length) {
       const step = e.shiftKey ? grid * 5 : grid;
       const d = arrows[key];
       this.nudge(d === 'left' ? -step : d === 'right' ? step : 0, d === 'up' ? -step : d === 'down' ? step : 0);
@@ -682,24 +706,25 @@ export class DiagramCanvas {
     if (!preview.noHover && this.pointer && !this.editing) {
       const node = this.nodeAt(d, this.pointer);
       if (node) outline(node.id, 'dg-hover');
-      else if (this.tool === selectTool) {
+      else if (isSelectingTool(this.tool)) {
         const edge = this.edgeAt(this.pointer);
         if (edge) line(edge, 'dg-hover-edge');
       }
     }
     const source = this.tool.id === 'arrow' ? arrowSource() : null;
     if (source) outline(source, 'dg-source');
-    if (this.selection?.kind === 'node') {
-      const n = outline(this.selection.id, 'dg-selection');
-      if (n && this.tool === selectTool) {
-        const s = 14 / this.zoom;
-        marks.push(h('rect', { x: n.x + n.w - s / 2, y: n.y + n.h - s / 2, width: s, height: s, rx: 3 / this.zoom, class: 'dg-handle' }));
-      }
+    for (const sel of this.selection) {
+      const n = sel.kind === 'node' ? outline(sel.id, 'dg-selection') : undefined;
       // A selected line's fastened ends: they follow the figure they're on.
       for (const p of n ? fastenedEnds(n) : []) marks.push(h('circle', { cx: p.x, cy: p.y, r: 6 / this.zoom, class: 'dg-fastened' }));
-    } else if (this.selection?.kind === 'edge') {
-      const edge = d.edges.find((e) => e.id === this.selection!.id);
+      const edge = sel.kind === 'edge' && d.edges.find((e) => e.id === sel.id);
       if (edge) line(edge, 'dg-selection-edge');
+    }
+    // The resize handle: only on a lone figure, in Velg.
+    const lone = this.single?.kind === 'node' && this.tool === selectTool ? findNode(d, this.single.id) : null;
+    if (lone) {
+      const s = 14 / this.zoom;
+      marks.push(h('rect', { x: lone.x + lone.w - s / 2, y: lone.y + lone.h - s / 2, width: s, height: s, rx: 3 / this.zoom, class: 'dg-handle' }));
     }
     marks.push(...(preview.overlay ?? []));
     this.overlay.replaceChildren(...marks.map(toDom));

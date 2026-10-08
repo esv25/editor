@@ -83,7 +83,7 @@ export function renderToolbar(
         const key = toolKey(tool);
         el.title = key ? `${tool.name} (${key.toUpperCase()})` : tool.name;
       }
-      deleteButton.disabled = !canvas.selection;
+      deleteButton.disabled = !canvas.selection.length;
       zoomLabel.querySelector('span')!.textContent = `${canvas.zoomPercent} %`;
       saveButton.hidden = !actions.canSaveAs();
       hint.textContent = canvas.hint;

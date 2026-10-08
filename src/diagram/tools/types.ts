@@ -6,10 +6,19 @@ export interface Selection {
   id: string;
 }
 
+export const sameItem = (a: Selection, b: Selection) => a.kind === b.kind && a.id === b.id;
+
+/** Keys held when the button went down. */
+export interface PointerKeys {
+  /** Shift or Ctrl: add to (or take from) the selection instead of replacing it. */
+  add: boolean;
+}
+
 /** What a tool can see and do. Provided by the canvas. */
 export interface ToolContext {
   readonly diagram: Diagram;
-  readonly selection: Selection | null;
+  /** Everything selected (figures and lines); empty when nothing is. */
+  readonly selection: readonly Selection[];
   readonly grid: number;
   /** How far from a figure a click still counts as hitting it (drawing units). */
   readonly tolerance: number;
@@ -21,7 +30,8 @@ export interface ToolContext {
   readonly handleSize: number;
   /** Replace the drawing (undoable, saved). */
   commit(next: Diagram): void;
-  select(selection: Selection | null): void;
+  /** Replace the selection: one item, several, or nothing. */
+  select(selection: Selection | readonly Selection[] | null): void;
   /** Start typing the text of a figure. */
   editText(nodeId: string): void;
   setTool(id: string): void;
@@ -58,7 +68,7 @@ export interface Tool {
   key: string;
   /** What to do next, shown in the hint bar. */
   hint(ctx: ToolContext): string;
-  pointerDown(ctx: ToolContext, p: Point): void;
+  pointerDown(ctx: ToolContext, p: Point, keys?: PointerKeys): void;
   /** The pointer moved with the button held (after pointerDown). */
   pointerMove?(ctx: ToolContext, p: Point): void;
   /** The button was released (drag and drop ends here). */

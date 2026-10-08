@@ -6,10 +6,15 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Tegnevinduet: en strek med hjørner som sitter fast på en figur, går nå et lite stykke rett ut fra figuren før den svinger, så den aldri går langs kanten av figuren.
+
+## 0.9.1 – 2026-10-08
+
 - Tegnevinduet: figurer **stiller seg på linje** med hverandre. Når du drar, plasserer eller endrer størrelse på en figur og en kant eller midten kommer nær en annen figurs, hekter den seg på – en stiplet hjelpelinje viser hvilke figurer som står på linje.
 - Tegnevinduet: en **strek som starter eller slutter på et punkt** (hjørne eller midtpunkt) på en figur, sitter fast der og **følger med når figuren flyttes** eller endrer størrelse. Velger du streken, viser fylte prikker endene som sitter fast. Flytter du streken selv, løsner den (og hekter seg fast igjen der endene havner på et punkt).
 - Tegnevinduet: **større tekst** i figurene. Teksten i bokser, ellipser, romber og tekstfelt blir større når figuren har plass til den (opptil dobbelt så stor), så den er lettere å lese når tegningen vises mindre i et notat. Figurer av samme type og størrelse får lik tekststørrelse. Tekst ved linjene (som M og 1) er også litt større.
-- Tegnevinduet: piler og streker kan ha **hjørner**, så de aldri går på skrå. Under «Hjørner» i panelet til høyre velger du «Rett» (som før), «Sidelengs først» (først til høyre/venstre, så opp/ned) eller «Opp/ned først». Det gjelder linja du har valgt, og nye linjer med Pil og Strek. Står to figurer ved siden av eller over hverandre, går linja rett ut, svinger midt mellom dem og går rett inn. En strek som sitter fast på en figur, går alltid et lite stykke rett ut fra figuren før den svinger, så den aldri går langs kanten.
+- Tegnevinduet: piler og streker kan ha **hjørner**, så de aldri går på skrå. Under «Hjørner» i panelet til høyre velger du «Rett» (som før), «Sidelengs først» (først til høyre/venstre, så opp/ned) eller «Opp/ned først». Det gjelder linja du har valgt, og nye linjer med Pil og Strek. Står to figurer ved siden av eller over hverandre, går linja rett ut, svinger midt mellom dem og går rett inn.
+- Tegnevinduet: **velg flere figurer** og flytt eller slett dem sammen. Det nye verktøyet **Marker** (tast M) lar deg klikke på figurer og linjer for å legge dem til eller ta dem bort, og dra over et tomt sted for å markere alt innenfor. Dra en av de valgte figurene for å flytte alle (linjene følger med), bruk piltastene, eller trykk Delete for å slette alle. I Velg virker Shift+klikk og Shift+dra på samme måte, og Ctrl+A velger alt.
 
 ## 0.9.0 – 2026-10-07
 

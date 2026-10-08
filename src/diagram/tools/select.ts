@@ -1,117 +1,254 @@
 /**
- * Velg: click a figure to select it; drag it to move it, drag its corner
- * handle to resize it (both snap to the grid), drag empty space to move the
- * view. A press only becomes a drag after the pointer has moved a little
- * (`settings.diagram.dragThreshold`), so a shaky click never moves anything.
- * Edges and middles line up with other figures' when close (align.ts).
- * Esc while dragging a figure puts it back.
+ * Velg and Marker share this: click to select, drag to move (every selected
+ * figure moves together), drag the corner handle of a lone figure to resize
+ * it (all snap to the grid). A press only becomes a drag after the pointer
+ * has moved a little (`settings.diagram.dragThreshold`), so a shaky click
+ * never moves anything. Edges and middles line up with other figures' when
+ * close (align.ts; a group lines up as one box). Esc while dragging puts
+ * things back.
+ *
+ * - Velg: a click selects just that; Shift/Ctrl+click adds or takes away;
+ *   dragging empty space moves the view (Shift/Ctrl+drag: mark an area).
+ * - Marker: every click adds or takes away (no keys to hold), and dragging
+ *   empty space marks everything the rectangle touches.
  */
-import { alignMove, alignResize, guidesFor } from '../align';
-import { findNode, updateNode, type Point } from '../model';
+import { alignMove, alignResize, guidesFor, type Box } from '../align';
+import { edgesBetween, findNode, moveNodes, nodesInRect, updateNode, type Diagram, type Point } from '../model';
+import { h } from '../svg';
 import { shapeIcon } from '../shapes/common';
 import { guideMarks } from './preview';
-import type { Tool, ToolContext } from './types';
+import { sameItem, type PointerKeys, type Selection, type Tool, type ToolContext } from './types';
 
 type Mode =
   | { kind: 'idle' }
-  /** Button down on a figure (or its corner); `dragging` once it has moved far enough. */
-  | { kind: 'move' | 'resize'; id: string; start: Point; dx: number; dy: number; dragging: boolean }
+  /**
+   * Button down on a figure; `dragging` once it has moved far enough. `ids`
+   * all move with `grab` (the one under the pointer). `onClick`: what a
+   * release without dragging does to the selection.
+   */
+  | { kind: 'move'; grab: string; ids: string[]; start: Point; dx: number; dy: number; dragging: boolean; onClick?: () => void }
+  | { kind: 'resize'; id: string; start: Point; dragging: boolean }
   /** Button down on empty space: dragging moves the view, holding `start` under the pointer. */
-  | { kind: 'pan'; start: Point; dragging: boolean };
+  | { kind: 'pan'; start: Point; dragging: boolean }
+  /** Marking an area: `base` was selected before (kept, the area adds to it). */
+  | { kind: 'area'; start: Point; end: Point; base: Selection[]; dragging: boolean };
 
-let mode: Mode = { kind: 'idle' };
+const has = (selection: readonly Selection[], item: Selection) => selection.some((s) => sameItem(s, item));
 
-/** The bottom-right corner of the selected figure, if `p` is on it. */
+const toggle = (ctx: ToolContext, item: Selection) =>
+  ctx.select(has(ctx.selection, item) ? ctx.selection.filter((s) => !sameItem(s, item)) : [...ctx.selection, item]);
+
+const selectedNodeIds = (ctx: ToolContext) => ctx.selection.filter((s) => s.kind === 'node').map((s) => s.id);
+
+/** The box around these figures (what lines up when they're dragged together). */
+function boxOf(d: Diagram, ids: string[]): Box | null {
+  const nodes = d.nodes.filter((n) => ids.includes(n.id));
+  if (!nodes.length) return null;
+  const x = Math.min(...nodes.map((n) => n.x));
+  const y = Math.min(...nodes.map((n) => n.y));
+  return { x, y, w: Math.max(...nodes.map((n) => n.x + n.w)) - x, h: Math.max(...nodes.map((n) => n.y + n.h)) - y };
+}
+
+/** The drawing without these figures: what the moving ones line up with. */
+const without = (d: Diagram, ids: string[]): Diagram => ({ ...d, nodes: d.nodes.filter((n) => !ids.includes(n.id)) });
+
+/** The bottom-right corner of the selected figure (only when it's alone), if `p` is on it. */
 function onHandle(ctx: ToolContext, p: Point): string | null {
-  if (ctx.selection?.kind !== 'node') return null;
-  const node = findNode(ctx.diagram, ctx.selection.id);
+  const only = ctx.selection.length === 1 ? ctx.selection[0] : null;
+  if (only?.kind !== 'node') return null;
+  const node = findNode(ctx.diagram, only.id);
   if (!node) return null;
   const reach = Math.max(ctx.handleSize, ctx.tolerance * 0.75);
   return Math.abs(p.x - (node.x + node.w)) <= reach && Math.abs(p.y - (node.y + node.h)) <= reach ? node.id : null;
 }
 
-/** The figure's position or size with the pointer at `p`. */
-function change(ctx: ToolContext, p: Point) {
-  if (mode.kind === 'idle' || mode.kind === 'pan' || !mode.dragging) return null;
-  const node = findNode(ctx.diagram, mode.id);
-  if (!node) return null;
-  const options = { grid: ctx.grid, tolerance: ctx.alignTolerance, ignore: node.id };
-  if (mode.kind === 'move') return alignMove(ctx.diagram, { x: p.x - mode.dx, y: p.y - mode.dy, w: node.w, h: node.h }, options);
-  return alignResize(ctx.diagram, node, p, { ...options, min: ctx.grid * 2 });
+/** Selection hints shared by both tools. */
+function selectionHint(ctx: ToolContext, marking: boolean): string | null {
+  const nodes = ctx.selection.filter((s) => s.kind === 'node').length;
+  const count = ctx.selection.length;
+  if (count > 1) {
+    const what = nodes === count ? `${count} figurer valgt` : `${count} ting valgt`;
+    const more = marking ? 'klikk: legg til / ta bort' : 'Shift/Ctrl+klikk: legg til / ta bort';
+    return `${what} · dra en av dem (eller piltastene): flytt alle · Delete: slett alle · ${more} · Esc: fjern markeringen`;
+  }
+  return null;
 }
 
-export const selectTool: Tool = {
+function makeSelectTool(tool: { id: string; name: string; key: string; icon: string; marking: boolean }): Tool {
+  let mode: Mode = { kind: 'idle' };
+
+  /** The drawing with the drag so far applied and the box that moved (for guides), or null if nothing has moved. */
+  const change = (ctx: ToolContext, p: Point): { diagram: Diagram; box: Box; ignore: string[] } | null => {
+    const options = { grid: ctx.grid, tolerance: ctx.alignTolerance };
+    if (mode.kind === 'move' && mode.dragging) {
+      const box = boxOf(ctx.diagram, mode.ids);
+      if (!box) return null;
+      const to = alignMove(without(ctx.diagram, mode.ids), { ...box, x: p.x - mode.dx, y: p.y - mode.dy }, options);
+      return { diagram: moveNodes(ctx.diagram, mode.ids, to.x - box.x, to.y - box.y), box: { ...box, ...to }, ignore: mode.ids };
+    }
+    if (mode.kind === 'resize' && mode.dragging) {
+      const node = findNode(ctx.diagram, mode.id);
+      if (!node) return null;
+      const size = alignResize(ctx.diagram, node, p, { ...options, ignore: node.id, min: ctx.grid * 2 });
+      return { diagram: updateNode(ctx.diagram, mode.id, size), box: { ...node, ...size }, ignore: [node.id] };
+    }
+    return null;
+  };
+
+  /** Select what the marked area touches (live, while dragging). */
+  const markArea = (ctx: ToolContext) => {
+    if (mode.kind !== 'area') return;
+    const nodes = nodesInRect(ctx.diagram, mode.start, mode.end).map((n) => n.id);
+    const items: Selection[] = [
+      ...nodes.map((id) => ({ kind: 'node' as const, id })),
+      ...edgesBetween(ctx.diagram, nodes).map((e) => ({ kind: 'edge' as const, id: e.id })),
+    ];
+    const base = mode.base;
+    ctx.select([...base, ...items.filter((item) => !has(base, item))]);
+  };
+
+  const startMove = (ctx: ToolContext, p: Point, grab: string, onClick?: () => void) => {
+    const selected = selectedNodeIds(ctx);
+    const ids = selected.includes(grab) ? selected : [grab];
+    const box = boxOf(ctx.diagram, ids)!;
+    mode = { kind: 'move', grab, ids, start: p, dx: p.x - box.x, dy: p.y - box.y, dragging: false, onClick };
+  };
+
+  return {
+    id: tool.id,
+    name: tool.name,
+    key: tool.key,
+    icon: tool.icon,
+
+    hint(ctx) {
+      if (mode.kind === 'move' && mode.dragging) {
+        return `Slipp der ${mode.ids.length > 1 ? 'figurene' : 'figuren'} skal stå – en strek viser når den står på linje med en annen · nær kanten ruller visningen · Esc: avbryt`;
+      }
+      if (mode.kind === 'resize' && mode.dragging) return 'Slipp der hjørnet skal være · Esc: avbryt';
+      if (mode.kind === 'pan' && mode.dragging) return 'Dra for å flytte visningen · slipp når du ser det du vil';
+      if (mode.kind === 'area' && mode.dragging) return 'Alt rektangelet berører blir valgt · slipp for å velge · Esc: avbryt';
+      const several = selectionHint(ctx, tool.marking);
+      if (several) return several;
+      if (tool.marking) {
+        return 'Klikk på figurer og linjer for å velge flere · dra på et tomt sted: marker et område · dra en valgt figur: flytt alle';
+      }
+      const only = ctx.selection[0];
+      if (only?.kind === 'node') {
+        return 'Dra figuren for å flytte den · dra hjørnet: endre størrelse · Enter: skriv tekst · Ctrl+pil: ny figur ved siden av · Shift+klikk: velg flere · Delete: slett';
+      }
+      if (only?.kind === 'edge') return 'Velg type linje til høyre · Enter: tekst midt på · Shift+klikk: velg flere · Delete: slett linja';
+      return 'Klikk på en figur for å velge den, dra for å flytte den · dra på et tomt sted (eller piltastene): flytt visningen · Shift+dra eller Marker: velg flere';
+    },
+
+    pointerDown(ctx, p, keys: PointerKeys = { add: false }) {
+      const add = tool.marking || keys.add;
+      const handle = add ? null : onHandle(ctx, p);
+      if (handle) {
+        mode = { kind: 'resize', id: handle, start: p, dragging: false };
+        return;
+      }
+      const node = ctx.nodeAt(p);
+      if (node) {
+        const item: Selection = { kind: 'node', id: node.id };
+        if (add) {
+          // Not selected yet: add it now (so it moves with the rest). Already selected: a click takes it away, a drag moves them all.
+          if (!has(ctx.selection, item)) {
+            ctx.select([...ctx.selection, item]);
+            startMove(ctx, p, node.id);
+          } else startMove(ctx, p, node.id, () => toggle(ctx, item));
+        } else if (has(ctx.selection, item) && ctx.selection.length > 1) {
+          // Part of a group: dragging moves the group, a click picks just this one.
+          startMove(ctx, p, node.id, () => ctx.select(item));
+        } else {
+          ctx.select(item);
+          startMove(ctx, p, node.id);
+        }
+        return;
+      }
+      const edge = ctx.edgeAt(p);
+      if (edge) {
+        const item: Selection = { kind: 'edge', id: edge.id };
+        if (add) toggle(ctx, item);
+        else ctx.select(item);
+        return;
+      }
+      if (add) {
+        mode = { kind: 'area', start: p, end: p, base: [...ctx.selection], dragging: false };
+        return;
+      }
+      ctx.select(null);
+      mode = { kind: 'pan', start: p, dragging: false };
+    },
+
+    pointerMove(ctx, p) {
+      if (mode.kind === 'idle') return;
+      if (!mode.dragging) {
+        if (Math.hypot(p.x - mode.start.x, p.y - mode.start.y) < ctx.dragThreshold) return;
+        mode.dragging = true;
+        ctx.refresh();
+      }
+      if (mode.kind === 'pan') ctx.panBy(mode.start.x - p.x, mode.start.y - p.y);
+      if (mode.kind === 'area') {
+        mode.end = p;
+        markArea(ctx);
+      }
+    },
+
+    pointerUp(ctx, p) {
+      const done = change(ctx, p);
+      const click = mode.kind === 'move' && !mode.dragging ? mode.onClick : undefined;
+      mode = { kind: 'idle' };
+      if (done) ctx.commit(done.diagram);
+      else if (click) click();
+      else ctx.refresh();
+    },
+
+    preview(ctx, pointer) {
+      if (!pointer || mode.kind === 'idle') return {};
+      if (mode.kind === 'pan') return mode.dragging ? { noHover: true } : {};
+      if (mode.kind === 'area') {
+        if (!mode.dragging) return {};
+        const { start, end } = mode;
+        const rect = { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y), width: Math.abs(end.x - start.x), height: Math.abs(end.y - start.y) };
+        return { noHover: true, overlay: [h('rect', { ...rect, class: 'dg-area' })] };
+      }
+      const done = change(ctx, pointer);
+      if (!done) return {};
+      const guides = guidesFor(without(done.diagram, done.ignore), done.box);
+      return { diagram: done.diagram, noHover: true, overlay: guideMarks(guides, ctx.handleSize) };
+    },
+
+    cancel(ctx) {
+      if (mode.kind === 'idle' || !mode.dragging) return false;
+      if (mode.kind === 'area') ctx.select(mode.base);
+      mode = { kind: 'idle' };
+      ctx.refresh();
+      return true;
+    },
+
+    reset() {
+      mode = { kind: 'idle' };
+    },
+
+    busy: () => (mode.kind === 'move' || mode.kind === 'resize' || mode.kind === 'area') && mode.dragging,
+  };
+}
+
+export const selectTool = makeSelectTool({
   id: 'select',
   name: 'Velg',
   key: 'v',
   icon: shapeIcon('<path d="m5 3 14 8-6 1.5L10 19z"/>'),
+  marking: false,
+});
 
-  hint(ctx) {
-    if (mode.kind === 'move' && mode.dragging) return 'Slipp der figuren skal stå – en strek viser når den står på linje med en annen · nær kanten ruller visningen · Esc: avbryt';
-    if (mode.kind === 'resize' && mode.dragging) return 'Slipp der hjørnet skal være · Esc: avbryt';
-    if (mode.kind === 'pan' && mode.dragging) return 'Dra for å flytte visningen · slipp når du ser det du vil';
-    if (ctx.selection?.kind === 'node') {
-      return 'Dra figuren for å flytte den · dra hjørnet: endre størrelse · Enter: skriv tekst · Ctrl+pil: ny figur ved siden av · Delete: slett';
-    }
-    if (ctx.selection?.kind === 'edge') return 'Velg type linje til høyre · Enter: tekst midt på · Delete: slett linja';
-    return 'Klikk på en figur for å velge den, dra for å flytte den · dra på et tomt sted (eller piltastene): flytt visningen';
-  },
+export const markTool = makeSelectTool({
+  id: 'mark',
+  name: 'Marker',
+  key: 'm',
+  icon: shapeIcon('<rect x="3" y="3" width="13" height="13" rx="1" stroke-dasharray="3 2.5"/><path d="m12 12 9 5-4 1-1.5 4z"/>'),
+  marking: true,
+});
 
-  pointerDown(ctx, p) {
-    const handle = onHandle(ctx, p);
-    if (handle) {
-      mode = { kind: 'resize', id: handle, start: p, dx: 0, dy: 0, dragging: false };
-      return;
-    }
-    const node = ctx.nodeAt(p);
-    if (node) {
-      ctx.select({ kind: 'node', id: node.id });
-      mode = { kind: 'move', id: node.id, start: p, dx: p.x - node.x, dy: p.y - node.y, dragging: false };
-      return;
-    }
-    const edge = ctx.edgeAt(p);
-    ctx.select(edge ? { kind: 'edge', id: edge.id } : null);
-    if (!edge) mode = { kind: 'pan', start: p, dragging: false };
-  },
-
-  pointerMove(ctx, p) {
-    if (mode.kind === 'idle') return;
-    if (!mode.dragging) {
-      if (Math.hypot(p.x - mode.start.x, p.y - mode.start.y) < ctx.dragThreshold) return;
-      mode.dragging = true;
-      ctx.refresh();
-    }
-    if (mode.kind === 'pan') ctx.panBy(mode.start.x - p.x, mode.start.y - p.y);
-  },
-
-  pointerUp(ctx, p) {
-    const done = change(ctx, p);
-    const id = mode.kind === 'move' || mode.kind === 'resize' ? mode.id : null;
-    mode = { kind: 'idle' };
-    if (done && id) ctx.commit(updateNode(ctx.diagram, id, done));
-    else ctx.refresh();
-  },
-
-  preview(ctx, pointer) {
-    if (!pointer || mode.kind === 'idle') return {};
-    if (mode.kind === 'pan') return mode.dragging ? { noHover: true } : {};
-    const done = change(ctx, pointer);
-    if (!done) return {};
-    const diagram = updateNode(ctx.diagram, mode.id, done);
-    const moved = findNode(diagram, mode.id)!;
-    return { diagram, noHover: true, overlay: guideMarks(guidesFor(diagram, moved, moved.id), ctx.handleSize) };
-  },
-
-  cancel(ctx) {
-    if (mode.kind === 'idle' || !mode.dragging) return false;
-    mode = { kind: 'idle' };
-    ctx.refresh();
-    return true;
-  },
-
-  reset() {
-    mode = { kind: 'idle' };
-  },
-
-  busy: () => (mode.kind === 'move' || mode.kind === 'resize') && mode.dragging,
-};
+/** Velg and Marker: the tools where the selection is what you work on. */
+export const isSelectingTool = (t: Tool) => t === selectTool || t === markTool;
