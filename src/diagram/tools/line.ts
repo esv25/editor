@@ -2,10 +2,11 @@
  * Strek: a straight line (or arrow) anywhere, not tied to figures. Click where
  * it starts, click where it ends. Near a figure's corner or side middle (or
  * another line's end) the point jumps there – shown by a ring – otherwise it
- * snaps to half the grid. The ends get the type chosen in the panel (Linje,
- * Pil, Arv …), and goes straight or round a corner (also chosen in the
- * panel). It's a freehand figure with two points, so it moves, resizes
- * and is deleted like any figure.
+ * snaps to half the grid. An end on a figure's point stays fastened there and
+ * follows the figure when it moves (attach.ts). The ends get the type chosen
+ * in the panel (Linje, Pil, Arv …), and the line goes straight or round a
+ * corner (also chosen in the panel). It's a freehand figure with two points,
+ * so it moves, resizes and is deleted like any figure.
  */
 import { edgePresets, renderEdge } from '../edges';
 import { addNode, type EdgeStyle, type Point } from '../model';
@@ -36,8 +37,8 @@ export const lineTool: Tool = {
 
   hint: () =>
     start
-      ? 'Klikk der streken skal slutte (den hekter seg på hjørner og midtpunkter) · Esc: avbryt'
-      : 'Klikk der streken skal begynne – nær et hjørne hekter den seg fast der · velg pil eller strek til høyre',
+      ? 'Klikk der streken skal slutte (den hekter seg fast på hjørner og midtpunkter) · Esc: avbryt'
+      : 'Klikk der streken skal begynne – på et hjørne eller midtpunkt hekter den seg fast og følger med figuren · velg pil eller strek til høyre',
 
   pointerDown(ctx, p) {
     const q = ctx.snapPoint(p);

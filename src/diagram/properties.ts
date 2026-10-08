@@ -149,7 +149,7 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
           refresh();
         },
       );
-      tip('Nær et hjørne eller et midtpunkt på en figur hekter streken seg fast der (en ring viser det).');
+      tip('Nær et hjørne eller et midtpunkt på en figur hekter streken seg fast der (en ring viser det), og følger med når figuren flyttes.');
       return;
     }
 
@@ -220,6 +220,7 @@ export function renderProperties(bar: HTMLElement, canvas: DiagramCanvas): Prope
         underlineButton('solid', 'Understrek', 'Heltrukken strek under teksten (nøkkel)');
         underlineButton('dashed', 'Stiplet understrek', 'Stiplet strek under teksten (delnøkkel i en svak entitet)');
       }
+      if (openLine) tip('En ende på et hjørne eller midtpunkt sitter fast (fylt prikk) og følger figuren når den flyttes. Flytt streken selv for å løsne den.');
       if (node.shape === 'class') tip('«--» på egen linje deler klassen i navn, felt og metoder.');
       tip('_tekst_ blir understreket (nøkkel, static), __tekst__ stiplet understreket (delnøkkel). *tekst* blir kursiv.');
       return;

@@ -3,10 +3,13 @@
  * handle to resize it (both snap to the grid), drag empty space to move the
  * view. A press only becomes a drag after the pointer has moved a little
  * (`settings.diagram.dragThreshold`), so a shaky click never moves anything.
+ * Edges and middles line up with other figures' when close (align.ts).
  * Esc while dragging a figure puts it back.
  */
-import { findNode, snap, updateNode, type Point } from '../model';
+import { alignMove, alignResize, guidesFor } from '../align';
+import { findNode, updateNode, type Point } from '../model';
 import { shapeIcon } from '../shapes/common';
+import { guideMarks } from './preview';
 import type { Tool, ToolContext } from './types';
 
 type Mode =
@@ -30,11 +33,11 @@ function onHandle(ctx: ToolContext, p: Point): string | null {
 /** The figure's position or size with the pointer at `p`. */
 function change(ctx: ToolContext, p: Point) {
   if (mode.kind === 'idle' || mode.kind === 'pan' || !mode.dragging) return null;
-  if (mode.kind === 'move') return { x: snap(p.x - mode.dx, ctx.grid), y: snap(p.y - mode.dy, ctx.grid) };
   const node = findNode(ctx.diagram, mode.id);
   if (!node) return null;
-  const min = ctx.grid * 2;
-  return { w: Math.max(min, snap(p.x - node.x, ctx.grid)), h: Math.max(min, snap(p.y - node.y, ctx.grid)) };
+  const options = { grid: ctx.grid, tolerance: ctx.alignTolerance, ignore: node.id };
+  if (mode.kind === 'move') return alignMove(ctx.diagram, { x: p.x - mode.dx, y: p.y - mode.dy, w: node.w, h: node.h }, options);
+  return alignResize(ctx.diagram, node, p, { ...options, min: ctx.grid * 2 });
 }
 
 export const selectTool: Tool = {
@@ -44,7 +47,7 @@ export const selectTool: Tool = {
   icon: shapeIcon('<path d="m5 3 14 8-6 1.5L10 19z"/>'),
 
   hint(ctx) {
-    if (mode.kind === 'move' && mode.dragging) return 'Slipp der figuren skal stå (nær kanten ruller visningen) · Esc: avbryt';
+    if (mode.kind === 'move' && mode.dragging) return 'Slipp der figuren skal stå – en strek viser når den står på linje med en annen · nær kanten ruller visningen · Esc: avbryt';
     if (mode.kind === 'resize' && mode.dragging) return 'Slipp der hjørnet skal være · Esc: avbryt';
     if (mode.kind === 'pan' && mode.dragging) return 'Dra for å flytte visningen · slipp når du ser det du vil';
     if (ctx.selection?.kind === 'node') {
@@ -93,7 +96,10 @@ export const selectTool: Tool = {
     if (!pointer || mode.kind === 'idle') return {};
     if (mode.kind === 'pan') return mode.dragging ? { noHover: true } : {};
     const done = change(ctx, pointer);
-    return done ? { diagram: updateNode(ctx.diagram, mode.id, done), noHover: true } : {};
+    if (!done) return {};
+    const diagram = updateNode(ctx.diagram, mode.id, done);
+    const moved = findNode(diagram, mode.id)!;
+    return { diagram, noHover: true, overlay: guideMarks(guidesFor(diagram, moved, moved.id), ctx.handleSize) };
   },
 
   cancel(ctx) {

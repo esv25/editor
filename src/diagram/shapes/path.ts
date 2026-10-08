@@ -140,8 +140,13 @@ export const path: ShapeType = {
       ...label(node),
     ]);
   },
-  // A line's own points (and corner): other lines can start where this one ends.
-  anchors: linePoints,
+  // A line's own points: other lines can start where this one ends. A corner comes last, so the
+  // points keep their numbers (line ends fastened here refer to them by index, see attach.ts).
+  anchors(node) {
+    const points = absolutePoints(node);
+    const line = linePoints(node);
+    return line.length > points.length ? [...points, line[1]] : points;
+  },
   boundary: rectBoundary,
   distance(node, p) {
     const points = sample(node);

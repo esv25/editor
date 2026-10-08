@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Tegnevinduet: figurer **stiller seg på linje** med hverandre. Når du drar, plasserer eller endrer størrelse på en figur og en kant eller midten kommer nær en annen figurs, hekter den seg på – en stiplet hjelpelinje viser hvilke figurer som står på linje.
+- Tegnevinduet: en **strek som starter eller slutter på et punkt** (hjørne eller midtpunkt) på en figur, sitter fast der og **følger med når figuren flyttes** eller endrer størrelse. Velger du streken, viser fylte prikker endene som sitter fast. Flytter du streken selv, løsner den (og hekter seg fast igjen der endene havner på et punkt).
 - Tegnevinduet: piler og streker kan ha **hjørner**, så de aldri går på skrå. Under «Hjørner» i panelet til høyre velger du «Rett» (som før), «Sidelengs først» (først til høyre/venstre, så opp/ned) eller «Opp/ned først». Det gjelder linja du har valgt, og nye linjer med Pil og Strek. Står to figurer ved siden av eller over hverandre, går linja rett ut, svinger midt mellom dem og går rett inn.
 
 ## 0.9.0 – 2026-10-07
