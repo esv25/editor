@@ -185,7 +185,7 @@ function table(node: SyntaxNode, text: string): Block {
     const cells = row.getChildren('TableCell');
     return segments.map(([from, to]) => {
       const cell = cells.find((c) => c.from >= from && c.to <= to);
-      return cell ? trimInlines(inlinesOf(cell, text)) : [];
+      return cell ? trimInlines(inlinesOf(cell, text)).map(pipesInCell) : [];
     });
   };
   const header = node.getChild('TableHeader');
@@ -194,6 +194,17 @@ function table(node: SyntaxNode, text: string): Block {
   const width = Math.max(head.length, align.length, ...rows.map((r) => r.length));
   const pad = (r: Inline[][]) => Array.from({ length: width }, (_, i) => r[i] ?? []);
   return { t: 'table', align: Array.from({ length: width }, (_, i) => align[i] ?? null), head: pad(head), rows: rows.map(pad) };
+}
+
+/**
+ * GFM: in a table, `\|` is a pipe everywhere in the cell, also in code and
+ * formulas (`$\|x\|$` is |x|). Plain text already has it as an escape.
+ */
+function pipesInCell(item: Inline): Inline {
+  const pipes = (s: string) => s.replace(/\\\|/g, '|');
+  if (item.t === 'code') return { ...item, text: pipes(item.text) };
+  if (item.t === 'math') return { ...item, latex: pipes(item.latex) };
+  return 'children' in item ? { ...item, children: item.children.map(pipesInCell) } : item;
 }
 
 // --- Inline content ------------------------------------------------------------------

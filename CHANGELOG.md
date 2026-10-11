@@ -6,6 +6,9 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Tabeller: formler i en celle redigeres med formelfeltet, som ellers i notatet – klikk på formelen, gå inn med piltastene eller Backspace, eller lag en ny med Ctrl+M. Mattepanelet og egne mattetaster virker der også.
+- Tabeller: `|x|` (absoluttverdi) i en formel i en tabell vises nå riktig, også i PDF og Word (før ble det ‖x‖).
+
 ## 0.9.3 – 2026-10-08
 
 - Tegninger i notater er lettere å lese: de kan bli bredere enn tekstkolonnen (helt ut til kantene av editoren), og eldre tegninger vises med den større teksten tegnevinduet bruker nå.
