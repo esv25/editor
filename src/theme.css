@@ -69,6 +69,20 @@
   --indent-guide-active: rgb(56 103 166 / 0.6);
   --trailing-space: rgb(224 50 31 / 0.16);
 
+  /* Boards («tavle»): the surface, cards, and the six preset colours of JSON Canvas (Obsidian). */
+  --board-bg: #f3f1ec;
+  --board-dot: rgb(0 0 0 / 0.13);
+  --card-bg: #ffffff;
+  --card-border: #d9d4ca;
+  --card-shadow: 0 1px 3px rgb(0 0 0 / 0.08), 0 4px 14px rgb(0 0 0 / 0.05);
+  --board-edge: #8c887f;
+  --board-1: #d9473b;
+  --board-2: #e08a1e;
+  --board-3: #c9a400;
+  --board-4: #3f9a4d;
+  --board-5: #1f9aa8;
+  --board-6: #8a5cd1;
+
   /* Terminal colours (ANSI). */
   --term-black: #2b2a28;
   --term-red: #c8312b;
@@ -148,6 +162,19 @@
   --indent-guide: rgb(255 255 255 / 0.15);
   --indent-guide-active: rgb(127 169 227 / 0.6);
   --trailing-space: rgb(255 107 91 / 0.22);
+
+  --board-bg: #18191b;
+  --board-dot: rgb(255 255 255 / 0.1);
+  --card-bg: #24252a;
+  --card-border: #3a3c42;
+  --card-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 4px 14px rgb(0 0 0 / 0.25);
+  --board-edge: #8a8780;
+  --board-1: #f0665a;
+  --board-2: #f2a14a;
+  --board-3: #e8c94a;
+  --board-4: #6cc786;
+  --board-5: #4cc3cf;
+  --board-6: #b08cf0;
 
   --term-black: #3b3d42;
   --term-red: #e06c75;

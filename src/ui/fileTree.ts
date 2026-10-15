@@ -3,12 +3,12 @@
  * subfolders. Only files the editor can open (notes and code) are listed.
  */
 import type { Group, Workspace } from '../app/workspace';
-import { codeFileExtensions, extensionOf, kindForName } from '../code/languages';
+import { BOARD_EXTENSION, codeFileExtensions, extensionOf, kindForName, type DocKind } from '../code/languages';
 import { platform } from '../platform';
 import { storage, type FolderEntry } from '../storage';
 import { showContextMenu, type MenuItem } from './contextMenu';
 
-const OPENABLE = new Set(['md', 'markdown', 'txt', ...codeFileExtensions]);
+const OPENABLE = new Set(['md', 'markdown', 'txt', BOARD_EXTENSION, ...codeFileExtensions]);
 
 const svg = (body: string) =>
   `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
@@ -17,13 +17,14 @@ const icons = {
   folderOpen: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1"/><path d="M3 7v10a2 2 0 0 0 2 2h12.5l3.5-8H7.5L4 19"/>'),
   note: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
   code: svg('<path d="m9 8-4 4 4 4M15 8l4 4-4 4"/>'),
+  board: svg('<rect x="3" y="4" width="8" height="6" rx="1"/><rect x="13" y="14" width="8" height="6" rx="1"/><path d="M11 7h3a2 2 0 0 1 2 2v5"/>'),
   chevron: svg('<path d="m9 6 6 6-6 6"/>'),
 };
 
 export interface FileTreeActions {
   /** Ask for a folder and link it to the group. */
   linkFolder(group: Group): void;
-  newDocument(folder: string, kind: 'markdown' | 'code'): void;
+  newDocument(folder: string, kind: DocKind): void;
 }
 
 const baseName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -121,8 +122,8 @@ export class FileTree {
     const row = document.createElement('button');
     row.type = 'button';
     const expanded = entry.isDirectory && this.expanded.has(entry.path);
-    const isCode = !entry.isDirectory && kindForName(entry.name) === 'code';
-    row.className = `file-row ${entry.isDirectory ? 'dir' : isCode ? 'file code' : 'file note'}${expanded ? ' expanded' : ''}`;
+    const kind = entry.isDirectory ? null : kindForName(entry.name);
+    row.className = `file-row ${entry.isDirectory ? 'dir' : kind === 'markdown' ? 'file note' : `file ${kind}`}${expanded ? ' expanded' : ''}`;
     row.title = entry.path;
 
     // One guide per level, so it's clear which folder a row belongs to.
@@ -136,7 +137,7 @@ export class FileTree {
     if (entry.isDirectory) chevron.innerHTML = icons.chevron;
     const icon = document.createElement('span');
     icon.className = 'file-icon';
-    icon.innerHTML = entry.isDirectory ? (expanded ? icons.folderOpen : icons.folder) : isCode ? icons.code : icons.note;
+    icon.innerHTML = entry.isDirectory ? (expanded ? icons.folderOpen : icons.folder) : kind === 'code' ? icons.code : kind === 'board' ? icons.board : icons.note;
     const name = document.createElement('span');
     name.className = 'file-name';
     name.textContent = entry.name;
@@ -176,6 +177,7 @@ export class FileTree {
     const items: MenuItem[] = [
       { label: 'Nytt dokument her', action: () => this.actions.newDocument(folder, 'markdown') },
       { label: 'Ny kodefil her', action: () => this.actions.newDocument(folder, 'code') },
+      { label: 'Ny tavle her', action: () => this.actions.newDocument(folder, 'board') },
       'separator',
       { label: 'Vis i Utforsker', action: () => void platform.revealPath?.(folder), disabled: !platform.revealPath },
     ];

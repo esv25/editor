@@ -5,7 +5,8 @@
 import { Text, type EditorState } from '@codemirror/state';
 import type { ViewUpdate } from '@codemirror/view';
 import { extensionForLang, extensionOf, type DocKind } from '../code/languages';
-import { currentSettingsVersion } from '../editor/createEditor';
+import { boardTitleText, parseBoard } from '../board/model';
+import { boardWrite, currentSettingsVersion } from '../editor/createEditor';
 import { getSettings } from '../settings';
 import { NeedsPermissionError, storage, type FileRef } from '../storage';
 import { suggestFileName, titleFromContent } from './fileNames';
@@ -35,6 +36,16 @@ let idCounter = 0;
 const newId = () => `d${Date.now().toString(36)}${(idCounter++).toString(36)}`;
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/** The text a file name is taken from: a board is named after its first card. */
+function titleSource(kind: DocKind, content: string): string {
+  if (kind !== 'board') return content;
+  try {
+    return boardTitleText(parseBoard(content));
+  } catch {
+    return '';
+  }
+}
 
 export class EditorDocument {
   readonly id: string;
@@ -99,9 +110,22 @@ export class EditorDocument {
   /** Call with every editor update while this document is active. */
   handleUpdate(update: ViewUpdate): void {
     this.state = update.state;
-    if (!update.docChanged) return;
+    if (update.docChanged) this.contentChanged();
+  }
+
+  /** Replace the whole text from outside the editor (the board view writes its file here). */
+  setContent(text: string): void {
+    if (text === this.content) return;
+    this.state = this.state.update({
+      changes: { from: 0, to: this.state.doc.length, insert: text },
+      annotations: boardWrite.of(true),
+    }).state;
+    this.contentChanged();
+  }
+
+  private contentChanged(): void {
     const wasDirty = this.dirty;
-    this.dirty = !update.state.doc.eq(this.savedDoc);
+    this.dirty = !this.state.doc.eq(this.savedDoc);
     if (this.dirty) {
       if (this.status.kind !== 'saving') this.status = { kind: 'dirty' };
       this.scheduleAutosave();
@@ -149,14 +173,19 @@ export class EditorDocument {
     this.notify();
     try {
       const isMarkdown = this.kind === 'markdown';
+      const isBoard = this.kind === 'board';
       const ext = isMarkdown ? 'md' : extensionOf(this.name) || extensionForLang[this.lang] || 'txt';
-      // Code files are named by time; Markdown by its first line (and follows it).
-      const baseName = isMarkdown ? suggestFileName(content) : suggestFileName('').replace('Notat', 'Kode');
+      // Code files are named by time; Markdown by its first line, a board by its first card (and follows it).
+      const baseName = isMarkdown
+        ? suggestFileName(content)
+        : isBoard
+          ? suggestFileName(titleSource('board', content)).replace(/^Notat /, 'Tavle ')
+          : suggestFileName('').replace('Notat', 'Kode');
       const folder = this.targetFolder || this.folderProvider() || getSettings().autosave.folder || undefined;
       const file = await storage.createNew(content, baseName, ext, folder);
       this.file = file;
       this.name = file.name;
-      this.autoNamed = isMarkdown;
+      this.autoNamed = isMarkdown || isBoard;
       this.markSaved(snapshot);
     } catch (err) {
       this.status = { kind: 'error', message: `Kunne ikke autolagre: ${errorText(err)}` };
@@ -219,7 +248,7 @@ export class EditorDocument {
   /** Rename an auto-named file when the document's first line has changed. */
   private async followTitle(content: string): Promise<void> {
     if (!this.autoNamed || !this.file || !storage.rename) return;
-    const title = titleFromContent(content);
+    const title = titleFromContent(titleSource(this.kind, content));
     if (!title || this.name.replace(/\.[^.]+$/, '') === title) return;
     try {
       this.file = await storage.rename(this.file, title);

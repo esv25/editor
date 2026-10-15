@@ -69,13 +69,15 @@ export class OutlinePanel {
 
   refresh(state: EditorState): void {
     if (!this.visible) return;
-    const isCode = state.facet(docKind) === 'code';
+    const kind = state.facet(docKind);
+    const isCode = kind !== 'markdown';
     this.headings = isCode ? [] : extractHeadings(state);
     this.list.replaceChildren();
     if (this.headings.length === 0) {
       const empty = document.createElement('li');
       empty.className = 'empty';
-      empty.textContent = isCode ? 'Kodefiler har ingen disposisjon' : 'Ingen overskrifter ennå';
+      empty.textContent =
+        kind === 'board' ? 'Tavla har ingen disposisjon – «Til dokument» lager en' : isCode ? 'Kodefiler har ingen disposisjon' : 'Ingen overskrifter ennå';
       this.list.append(empty);
       return;
     }

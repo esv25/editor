@@ -2,6 +2,7 @@
  * Window title and the status bar (save status, word count / code info).
  */
 import type { EditorDocument } from '../app/document';
+import { boardText, parseBoard } from '../board/model';
 import { activeFeatures, problemCounts } from '../code/assist';
 import { describeIndent } from '../code/indentation';
 import { describeCommand } from '../commands/registry';
@@ -83,7 +84,14 @@ export function renderCount(doc: EditorDocument): void {
     el.textContent = `${lang} · linje ${line.number}, kol ${head - line.from + 1} · ${describeIndent(state, head)} · ${state.doc.lines} linjer`;
     return;
   }
-  const text = state.doc.toString();
+  let text = state.doc.toString();
+  if (doc.kind === 'board') {
+    try {
+      text = boardText(parseBoard(text));
+    } catch {
+      text = '';
+    }
+  }
   const words = text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
   el.textContent = `${words.toLocaleString('nb-NO')} ord · ${text.length.toLocaleString('nb-NO')} tegn`;
 }

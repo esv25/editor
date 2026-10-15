@@ -35,7 +35,7 @@ UI-tekst er på norsk (bokmål). Kode, identifikatorer og kodekommentarer er på
 - `npm run release` – publiserer en ny versjon som installerte apper oppdaterer seg til
   (se «Oppdateringer» under)
 
-I dev-modus ligger `window.editorView` og `window.workspace` tilgjengelig for feilsøking
+I dev-modus ligger `window.editorView`, `window.workspace` og `window.board` tilgjengelig for feilsøking
 i nettleserkonsollen.
 
 Feilsøking i skrivebordsappen: start med miljøvariabelen
@@ -77,6 +77,9 @@ src/
     debuggers.ts          språk → feilsøker (standard + settings.debuggers)
     dap.ts                DAP-klient + backend (debugpy for Python)
     node.ts               Node-backend over Chrome DevTools Protocol (JS/TS)
+  board/                  tavla (se «Tavle» under)
+    model.ts              Board = JSON Canvas (.canvas, som Obsidian): kort, områder, piler – ren logikk
+    view.ts               BoardView: viser tavle-dokumentet i stedet for editoren
   features/               én CodeMirror-funksjon per fil (se under)
     index.ts              listen over aktive features
     types.ts              Feature-grensesnittet
@@ -250,6 +253,42 @@ Markdown (`$…$`, `$$` på egne linjer), så filene virker i Obsidian/Typora/Gi
   `node_modules` og filtyper editoren ikke kan åpne), og nye dokumenter autolagres i
   mappa. Et dokument kan ha `targetFolder` (f.eks. en undermappe valgt i treet) som går
   foran gruppens mappe. Høyreklikk på gruppefanen/treet gir valgene (`ui/contextMenu.ts`).
+
+### Tavle (`src/board/`)
+
+En tredje dokumenttype ved siden av notat og kode (`DocKind` `'board'`, filendelse `.canvas`), for å drøfte og
+lære bort når et lineært dokument blir for stramt: kort plassert fritt på en uendelig flate, piler mellom dem og
+områder rundt dem. Filformatet er **JSON Canvas** (Obsidian sitt), så tavler åpnes der også; felt og nodetyper vi
+ikke kjenner (fil-, lenkekort, `styleAttributes` …) beholdes og vises/skrives uendret. En fil som ikke er gyldig
+JSON Canvas vises som feil og skrives aldri over.
+
+- `model.ts` (ren logikk, testet i `tests/board.test.ts`): `parseBoard`/`serializeBoard` (tab-innrykk som Obsidian),
+  og rene endringer som gir ny `Board` (addNode – områder legges bakerst, moveNodes – et område tar med det som
+  ligger helt inni, removeNodes – tar pilene med, connect, reverseEdge, placeNextTo – plass ved siden av uten å
+  dekke andre kort). `edgeGeometry`: kurve ut av sidene som vender mot hverandre (eller sidene i fila).
+  `readingOrder` (pilene først, ellers ovenfra og ned) og `boardToMarkdown` («Til dokument»: kort utenfor områder
+  først, hvert område som `##`-overskrift, tekst på piler i kursiv) – også PDF/Word/utskrift av en tavle bruker den.
+- Dokumentet: tavla har sin egen `EditorState` med JSON-teksten (`createBoardState`; `changeFilter` slipper bare
+  gjennom endringer merket `boardWrite`). `BoardView` skriver hele fila med `EditorDocument.setContent` ved hver
+  endring, så ulagret-status, autolagring (navn fra første kort), økten og Ctrl+S virker som ellers.
+- `view.ts`: én `BoardView` (i `#board`, ved siden av `#editor`, som skjules). Hvert tekstkort er en egen
+  `EditorView` med `createMarkdownState(text, extra)` – samme features som notater (formler, lister, tabeller,
+  bilder relativt til tavlas mappe). Kortenes høyde følger teksten (måles med ResizeObserver; lagret høyde
+  oppdateres bare når kortet skrives i eller får ny bredde, så det å åpne en tavle endrer ingenting). Kort som
+  ikke er i fokus viser alt ferdig formatert (livePreview viser bare markering i fokusert editor).
+  Kortenes oppdateringer går ikke til `Workspace` (`onUpdate` i `app.ts` ser på `u.view`); `getView()` gir kortet
+  som skrives i (så verktøylinja, mattepanelet og Ctrl+Z virker der), formateringsknappene starter skriving i et
+  valgt kort (`viewForFormatting`).
+- Angring: hele tavla som øyeblikksbilder (`History<Board>` fra tegnevinduet). Tekst skrevet i et kort blir ett steg
+  når man går ut av kortet; inni kortet er Ctrl+Z kortets egen. Et nytt kort som forlates tomt, forsvinner (også
+  fra angrelista). `edit.undo`/`edit.redo` pakkes inn i `app.ts` så knappene går til tavla.
+- Betjening (samme valg som tegnevinduet: dra med terskel `settings.diagram.dragThreshold`, alt snapper til
+  `settings.diagram.grid`, hint-linje nederst): dobbeltklikk/Enter = nytt kort, dra i stripa øverst = flytt, hjørnet =
+  bredde (områder: begge veier), dra tomrom/midtknapp/hjul = panorer, Ctrl+hjul = zoom, Shift+dra = marker, Tab =
+  neste kort, piltaster flytter, Ctrl+pil eller «+» på sidene = nytt kort med pil, Esc = ferdig med kortet,
+  høyreklikk = meny (farge, pilspisser, snu, tekst på pila). Kommandoene `board.*` og `file.newBoard` ligger i `app.ts`.
+- Farger: `--board-1…6` (Obsidians seks forhåndsfarger) og `--board-*`/`--card-*` i `theme.css`; hex-farger fra fila
+  brukes bare hvis de er `#rgb`/`#rrggbb`. All tekst fra fila settes med `textContent`.
 
 ### Tegnevinduet (`src/diagram/`, `diagram.html`)
 

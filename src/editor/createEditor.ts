@@ -3,7 +3,7 @@
  * per open document (Markdown or code). Switching tabs swaps the state, so
  * each document keeps its own undo history, cursor and scroll.
  */
-import { Compartment, EditorState, Facet, type Extension, type StateEffect } from '@codemirror/state';
+import { Annotation, Compartment, EditorState, Facet, type Extension, type StateEffect } from '@codemirror/state';
 import {
   EditorView,
   drawSelection,
@@ -37,6 +37,7 @@ export const docKind = Facet.define<DocKind, DocKind>({ combine: (values) => val
 const dynamic = new Compartment();
 
 function dynamicExtensions(kind: DocKind, settings: Settings, lang = ''): Extension {
+  if (kind === 'board') return [];
   if (kind === 'code') return [commandKeymap('code'), codeAssistExtensions(lang, settings.codeHelp)];
   return [commandKeymap('markdown'), features.map((f) => f.extension?.(settings) ?? [])];
 }
@@ -71,10 +72,12 @@ function sharedExtensions(): Extension {
   ];
 }
 
-export function createMarkdownState(text: string): EditorState {
+/** `extra`: more extensions (a card on a board adds its own listener and keys). */
+export function createMarkdownState(text: string, extra: Extension = []): EditorState {
   return EditorState.create({
     doc: text,
     extensions: [
+      extra,
       docKind.of('markdown'),
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({ spellcheck: 'true', lang: 'nb' }),
@@ -84,6 +87,24 @@ export function createMarkdownState(text: string): EditorState {
       placeholder('Begynn å skrive …'),
       dynamic.of(dynamicExtensions('markdown', getSettings())),
       sharedExtensions(),
+    ],
+  });
+}
+
+/** Marks the board's own writes to its document (nothing else may change a board's text). */
+export const boardWrite = Annotation.define<boolean>();
+
+/**
+ * A board's document: its JSON Canvas text, shown and edited by the board
+ * view (src/board/), not by the editor. Only the board writes to it.
+ */
+export function createBoardState(text: string): EditorState {
+  return EditorState.create({
+    doc: text,
+    extensions: [
+      docKind.of('board'),
+      dynamic.of([]),
+      EditorState.changeFilter.of((tr) => tr.annotation(boardWrite) === true),
     ],
   });
 }

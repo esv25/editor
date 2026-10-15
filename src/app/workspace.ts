@@ -4,9 +4,10 @@
  */
 import { EditorSelection } from '@codemirror/state';
 import type { EditorView, ViewUpdate } from '@codemirror/view';
-import { extensionForLang, kindForName, langForName, withExtension, type DocKind } from '../code/languages';
+import { BOARD_EXTENSION, extensionForLang, kindForName, langForName, withExtension, type DocKind } from '../code/languages';
 import { breakpointLines, setBreakpointsEffect } from '../debug/breakpoints';
 import {
+  createBoardState,
   createCodeState,
   createMarkdownState,
   currentSettingsVersion,
@@ -32,7 +33,14 @@ const newGroupId = () => `g${Date.now().toString(36)}${Math.random().toString(36
 const samePath = (a?: string, b?: string) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
 
 async function stateFor(kind: DocKind, content: string, lang: string) {
+  if (kind === 'board') return createBoardState(content);
   return kind === 'markdown' ? createMarkdownState(content) : createCodeState(content, lang);
+}
+
+function untitledName(kind: DocKind, lang: string): string {
+  if (kind === 'markdown') return `${UNTITLED}.md`;
+  if (kind === 'board') return `${UNTITLED}.${BOARD_EXTENSION}`;
+  return `${UNTITLED}.${extensionForLang[lang] ?? 'txt'}`;
 }
 
 export class Workspace {
@@ -101,8 +109,9 @@ export class Workspace {
   private adopt(doc: EditorDocument): void {
     doc.folderProvider = () => this.groups.find((g) => g.docs.includes(doc))?.folder;
     doc.onChange(() => {
-      // "Save as" with a different extension turns a note into code or back.
-      if (doc.file && kindForName(doc.name) !== doc.kind) void this.convert(doc);
+      // "Save as" with a different extension turns a note into code or back (a board stays a board).
+      const kind = kindForName(doc.name);
+      if (doc.file && kind !== doc.kind && kind !== 'board' && doc.kind !== 'board') void this.convert(doc);
       this.changed();
     });
   }
@@ -130,12 +139,13 @@ export class Workspace {
     }
     for (const fn of this.activeListeners) fn();
     this.changed();
-    this.view.focus();
+    // A board is shown by the board view, which takes the focus itself.
+    if (doc.kind !== 'board') this.view.focus();
   }
 
   /** New untitled document in the active group; `folder`: autosave it there (e.g. a subfolder). */
   async newDocument(kind: DocKind = 'markdown', lang = 'python', folder?: string): Promise<EditorDocument> {
-    const name = kind === 'markdown' ? `${UNTITLED}.md` : `${UNTITLED}.${extensionForLang[lang] ?? 'txt'}`;
+    const name = untitledName(kind, lang);
     const doc = new EditorDocument({
       file: null,
       name,

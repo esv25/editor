@@ -1315,6 +1315,222 @@ html, body {
 .cm-debug-ref { border-radius: 2px; background: color-mix(in srgb, var(--pin) 15%, transparent); box-shadow: inset 0 -2px var(--pin); }
 
 /* ---------- PDF and printing (src/export/index.ts) ---------- */
+/* ---------- Board («tavle», src/board/) ---------- */
+#editor[hidden], #board[hidden] { display: none; }
+#board {
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+  /* clip, not hidden: nothing (not even a card editor scrolling to its cursor) may scroll it. */
+  overflow: clip;
+  outline: none;
+  background-color: var(--board-bg);
+  background-image: radial-gradient(circle, var(--board-dot) 1.2px, transparent 1.4px);
+  background-size: var(--grid-size, 20px) var(--grid-size, 20px);
+  background-position: var(--grid-x, 0) var(--grid-y, 0);
+  font-family: var(--font-ui);
+  touch-action: none;
+  user-select: none;
+}
+.board-world { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+.board-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; z-index: 500; pointer-events: none; }
+.board-edge { --edge-color: var(--board-edge); }
+.board-edge-hit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
+.board-edge-line { fill: none; stroke: var(--edge-color); stroke-width: 2.5; stroke-linecap: round; }
+.board-edge-head { fill: var(--edge-color); }
+.board-edge.selected .board-edge-line { stroke: var(--accent); stroke-width: 4; }
+.board-edge.selected .board-edge-head { fill: var(--accent); }
+.board-edge-label {
+  font: 14px var(--font-ui);
+  fill: var(--fg);
+  paint-order: stroke;
+  stroke: var(--board-bg);
+  stroke-width: 6px;
+  stroke-linejoin: round;
+  pointer-events: all;
+  cursor: pointer;
+}
+.board-edge-preview { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 6 5; }
+
+/* Cards: a strip to grab at the top, the card's own editor below. */
+.board-card {
+  position: absolute;
+  --node-color: var(--card-border);
+  display: flex;
+  flex-direction: column;
+  min-height: 44px;
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  border-radius: 8px;
+  box-shadow: var(--card-shadow);
+}
+.board-card.colored { border-color: var(--node-color); background: color-mix(in srgb, var(--node-color) 7%, var(--card-bg)); }
+.board-card.selected { outline: 3px solid var(--accent); outline-offset: 2px; }
+.board-card.editing { outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; }
+.board-card.connect-target { cursor: crosshair; }
+.board-card.connect-target:hover { outline: 3px dashed var(--accent); outline-offset: 3px; }
+.board-card-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  height: 22px;
+  padding: 2px 4px 0;
+  border-radius: 7px 7px 0 0;
+  cursor: grab;
+}
+.board-card.colored .board-card-bar { background: color-mix(in srgb, var(--node-color) 22%, transparent); }
+.board-card:not(.colored) .board-card-bar { background: color-mix(in srgb, var(--muted) 8%, transparent); }
+.board-bar-button {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.board-bar-button:hover { background: var(--button-hover); color: var(--fg); }
+.board-card:hover .board-bar-button, .board-card.selected .board-bar-button, .board-card.editing .board-bar-button { display: inline-flex; }
+.board-color-button { color: var(--node-color); }
+.board-card:not(.colored) .board-color-button { color: var(--faint); }
+.board-card-body { flex: 1; min-width: 0; cursor: text; user-select: text; }
+.board-card-other { padding: 10px 14px; color: var(--muted); cursor: default; overflow: hidden; text-overflow: ellipsis; }
+/* The card's editor: the note editor, made to fit a card. */
+.board-card .cm-editor { height: auto; background: transparent; font-size: calc(var(--font-size) * 0.92); }
+.board-card .cm-scroller { overflow: visible !important; line-height: 1.5; }
+.board-card .cm-content { max-width: none !important; margin: 0 !important; padding: 6px 14px 10px !important; }
+.board-card .cm-placeholder { font-size: 0.9em; }
+
+.board-resize {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 55%, var(--faint) 55% 63%, transparent 63% 72%, var(--faint) 72% 80%, transparent 80%);
+  opacity: 0;
+}
+.board-card .board-resize { cursor: ew-resize; }
+.board-card:hover .board-resize, .board-card.selected .board-resize, .board-group:hover .board-resize, .board-group.selected .board-resize { opacity: 1; }
+
+/* Areas: a frame with its name on a tab above; the inside is board (dbl-click makes a card there). */
+.board-group {
+  position: absolute;
+  --node-color: var(--faint);
+  border: 2px solid var(--node-color);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--node-color) 6%, transparent);
+  pointer-events: none;
+}
+.board-group.colored { background: color-mix(in srgb, var(--node-color) 9%, transparent); }
+.board-group.selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.board-group-label {
+  position: absolute;
+  left: 10px;
+  bottom: 100%;
+  margin-bottom: 4px;
+  max-width: calc(100% - 20px);
+  padding: 3px 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--node-color) 22%, var(--board-bg));
+  color: var(--fg);
+  font: 600 15px var(--font-ui);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: auto;
+  cursor: grab;
+}
+.board-group .board-resize { pointer-events: auto; }
+.board-text-input {
+  font: inherit;
+  min-width: 12em;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* The + buttons around the selected card, the arrow-text field. Same size at any zoom. */
+.board-chrome { position: absolute; left: 0; top: 0; z-index: 3000; }
+.board-add {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  background: var(--card-bg);
+  color: var(--accent);
+  cursor: pointer;
+  transform: scale(var(--inv-zoom, 1));
+  box-shadow: var(--card-shadow);
+}
+.board-add:hover { background: var(--accent); color: var(--card-bg); }
+.board-edge-input { position: absolute; transform: translate(-50%, -50%); }
+
+.board-marquee { position: absolute; border: 1.5px dashed var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); pointer-events: none; z-index: 10; }
+.board-message {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  max-width: 34em;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--syn-invalid);
+  z-index: 10;
+}
+.board-message[hidden], .board-hint[hidden], .board-marquee[hidden] { display: none; }
+.board-hint {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  right: 230px;
+  font-size: 13px;
+  color: var(--muted);
+  pointer-events: none;
+  z-index: 10;
+}
+.board-zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  z-index: 10;
+}
+.board-zoom button {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--fg);
+  font: 14px var(--font-ui);
+  cursor: pointer;
+}
+.board-zoom button:hover { background: var(--button-hover); }
+.board-zoom-label { min-width: 52px !important; color: var(--muted) !important; font-size: 12px !important; }
+.file-row.board .file-icon { color: var(--board-5); opacity: 0.9; }
+
 /* The document is put in #print-root while printing; paper always has the same colours, whatever the theme. */
 #print-root {
   display: none;

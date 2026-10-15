@@ -5,7 +5,7 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { appLocalDataDir, documentDir, join } from '@tauri-apps/api/path';
 import { exists, mkdir, readDir, readFile, readTextFile, remove, rename, writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
-import { codeFileExtensions } from '../code/fileTypes';
+import { BOARD_EXTENSION, codeFileExtensions } from '../code/fileTypes';
 import { backupDay, backupFileName, expiredBackupDays } from './backupRules';
 import type { FileRef, FolderEntry, OpenedFile, StorageBackend } from './types';
 
@@ -14,8 +14,9 @@ interface PathRef extends FileRef {
 }
 
 const filters = [
-  { name: 'Markdown og kode', extensions: ['md', 'markdown', 'txt', ...codeFileExtensions] },
+  { name: 'Markdown, tavler og kode', extensions: ['md', 'markdown', 'txt', BOARD_EXTENSION, ...codeFileExtensions] },
   { name: 'Markdown og tekst', extensions: ['md', 'markdown', 'txt'] },
+  { name: 'Tavler', extensions: [BOARD_EXTENSION] },
   { name: 'Alle filer', extensions: ['*'] },
 ];
 

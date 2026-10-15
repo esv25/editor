@@ -3,6 +3,9 @@
  * drawing window can use them without loading the editor's language support.
  */
 
+/** Boards («tavle») are JSON Canvas files, as in Obsidian. */
+export const BOARD_EXTENSION = 'canvas';
+
 /** Language id -> file extension for new code files. */
 export const extensionForLang: Record<string, string> = {
   python: 'py',

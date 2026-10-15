@@ -9,6 +9,7 @@
  * opens its print dialog, where "Lagre som PDF" is one of the printers.
  */
 import type { EditorDocument } from '../app/document';
+import { boardToMarkdown, parseBoard } from '../board/model';
 import { imageUrl } from '../features/images/loader';
 import { dirOf, isHostAllowed, remoteHost, resolveImageSource } from '../features/util/imagePath';
 import { platform } from '../platform';
@@ -31,6 +32,8 @@ const errorText = (err: unknown) => (err instanceof Error ? err.message : String
 function blocksOf(doc: EditorDocument): Block[] {
   const text = doc.state.doc.toString();
   if (doc.kind === 'code') return [{ t: 'code', lang: doc.lang, title: doc.name, text }];
+  // A board is exported as the document «Til dokument» makes of it.
+  if (doc.kind === 'board') return parseDocument(boardToMarkdown(parseBoard(text)));
   return parseDocument(text);
 }
 

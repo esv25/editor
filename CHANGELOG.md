@@ -6,6 +6,7 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Ny: **Tavle** – for å drøfte og lære bort når et dokument blir for stramt. Skriv kort hvor som helst på en fri flate (dobbeltklikk, eller Enter), start gjerne flere steder, koble kort med piler, og samle dem i områder med navn. Kortene er små notater: formler, lister, kode og bilder virker som ellers. Ctrl+pil (eller + på sidene av et kort) lager et nytt kort med pil dit; kort og piler kan få farge. Lag en ny tavle med tavle-knappen ved fanene. «Til dokument» gjør tavla om til et vanlig notat når du vil skrive det ut ordentlig, og PDF/Word/utskrift virker på samme måte. Tavler lagres som `.canvas` og kan også åpnes i Obsidian.
 - Tabeller: formler i en celle redigeres med formelfeltet, som ellers i notatet – klikk på formelen, gå inn med piltastene eller Backspace, eller lag en ny med Ctrl+M. Mattepanelet og egne mattetaster virker der også.
 - Tabeller: `|x|` (absoluttverdi) i en formel i en tabell vises nå riktig, også i PDF og Word (før ble det ‖x‖).
 

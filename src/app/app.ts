@@ -3,10 +3,11 @@
  */
 import type { EditorView, ViewUpdate } from '@codemirror/view';
 import { installGlobalKeys } from '../commands/keys';
-import { registerCommands, runCommand } from '../commands/registry';
+import { getCommand, registerCommand, registerCommands, runCommand } from '../commands/registry';
+import { BoardView } from '../board/view';
 import { breakpointsChanged, toggleBreakpoint } from '../debug/breakpoints';
 import { DebugController } from '../debug/controller';
-import { createMarkdownState, createView } from '../editor/createEditor';
+import { createMarkdownState, createView, docKind } from '../editor/createEditor';
 import { runContext } from '../features/codeBlockTools';
 import { allowRunning } from './trust';
 import { runnerFor } from '../features/codeBlockTools/runners';
@@ -59,7 +60,12 @@ export async function startApp(): Promise<void> {
   let ws!: Workspace;
   let view!: EditorView;
   let debug!: DebugController;
-  const getView = () => view;
+  let board!: BoardView;
+  /** On a board, the card being written in is the editor; otherwise the editor itself. */
+  const getView = () => board?.editingView ?? view;
+  /** Formatting buttons on a board also work on the selected card (and start writing in it). */
+  const formatView = () => (ws?.activeDoc?.kind === 'board' && board.viewForFormatting()) || getView();
+  const onBoard = () => ws?.activeDoc?.kind === 'board' && board.activeDoc === ws.activeDoc;
   const active = () => ws.activeDoc;
 
   // Terminal panel below the editor (desktop only). New terminals open in the active document's folder.
@@ -96,6 +102,48 @@ export async function startApp(): Promise<void> {
       key: 'Mod-n',
       scope: 'any',
       run: () => (void ws.newDocument(), true),
+    },
+    {
+      id: 'file.newBoard',
+      name: 'Ny tavle (kort, piler og områder fritt på en flate)',
+      label: 'Ny tavle',
+      scope: 'any',
+      run: () => (void ws.newDocument('board'), true),
+    },
+    {
+      id: 'board.addCard',
+      name: 'Nytt kort på tavla (eller dobbeltklikk et tomt sted)',
+      icon: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 9v6M9 12h6"/>'),
+      scope: 'any',
+      run: () => (onBoard() ? (board.addCard(), true) : false),
+    },
+    {
+      id: 'board.addGroup',
+      name: 'Nytt område (rundt de valgte kortene)',
+      icon: svg('<rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="3 3"/><path d="M7 8h5"/>'),
+      scope: 'any',
+      run: () => (onBoard() ? (board.addGroup(), true) : false),
+    },
+    {
+      id: 'board.connect',
+      name: 'Pil fra det valgte kortet (klikk så på kortet den skal til)',
+      icon: svg('<rect x="2" y="9" width="6" height="6" rx="1"/><rect x="16" y="9" width="6" height="6" rx="1"/><path d="M8 12h7M12 9l3 3-3 3"/>'),
+      scope: 'any',
+      run: () => (onBoard() ? (board.startConnecting(), true) : false),
+    },
+    {
+      id: 'board.fit',
+      name: 'Vis hele tavla',
+      icon: svg('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
+      scope: 'any',
+      run: () => (onBoard() ? (board.fit(), true) : false),
+    },
+    {
+      id: 'board.toDocument',
+      name: 'Lag dokument av tavla (kortene etter hverandre, områdene som overskrifter)',
+      label: 'Til dokument',
+      scope: 'any',
+      run: () => (onBoard() ? (board.toDocument(), true) : false),
     },
     {
       id: 'file.newCode',
@@ -335,6 +383,14 @@ export async function startApp(): Promise<void> {
 
   let countTimer: ReturnType<typeof setTimeout> | undefined;
   const onUpdate = (u: ViewUpdate) => {
+    // A card on a board (its own editor): the board keeps the document up to date.
+    if (u.view !== view) {
+      if (u.docChanged || u.selectionSet || u.focusChanged) {
+        mdToolbar.update(u.state);
+        editBar.update(u.state);
+      }
+      return;
+    }
     ws?.handleUpdate(u);
     const doc = ws?.activeDoc;
     if (!doc) return;
@@ -355,11 +411,38 @@ export async function startApp(): Promise<void> {
 
   view = createView(el('editor'), onUpdate);
   ws = new Workspace(view);
+  board = new BoardView(el('board'), {
+    write: (doc, text) => {
+      doc.setContent(text);
+      ws.scheduleSave();
+      clearTimeout(countTimer);
+      countTimer = setTimeout(() => renderCount(doc), 300);
+    },
+    changed: () => {
+      const state = getView().state;
+      editBar.update(state);
+      mdToolbar.update(state);
+    },
+    openPath: (path) => void ws.openPath(path),
+    createDocument: (markdown) =>
+      void ws.newDocument().then(() => view.dispatch({ changes: { from: 0, insert: markdown } })),
+  });
+  // Undo and redo on a board (not writing in a card) go to the board's own history.
+  for (const id of ['edit.undo', 'edit.redo']) {
+    const base = getCommand(id)!;
+    const isBoard = (v: EditorView) => v.state.facet(docKind) === 'board';
+    registerCommand({
+      ...base,
+      run: (v) => (isBoard(v) ? (id === 'edit.undo' ? board.undo() : board.redo()) : base.run(v)),
+      isEnabled: (state) => (state.facet(docKind) === 'board' ? (id === 'edit.undo' ? board.canUndo : board.canRedo) : (base.isEnabled?.(state) ?? true)),
+    });
+  }
   debug = new DebugController(ws, getView, terminal);
   // Handy for debugging in the browser console during development.
-  if (import.meta.env.DEV) Object.assign(window, { editorView: view, workspace: ws, debug, terminal });
+  if (import.meta.env.DEV) Object.assign(window, { editorView: view, workspace: ws, debug, terminal, board });
   const editBar = renderButtons(el('edit-actions'), ['edit.undo', 'edit.redo'], getView);
-  const mdToolbar = renderButtons(el('md-tools'), getSettings().toolbar, getView);
+  const mdToolbar = renderButtons(el('md-tools'), getSettings().toolbar, formatView);
+  renderButtons(el('board-tools'), ['board.addCard', 'board.addGroup', 'board.connect', 'board.fit', '|', 'board.toDocument'], getView);
   const codeBar = new CodeBar(el('code-tools'), getView, debug, (doc, lang) => void ws.setLanguage(doc, lang));
   const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save', 'file.export'], getView);
   const viewBar = renderButtons(
@@ -387,6 +470,7 @@ export async function startApp(): Promise<void> {
   const tabs = new TabsUI(el('group-tabs'), el('doc-tabs'), ws, {
     newDocument: () => void ws.newDocument(),
     newCodeFile: () => void ws.newDocument('code', 'python'),
+    newBoard: () => void ws.newDocument('board'),
     linkFolder: (group) => void linkFolder(group),
   });
   const fileTree = new FileTree(el('files'), ws, {
@@ -440,8 +524,11 @@ export async function startApp(): Promise<void> {
     const doc = ws.activeDoc;
     if (!doc) return;
     const isCode = doc.kind === 'code';
+    const isBoard = doc.kind === 'board';
     el('md-tools').hidden = isCode;
     el('code-tools').hidden = !isCode;
+    el('board-tools').hidden = !isBoard;
+    el('editor').hidden = isBoard;
     mathPanel.setEnabled(!isCode);
     if (isCode) codeBar.update(doc);
     else mdToolbar.update(doc.state);
@@ -450,6 +537,8 @@ export async function startApp(): Promise<void> {
     outline.refresh(doc.state);
     renderCount(doc);
     renderProblems(doc);
+    if (isBoard) board.show(doc);
+    else board.hide();
   });
   el('status-problems').addEventListener('click', () => {
     runCommand(view, 'code.problems');

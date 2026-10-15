@@ -6,11 +6,12 @@ import type { Extension } from '@codemirror/state';
 import { LanguageDescription } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
 import { normalizeLang } from '../features/codeBlockTools/runners';
-import { extensionForLang } from './fileTypes';
+import { BOARD_EXTENSION, extensionForLang } from './fileTypes';
 
-export { codeFileExtensions, extensionForLang } from './fileTypes';
+export { BOARD_EXTENSION, codeFileExtensions, extensionForLang } from './fileTypes';
 
-export type DocKind = 'markdown' | 'code';
+/** A note (Markdown), a code file, or a board («tavle», JSON Canvas). */
+export type DocKind = 'markdown' | 'code' | 'board';
 
 const MARKDOWN_EXTENSIONS = ['md', 'markdown', 'mdown', 'txt'];
 
@@ -32,9 +33,10 @@ export function extensionOf(name: string): string {
   return m ? m[1].toLowerCase() : '';
 }
 
-/** Markdown for .md/.txt (and files without extension), code for everything else. */
+/** Markdown for .md/.txt (and files without extension), a board for .canvas, code for everything else. */
 export function kindForName(name: string): DocKind {
   const ext = extensionOf(name);
+  if (ext === BOARD_EXTENSION) return 'board';
   return ext === '' || MARKDOWN_EXTENSIONS.includes(ext) ? 'markdown' : 'code';
 }
 

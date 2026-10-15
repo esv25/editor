@@ -7,6 +7,9 @@ import { platform } from '../platform';
 import { storage } from '../storage';
 import { showContextMenu } from './contextMenu';
 
+const BOARD_ICON =
+  '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="8" height="6" rx="1"/><rect x="13" y="14" width="8" height="6" rx="1"/><path d="M11 7h3a2 2 0 0 1 2 2v5"/></svg>';
+
 function button(className: string, text: string, title: string, onClick: () => void): HTMLButtonElement {
   const b = document.createElement('button');
   b.type = 'button';
@@ -29,7 +32,7 @@ export class TabsUI {
     private groupsEl: HTMLElement,
     private docsEl: HTMLElement,
     private ws: Workspace,
-    private actions: { newDocument(): void; newCodeFile(): void; linkFolder(group: Group): void },
+    private actions: { newDocument(): void; newCodeFile(): void; newBoard(): void; linkFolder(group: Group): void },
   ) {}
 
   render(): void {
@@ -45,10 +48,13 @@ export class TabsUI {
     const codeButton = button('tab-add tab-add-code', '', 'Ny kodefil', () => this.actions.newCodeFile());
     codeButton.innerHTML =
       '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 8-4 4 4 4M15 8l4 4-4 4"/></svg>';
+    const boardButton = button('tab-add tab-add-board', '', 'Ny tavle – kort, piler og områder fritt på en flate', () => this.actions.newBoard());
+    boardButton.innerHTML = BOARD_ICON;
     this.docsEl.replaceChildren(
       ...group.docs.map((d) => this.docTab(d)),
       button('tab-add', '+', 'Nytt dokument (Ctrl+N)', () => this.actions.newDocument()),
       codeButton,
+      boardButton,
     );
     this.docsEl.querySelector('.tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     this.renaming?.input.focus();
@@ -136,6 +142,11 @@ export class TabsUI {
       icon.className = 'tab-icon';
       icon.innerHTML =
         '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 8-4 4 4 4M15 8l4 4-4 4"/></svg>';
+      tab.append(icon);
+    } else if (doc.kind === 'board') {
+      const icon = document.createElement('span');
+      icon.className = 'tab-icon';
+      icon.innerHTML = BOARD_ICON.replace(/1[45]"/g, '14"');
       tab.append(icon);
     }
     const label = document.createElement('span');
