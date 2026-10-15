@@ -222,9 +222,20 @@ describe('reading a board in order', () => {
       ],
       [{ id: 'e', fromNode: 'def', toNode: 'ex', label: 'for eksempel' }],
     );
+    // The arrow leads from «Definisjon» on to «Eksempler»; the loose card comes after that chain.
     expect(boardToMarkdown(b)).toBe(
-      'Spørsmål: hva med sirkler?\n\n## Definisjon\n\nEn funksjon gir én verdi for hver $x$\n\n## Eksempler\n\n*for eksempel:*\n\n- $f(x) = 2x + 1$\n',
+      '## Definisjon\n\nEn funksjon gir én verdi for hver $x$\n\n## Eksempler\n\n*for eksempel:*\n\n- $f(x) = 2x + 1$\n\nSpørsmål: hva med sirkler?\n',
     );
+  });
+
+  it('takes areas and loose cards in the order they stand, without arrows', () => {
+    const b = board([group('g', 0, 300, 500, 300, 'Senere'), card('in', 20, 320, 'Inni'), card('first', 0, 0, 'Først')]);
+    expect(boardToMarkdown(b)).toBe('Først\n\n## Senere\n\nInni\n');
+  });
+
+  it('moves headings in an area\'s cards down under the area\'s heading', () => {
+    const b = board([group('g', 0, 0, 500, 300, 'Tema'), card('c', 20, 20, '# Stor\n\n```\n# kommentar\n```\n\n#### Liten')]);
+    expect(boardToMarkdown(b)).toBe('## Tema\n\n### Stor\n\n```\n# kommentar\n```\n\n###### Liten\n');
   });
 
   it('names a board after its first card and counts its words', () => {

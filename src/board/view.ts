@@ -700,7 +700,14 @@ export class BoardView {
         group.append(arrowHead(g.from, { x: -n.x, y: -n.y }, 'board-edge-head'));
       }
       if (edge.label?.trim()) {
-        const text = make('text', { x: g.mid.x, y: g.mid.y, class: 'board-edge-label', 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
+        // Beside the line, not on it, so a short arrow's head stays visible.
+        const sideways = Math.abs(g.to.x - g.from.x) >= Math.abs(g.to.y - g.from.y);
+        const text = make(
+          'text',
+          sideways
+            ? { x: g.mid.x, y: g.mid.y - 10, class: 'board-edge-label', 'text-anchor': 'middle' }
+            : { x: g.mid.x + 12, y: g.mid.y, class: 'board-edge-label', 'text-anchor': 'start', 'dominant-baseline': 'middle' },
+        );
         text.textContent = edge.label;
         group.append(text);
       }

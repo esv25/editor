@@ -398,9 +398,11 @@ export function readingOrder(board: Board, nodes = board.nodes.filter(isCard)): 
 }
 
 /**
- * The board as one Markdown document: each area becomes a heading with its
- * cards under it (areas in reading order), cards outside areas come first.
- * Cards are separated by blank lines; an arrow's text becomes a line in italics.
+ * The board as one Markdown document. Areas and cards outside areas are taken
+ * in reading order as units (an arrow from a card in one area to a card in
+ * another, or to a loose card, leads there next); each area becomes a heading
+ * with its cards under it, and headings in those cards move down a level so
+ * they sit under it. An arrow's text becomes a line in italics before the card it points to.
  */
 export function boardToMarkdown(board: Board): string {
   const groups = board.nodes.filter(isGroup);
@@ -414,26 +416,57 @@ export function boardToMarkdown(board: Board): string {
   const labels = new Map<string, string>();
   for (const e of board.edges) if (e.label?.trim()) labels.set(e.toNode, labels.has(e.toNode) ? `${labels.get(e.toNode)}, ${e.label.trim()}` : e.label.trim());
 
-  const section = (list: BoardNode[]) =>
-    readingOrder(board, list)
-      .map((card) => {
-        const text = (card.text ?? '').trim();
-        const label = labels.get(card.id);
-        return label ? `*${label}:*\n\n${text}` : text;
-      })
-      .filter((t) => t !== '')
-      .join('\n\n');
+  const cardText = (card: BoardNode, inArea: boolean) => {
+    const text = (card.text ?? '').trim();
+    if (!text) return '';
+    const body = inArea ? demoteHeadings(text, 2) : text;
+    const label = labels.get(card.id);
+    return label ? `*${label}:*\n\n${body}` : body;
+  };
+
+  // Units: the areas that hold cards (or have a name), and the loose cards.
+  const unitOf = (id: string) => home.get(id)?.id ?? id;
+  const units: BoardNode[] = [
+    ...groups.filter((g) => g.label?.trim() || cards.some((c) => home.get(c.id) === g)).map((g) => ({ ...g, type: 'text' })),
+    ...cards.filter((c) => !home.get(c.id)),
+  ];
+  const unitIds = new Set(units.map((u) => u.id));
+  const unitEdges = board.edges
+    .filter((e) => home.has(e.fromNode) && home.has(e.toNode))
+    .map((e) => ({ ...e, fromNode: unitOf(e.fromNode), toNode: unitOf(e.toNode) }))
+    .filter((e) => e.fromNode !== e.toNode && unitIds.has(e.fromNode) && unitIds.has(e.toNode));
 
   const parts: string[] = [];
-  const loose = section(cards.filter((c) => !home.get(c.id)));
-  if (loose) parts.push(loose);
-  const orderedGroups = [...groups].sort((a, b) => (Math.abs(a.y - b.y) > 20 ? a.y - b.y : a.x - b.x));
-  for (const group of orderedGroups) {
-    const body = section(cards.filter((c) => home.get(c.id) === group));
-    const title = group.label?.trim() || 'Område';
-    if (body || group.label) parts.push(`## ${title}${body ? `\n\n${body}` : ''}`);
+  for (const unit of readingOrder({ nodes: units, edges: unitEdges }, units)) {
+    const group = groups.find((g) => g.id === unit.id);
+    if (!group) {
+      const text = cardText(unit, false);
+      if (text) parts.push(text);
+      continue;
+    }
+    const body = readingOrder(board, cards.filter((c) => home.get(c.id) === group))
+      .map((c) => cardText(c, true))
+      .filter((t) => t !== '')
+      .join('\n\n');
+    parts.push(`## ${group.label?.trim() || 'Område'}${body ? `\n\n${body}` : ''}`);
   }
   return parts.join('\n\n') + '\n';
+}
+
+/** Move ATX headings down `levels` (at most to ######), outside code blocks. */
+export function demoteHeadings(text: string, levels: number): string {
+  let inFence = false;
+  return text
+    .split('\n')
+    .map((line) => {
+      if (/^\s{0,3}(`{3,}|~{3,})/.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence) return line;
+      return line.replace(/^(\s{0,3})(#{1,6})(?=\s|$)/, (_, indent: string, marks: string) => indent + '#'.repeat(Math.min(6, marks.length + levels)));
+    })
+    .join('\n');
 }
 
 /** Text to name a new board's file after: its first card (in reading order). */
