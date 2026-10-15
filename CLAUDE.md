@@ -217,6 +217,12 @@ Markdown (`$…$`, `$$` på egne linjer), så filene virker i Obsidian/Typora/Gi
   står i; Tab/Enter/piltaster/Ctrl+Z i cellen går via kommandoene. CodeMirror ser ikke tastene fra
   widgeten, så app-kommandoer (`commandsForKey`) videresendes, og Ctrl+B/I/E pakker inn i cellen.
   Uten `hideMarkup` er tabellen Markdown med monospace-linjer, og Tab/Enter virker der.
+- Formler i celler (`cellMath.ts`, ren logikk, testet i `tests/tableCellMath.test.ts`): mens en celle
+  redigeres, er hver `$…$` en ferdig tegnet, ikke-redigerbar bit av feltet (`cm-table-math`, LaTeX i
+  `data-latex`); `fieldText` gjør feltet om til celletekst igjen. Klikk, piltaster/Backspace/Delete inn,
+  eller Ctrl+M åpner det vanlige formelfeltet der (`openCellField` i `features/math/index.ts`; mattepanelet
+  og egne mattetaster går dit via `setCellFormulaStarter`). I en tabell er `\|` en pipe også inni formler
+  og kode (GFM; `pipesInCell` i `export/document.ts`), så LaTeX sin `\|` skrives `\Vert`.
 - Formler (`formula.ts`, ren logikk, testet i `tests/tableFormula.test.ts`): celle som starter med
   `=`, adresser A1 (overskriften er rad 1), områder `B2:B4`, + − × ÷ ^ %, sammenligninger, `&`, og
   funksjoner med norske og engelske navn (`SUMMER`/`SUM` …). Lagres som `svar <!-- =formel -->`, så

@@ -193,7 +193,7 @@ export function onFormulaOpenChange(fn: (open: boolean, view: EditorView) => voi
 
 /** Whether a formula is being edited in this state. */
 export function formulaOpenIn(state: EditorState): boolean {
-  return !!state.field(activeField, false);
+  return !!state.field(activeField, false) || cellField?.view.state === state;
 }
 
 /** A field outside the document that panel clicks should go to (the shortcut editor), or null. */
@@ -349,6 +349,72 @@ function close(view: EditorView, id: number, dir: Exit | null): ChangeSet | null
 /** Close the open formula field, if any (e.g. before switching tabs). */
 export function closeMathField(dir: Exit | null = null): void {
   if (current) close(current.view, current.id, dir);
+  if (cellField) finishCellField(cellField.field, dir);
+}
+
+// --- Formulas in table cells ---------------------------------------------------
+//
+// A drawn table is one widget; its cells are fields of their own, so a formula
+// there isn't in the document's decorations. The table places the field itself
+// and writes what it says; keys, the math panel and the user's shortcuts work
+// as in any other formula.
+
+export type FieldEntry = Entry;
+
+export interface CellFieldHost {
+  /** Where the field goes (it must be in the DOM when this returns). */
+  place(dom: HTMLElement): void;
+  change(latex: string): void;
+  /** The field closed: its final LaTeX (null: unchanged), and which way the cursor goes. */
+  exit(dir: Exit | null, latex: string | null): void;
+  undo(): void;
+  redo(): void;
+}
+
+let cellField: { view: EditorView; field: MathField; host: CellFieldHost } | null = null;
+
+/** Starts a new formula in the table cell being edited (Ctrl+M, the panel, a shortcut). */
+let cellStarter: ((entry: Entry) => void) | null = null;
+export function setCellFormulaStarter(fn: ((entry: FieldEntry) => void) | null): void {
+  cellStarter = fn;
+}
+
+/** Open a formula field for a table cell's formula. */
+export function openCellField(view: EditorView, latex: string, display: boolean, host: CellFieldHost, entry: FieldEntry): void {
+  closeMathField(null);
+  const field: MathField = new MathField(
+    latex,
+    { display, shortcuts: config.shortcuts, lookupCommand },
+    {
+      change: (l) => host.change(l),
+      exit: (dir) => finishCellField(field, dir),
+      undo: () => host.undo(),
+      redo: () => host.redo(),
+      userKey: (e) => handleUserKey(view, e),
+      key: (e) => handleAppKey(view, e),
+      keepsFocus: (el) => !!el && [...focusZones].some((zone) => zone.contains(el)),
+      symbolMenu: (e, choices) => symbolMenu?.(e, choices),
+    },
+  );
+  cellField = { view, field, host };
+  host.place(field.dom);
+  applyEntry(field, entry);
+  field.focus();
+  openListener?.(true, view);
+}
+
+function finishCellField(field: MathField, dir: Exit | null): void {
+  if (cellField?.field !== field) return;
+  const { view, host } = cellField;
+  cellField = null;
+  const latex = field.finish();
+  host.exit(dir, field.edited ? latex : null);
+  openListener?.(false, view);
+}
+
+/** The user's own math keys in a table cell (they start a formula there). */
+export function cellMathKey(view: EditorView, e: KeyboardEvent): boolean {
+  return handleUserKey(view, e);
 }
 
 /** Open the formula at a position. */
@@ -366,6 +432,11 @@ function openAt(view: EditorView, pos: number, entry: Entry): boolean {
 /** Start a new formula at the cursor (the selected text becomes its LaTeX). */
 function openNew(view: EditorView, block: boolean, entry: Entry): void {
   if (current) close(current.view, current.id, null);
+  if (cellStarter) {
+    // In a table cell: always in the line.
+    cellStarter(entry);
+    return;
+  }
   const { state } = view;
   const sel = state.selection.main;
   const text = state.sliceDoc(sel.from, sel.to);
@@ -409,6 +480,10 @@ export function insertMath(view: EditorView, item: Pick<MathItem, 'latex' | 'act
     insertTarget.applyItem(item as MathItem);
     return;
   }
+  if (cellField && !cellField.field.closed) {
+    cellField.field.applyItem(item as MathItem);
+    return;
+  }
   const a = view.state.field(activeField, false);
   if (current && current.view === view && a?.id === current.id && !current.field.closed) {
     current.field.applyItem(item as MathItem);
@@ -431,6 +506,7 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 
 /** Whether a formula is being edited (the panel shows matrix tools etc.). */
 export function mathFieldOpen(): boolean {
+  if (cellField) return true;
   return current !== null && !current.field.closed;
 }
 
@@ -722,7 +798,7 @@ const commands: EditorCommand[] = [
     icon: svg('<path d="M3 13h2l3 7 4-16h9"/><path d="m14 10 5 6M19 10l-5 6"/>'),
     key: 'Mod-m',
     run: (view) => {
-      if (current) closeMathField('right');
+      if (current || cellField) closeMathField('right');
       else openNew(view, false, 'end');
       return true;
     },
@@ -733,7 +809,7 @@ const commands: EditorCommand[] = [
     icon: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h4M9 7v4M14 9h4M7 15h4M14 14h4M14 16h4"/>'),
     key: 'Mod-Shift-m',
     run: (view) => {
-      if (current) closeMathField('right');
+      if (current || cellField) closeMathField('right');
       openNew(view, true, 'start');
       return true;
     },

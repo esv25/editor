@@ -15,9 +15,12 @@ import { Prec, StateField, type EditorState, type Range, type StateCommand } fro
 import { Decoration, EditorView, WidgetType, keymap, type Command, type DecorationSet } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { parseDocument, type Block, type Inline } from '../../export/document';
-import { commandsForKey } from '../../commands/keys';
+import { commandsForKey, matchesKey, strokes } from '../../commands/keys';
+import { keysFor, runCommand } from '../../commands/registry';
 import { showContextMenu, showMenuUnder, type MenuItem } from '../../ui/contextMenu';
-import { renderInto } from '../math/render';
+import { cellMathKey, closeMathField, openCellField, setCellFormulaStarter, type FieldEntry } from '../math';
+import type { Exit } from '../math/editor';
+import { renderMath } from '../math/render';
 import type { Feature } from '../types';
 import {
   cellDocRange,
@@ -45,6 +48,7 @@ import {
   tableRowBelow,
   type TableAt,
 } from './commands';
+import { cellParts, mathSource } from './cellMath';
 import { cellFormula, cellName, columnName, computeTable, formatValue, FormulaError, type Value } from './formula';
 import { parseTable, pipesEscaped, pipesUnescaped } from './model';
 
@@ -60,6 +64,115 @@ const run = (command: StateCommand) => (view: EditorView) => command(view);
  */
 const shown = (raw: string) => cellFormula(raw) ?? pipesUnescaped(raw);
 const written = (text: string) => pipesEscaped(text.replace(/\r?\n/g, ' ').trim());
+
+// --- Formulas in a cell ------------------------------------------------------------------
+//
+// While a cell is edited its text shows as typed, but each formula stays typeset
+// (an uneditable piece of the field, holding its LaTeX); it opens in the formula
+// field like formulas elsewhere: click it, arrow or Backspace into it, Ctrl+M.
+
+const CHIP = 'cm-table-math';
+const isChip = (node: Node | null | undefined): node is HTMLElement => node instanceof HTMLElement && node.classList.contains(CHIP);
+
+function drawMath(el: HTMLElement, latex: string, display: boolean): void {
+  el.classList.toggle('cm-math-empty', !latex.trim());
+  el.classList.remove('cm-math-error');
+  el.title = '';
+  if (!latex.trim()) {
+    el.textContent = 'Tom formel';
+    return;
+  }
+  const { html, error } = renderMath(latex, display);
+  el.innerHTML = html; // KaTeX's own output
+  if (error) {
+    el.classList.add('cm-math-error');
+    el.title = `Feil i formelen: ${error}`;
+  }
+}
+
+function drawChip(el: HTMLElement): void {
+  el.classList.remove('cm-math-editing');
+  drawMath(el, el.dataset.latex ?? '', el.dataset.dollars === '2');
+}
+
+function makeChip(latex: string, dollars: number): HTMLElement {
+  const el = document.createElement('span');
+  el.className = `cm-math cm-math-inline ${CHIP}`;
+  el.contentEditable = 'false';
+  el.dataset.latex = latex;
+  el.dataset.dollars = String(dollars);
+  drawChip(el);
+  return el;
+}
+
+/** A piece of the field as cell text. */
+function partText(node: Node): string {
+  if (isChip(node)) return mathSource(node.dataset.latex ?? '', Number(node.dataset.dollars) || 1);
+  if (node.nodeName === 'BR') return '';
+  return node.textContent ?? '';
+}
+
+/** What the field says, as cell text (pipes not escaped yet). */
+const fieldText = (td: HTMLElement) => [...td.childNodes].map(partText).join('');
+
+/** Show a cell's Markdown in its field: text as typed, formulas typeset (a computed cell: its formula). */
+function fillField(td: HTMLElement, raw: string): void {
+  const formula = cellFormula(raw);
+  if (formula !== null) {
+    td.textContent = formula;
+    return;
+  }
+  td.replaceChildren(
+    ...cellParts(raw).map((p) => (p.t === 'text' ? document.createTextNode(p.text) : makeChip(p.latex, p.dollars))),
+  );
+}
+
+/** A position in the field as an offset in its cell text (inside a formula: after it). */
+function offsetIn(td: HTMLElement, node: Node, offset: number): number {
+  let total = 0;
+  if (node === td) {
+    for (let i = 0; i < offset && i < td.childNodes.length; i++) total += partText(td.childNodes[i]).length;
+    return total;
+  }
+  for (const child of td.childNodes) {
+    if (child === node || child.contains(node)) {
+      if (child === node && node.nodeType === Node.TEXT_NODE) return total + offset;
+      if (isChip(child)) return total + partText(child).length;
+      const range = document.createRange();
+      range.selectNodeContents(child);
+      range.setEnd(node, offset);
+      return total + range.toString().length;
+    }
+    total += partText(child).length;
+  }
+  return total;
+}
+
+/** The formula right before (or after) a collapsed caret, if any. */
+function chipBeside(td: HTMLElement, before: boolean): HTMLElement | null {
+  const sel = document.getSelection();
+  if (!sel?.rangeCount || !sel.isCollapsed) return null;
+  const { startContainer: node, startOffset: offset } = sel.getRangeAt(0);
+  let next: Node | null;
+  if (node === td) next = td.childNodes[before ? offset - 1 : offset] ?? null;
+  else if (node.nodeType === Node.TEXT_NODE && node.parentNode === td) {
+    if (before ? offset > 0 : offset < (node as Text).length) return null;
+    next = before ? node.previousSibling : node.nextSibling;
+  } else return null;
+  while (next && next.nodeType === Node.TEXT_NODE && !(next as Text).length) next = before ? next.previousSibling : next.nextSibling;
+  return isChip(next) ? next : null;
+}
+
+function caretBeside(el: HTMLElement, after: boolean): void {
+  const sel = document.getSelection();
+  if (!sel) return;
+  const range = document.createRange();
+  if (after) range.setStartAfter(el);
+  else range.setStartBefore(el);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
 
 // --- Drawing ---------------------------------------------------------------------------
 
@@ -78,7 +191,8 @@ function renderInlines(parent: HTMLElement, items: Inline[]): void {
       }
       case 'math': {
         const el = document.createElement('span');
-        renderInto(el, item.latex, false);
+        el.className = 'cm-math cm-math-inline';
+        drawMath(el, item.latex, false);
         parent.append(el);
         break;
       }
@@ -268,14 +382,26 @@ function setCaret(td: HTMLElement, how: { offset?: number; select?: boolean }): 
   const sel = document.getSelection();
   if (!sel) return;
   const range = document.createRange();
-  const text = td.firstChild;
-  if (how.select || !text) {
-    range.selectNodeContents(td);
-    if (!how.select) range.collapse(false);
-  } else {
-    const at = Math.min(how.offset ?? Infinity, text.textContent!.length);
-    range.setStart(text, at);
-    range.collapse(true);
+  range.selectNodeContents(td);
+  if (!how.select) {
+    range.collapse(false);
+    // Offsets count cell text; one inside a formula lands after it.
+    let left = how.offset ?? Infinity;
+    for (const child of td.childNodes) {
+      const length = partText(child).length;
+      if (child.nodeType === Node.TEXT_NODE && left <= length) {
+        range.setStart(child, left);
+        range.collapse(true);
+        break;
+      }
+      if (left < length) {
+        if (left <= 0) range.setStartBefore(child);
+        else range.setStartAfter(child);
+        range.collapse(true);
+        break;
+      }
+      left -= length;
+    }
   }
   sel.removeAllRanges();
   sel.addRange(range);
@@ -284,13 +410,10 @@ function setCaret(td: HTMLElement, how: { offset?: number; select?: boolean }): 
 /** Caret offset in the field, and whether it's collapsed. */
 function caretIn(td: HTMLElement): { offset: number; collapsed: boolean; length: number } {
   const sel = document.getSelection();
-  const length = td.textContent?.length ?? 0;
-  if (!sel || !sel.rangeCount) return { offset: length, collapsed: true, length };
+  const length = fieldText(td).length;
+  if (!sel || !sel.rangeCount || !td.contains(sel.anchorNode)) return { offset: length, collapsed: true, length };
   const range = sel.getRangeAt(0);
-  const before = document.createRange();
-  before.selectNodeContents(td);
-  before.setEnd(range.endContainer, range.endOffset);
-  return { offset: before.toString().length, collapsed: range.collapsed, length };
+  return { offset: offsetIn(td, range.endContainer, range.endOffset), collapsed: range.collapsed, length };
 }
 
 /** Turn a drawn cell into a text field showing its Markdown. */
@@ -299,14 +422,23 @@ function startEditing(view: EditorView, root: HTMLElement, td: HTMLElement): voi
   const range = cellRange(view, root, td);
   if (!range) return;
   td.dataset.editing = 'true';
-  td.textContent = shown(view.state.sliceDoc(...range));
+  fillField(td, view.state.sliceDoc(...range));
+  starterCell = td;
+  setCellFormulaStarter((entry) => newFormula(view, root, td, entry));
   // The editor's cursor follows, so commands (menu, toolbar) know the cell.
   view.dispatch({ selection: { anchor: range[1] }, userEvent: 'select' });
 }
 
+/** The cell whose field new formulas (Ctrl+M, the math panel) go into. */
+let starterCell: HTMLElement | null = null;
+
 function stopEditing(view: EditorView, root: HTMLElement, td: HTMLElement): void {
   if (!editing(td)) return;
   delete td.dataset.editing;
+  if (starterCell === td) {
+    starterCell = null;
+    setCellFormulaStarter(null);
+  }
   root.classList.remove('cm-table-show-refs');
   const drawn = blocks.get(root);
   if (drawn) drawCell(td, drawn);
@@ -324,7 +456,7 @@ function writeCell(view: EditorView, root: HTMLElement, td: HTMLElement): void {
   const range = cellRange(view, root, td);
   if (!range) return;
   const old = view.state.sliceDoc(...range);
-  const next = written(td.textContent ?? '');
+  const next = written(fieldText(td));
   if (old === next) return;
   let start = 0;
   while (start < old.length && start < next.length && old[start] === next[start]) start++;
@@ -362,7 +494,7 @@ function focusSelection(view: EditorView): void {
   if (!td) return;
   const range = cellDocRange(view.state, at, cell.row, cell.col);
   const raw = range ? view.state.sliceDoc(...range) : '';
-  if (editing(td) && td.textContent !== shown(raw)) td.textContent = shown(raw);
+  if (editing(td) && written(fieldText(td)) !== raw) fillField(td, raw);
   td.focus();
   startEditing(view, root, td);
   setCaret(td, sel.empty ? { offset: shown(raw.slice(0, Math.max(0, sel.head - (range?.[0] ?? 0)))).length } : { select: true });
@@ -398,7 +530,88 @@ function wrapInCell(td: HTMLElement, mark: string): void {
   }
 }
 
-const isFormula = (td: HTMLElement) => (td.textContent ?? '').trim().startsWith('=');
+/** Open a formula in the field for editing (the formula field takes its place). */
+function editChip(view: EditorView, root: HTMLElement, td: HTMLElement, el: HTMLElement, entry: FieldEntry): void {
+  openCellField(
+    view,
+    el.dataset.latex ?? '',
+    el.dataset.dollars === '2',
+    {
+      place: (dom) => {
+        el.classList.add('cm-math-editing');
+        el.classList.remove('cm-math-empty', 'cm-math-error');
+        el.title = '';
+        el.replaceChildren(dom);
+      },
+      change: (latex) => {
+        el.dataset.latex = latex;
+        writeCell(view, root, td);
+      },
+      exit: (dir, latex) => leaveChip(view, root, td, el, dir, latex),
+      undo: () => undoInCell(view, td, 'edit.undo'),
+      redo: () => undoInCell(view, td, 'edit.redo'),
+    },
+    entry,
+  );
+}
+
+function leaveChip(view: EditorView, root: HTMLElement, td: HTMLElement, el: HTMLElement, dir: Exit | null, latex: string | null): void {
+  if (latex !== null) el.dataset.latex = latex;
+  if (!el.isConnected) return; // the cell was filled anew (undo)
+  const empty = !(el.dataset.latex ?? '').trim();
+  // An empty formula goes away; the caret stays where it was.
+  const anchor = empty ? (el.previousSibling ?? el.nextSibling) : el;
+  const after = empty ? anchor === el.previousSibling : dir === 'right' || dir === 'down';
+  if (empty) el.remove();
+  else drawChip(el);
+  writeCell(view, root, td);
+  if (dir === null) {
+    // The focus went elsewhere: done with the cell too, unless it went back to it.
+    setTimeout(() => {
+      if (!td.contains(document.activeElement)) stopEditing(view, root, td);
+    });
+    return;
+  }
+  td.focus();
+  if (anchor instanceof HTMLElement || anchor instanceof Text) {
+    if (anchor instanceof Text) setCaret(td, { offset: offsetIn(td, anchor, after ? anchor.length : 0) });
+    else caretBeside(anchor, after);
+  } else setCaret(td, {});
+  if (dir === 'up' || dir === 'down') moveFromCell(view, root, td, dir);
+}
+
+/** Ctrl+Z / Ctrl+Y in a cell's formula: close it, undo in the document, show the result. */
+function undoInCell(view: EditorView, td: HTMLElement, id: string): void {
+  td.focus();
+  closeMathField(null);
+  runCommand(view, id);
+  focusSelection(view);
+}
+
+/** Ctrl+M, the math panel or a math key in a cell: a new formula at the caret (the selected text becomes it). */
+function newFormula(view: EditorView, root: HTMLElement, td: HTMLElement, entry: FieldEntry): void {
+  if (!editing(td) || isFormula(td)) return;
+  const sel = document.getSelection();
+  const inCell = !!sel?.rangeCount && td.contains(sel.anchorNode) && td.contains(sel.focusNode);
+  const latex = inCell && !sel!.isCollapsed ? sel!.toString().trim() : '';
+  const el = makeChip(latex, 1);
+  if (inCell) {
+    const range = sel!.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(el);
+  } else td.append(el);
+  if (typeof entry === 'object' && 'insert' in entry) entry = { ...entry, wrap: !!latex };
+  editChip(view, root, td, el, entry);
+}
+
+/** Leave a cell up or down: the cell there, or out of the table. */
+function moveFromCell(view: EditorView, root: HTMLElement, td: HTMLElement, dir: 'up' | 'down' | 'left' | 'right'): void {
+  const range = cellRange(view, root, td);
+  if (range) view.dispatch({ selection: { anchor: Math.min(range[1], range[0] + caretIn(td).offset) }, userEvent: 'select' });
+  if (!tableMoveCell(dir)(view)) leaveTable(view, root, dir === 'down' || dir === 'right');
+}
+
+const isFormula = (td: HTMLElement) => fieldText(td).trim().startsWith('=');
 
 /** Column letters and row numbers, while a formula is being written. */
 function showRefs(root: HTMLElement, td: HTMLElement): void {
@@ -411,7 +624,7 @@ function showRefs(root: HTMLElement, td: HTMLElement): void {
  */
 function insertReference(formulaCell: HTMLElement, target: HTMLElement, range: boolean): void {
   const name = cellName(Number(target.dataset.row), Number(target.dataset.col));
-  const before = (formulaCell.textContent ?? '').slice(0, caretIn(formulaCell).offset);
+  const before = fieldText(formulaCell).slice(0, caretIn(formulaCell).offset);
   const extend = range && /[A-Za-z]{1,3}\d+$/.test(before);
   document.execCommand('insertText', false, extend ? `:${name}` : name);
 }
@@ -430,6 +643,20 @@ function wireCell(view: EditorView, root: HTMLElement, td: HTMLElement): void {
       insertReference(writing, td, e.shiftKey);
       return;
     }
+    // A formula: open it where it was clicked.
+    const math = e.button === 0 && e.target instanceof Element ? e.target.closest<HTMLElement>('.cm-math') : null;
+    if (math && td.contains(math)) {
+      e.preventDefault();
+      let el: HTMLElement | undefined = math;
+      if (!editing(td)) {
+        // The drawn cell becomes its field; the same formula there.
+        const index = [...td.querySelectorAll('.cm-math')].indexOf(math);
+        td.focus();
+        el = td.querySelectorAll<HTMLElement>(`.${CHIP}`)[index];
+      }
+      if (el) editChip(view, root, td, el, { x: e.clientX, y: e.clientY });
+      return;
+    }
     // The first click turns the drawn cell into its text: put the caret at the end.
     if (e.button === 0 && !editing(td)) {
       e.preventDefault();
@@ -437,25 +664,37 @@ function wireCell(view: EditorView, root: HTMLElement, td: HTMLElement): void {
       setCaret(td, {});
     }
   });
-  td.addEventListener('blur', () => stopEditing(view, root, td));
-  td.addEventListener('input', () => {
+  td.addEventListener('blur', (e) => {
+    // Into one of its own formulas: still editing (the formula says when it's left).
+    if (e.relatedTarget instanceof Node && td.contains(e.relatedTarget)) return;
+    stopEditing(view, root, td);
+  });
+  td.addEventListener('input', (e) => {
+    if (inFormula(e)) return;
     showRefs(root, td);
     writeCell(view, root, td);
   });
   td.addEventListener('paste', (e) => {
+    if (inFormula(e)) return;
     e.preventDefault();
     const text = e.clipboardData?.getData('text/plain') ?? '';
     document.execCommand('insertText', false, text.replace(/\s*\r?\n\s*/g, ' '));
   });
   td.addEventListener('contextmenu', (e) => {
+    if (inFormula(e)) return;
     if (!editing(td)) {
       td.focus();
       setCaret(td, {});
     }
     showContextMenu(e, tableMenu(view));
   });
-  td.addEventListener('keydown', (e) => onCellKey(view, root, td, e));
+  td.addEventListener('keydown', (e) => {
+    if (!inFormula(e)) onCellKey(view, root, td, e);
+  });
 }
+
+/** Events from an open formula's field are the field's own. */
+const inFormula = (e: Event) => e.target instanceof Element && !!e.target.closest(`.${CHIP}`);
 
 function onCellKey(view: EditorView, root: HTMLElement, td: HTMLElement, e: KeyboardEvent): void {
   const mod = e.ctrlKey || e.metaKey;
@@ -474,6 +713,26 @@ function onCellKey(view: EditorView, root: HTMLElement, td: HTMLElement, e: Keyb
     sync();
     if (!tableMoveCell(dir)(view)) leaveTable(view, root, dir === 'down' || dir === 'right');
   };
+  // The user's own math keys come first, as everywhere (they start a formula here).
+  if (cellMathKey(view, e)) {
+    e.stopPropagation();
+    return;
+  }
+  // Into a formula beside the caret, as in the text.
+  const plain = !e.shiftKey && !mod && !e.altKey;
+  const into = { ArrowLeft: 'end', Backspace: 'end', ArrowRight: 'start', Delete: 'start' }[e.key] as 'start' | 'end' | undefined;
+  const chip = plain && into ? chipBeside(td, into === 'end') : null;
+  if (chip) {
+    done();
+    editChip(view, root, td, chip, into!);
+    return;
+  }
+  // Ctrl+M (and the block key): a new formula in the cell.
+  if (['math.inline', 'math.block'].some((id) => keysFor(id).some((k) => strokes(k).length === 1 && matchesKey(e, k)))) {
+    done();
+    newFormula(view, root, td, 'end');
+    return;
+  }
   if (e.altKey && !mod) return;
   switch (e.key) {
     case 'Tab':

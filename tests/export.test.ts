@@ -91,6 +91,11 @@ describe('parseDocument', () => {
     });
   });
 
+  it('reads escaped pipes in table formulas and code as pipes', () => {
+    const [table] = parseDocument('| a | b |\n| - | - |\n| $\\|x\\|$ | `a\\|b` |');
+    expect(table).toMatchObject({ rows: [[[{ t: 'math', latex: '|x|' }], [{ t: 'code', text: 'a|b' }]]] });
+  });
+
   it('keeps raw HTML as text and drops comments', () => {
     expect(parseDocument('<div onclick="x">hei</div>\n\n<!-- skjult -->')).toEqual([
       { t: 'para', children: [{ t: 'text', text: '<div onclick="x">hei</div>' }] },
