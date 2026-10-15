@@ -112,24 +112,44 @@ export async function startApp(): Promise<void> {
     },
     {
       id: 'board.addCard',
-      name: 'Nytt kort på tavla (eller dobbeltklikk et tomt sted)',
+      name: 'Ny tekst på tavla (eller dobbeltklikk et tomt sted)',
       icon: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 9v6M9 12h6"/>'),
       scope: 'any',
       run: () => (onBoard() ? (board.addCard(), true) : false),
     },
     {
       id: 'board.addGroup',
-      name: 'Nytt område (rundt de valgte kortene)',
+      name: 'Nytt område (rundt det som er valgt)',
       icon: svg('<rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="3 3"/><path d="M7 8h5"/>'),
       scope: 'any',
       run: () => (onBoard() ? (board.addGroup(), true) : false),
     },
     {
       id: 'board.connect',
-      name: 'Pil fra det valgte kortet (klikk så på kortet den skal til)',
+      name: 'Pil fra det valgte (klikk så der den skal til)',
       icon: svg('<rect x="2" y="9" width="6" height="6" rx="1"/><rect x="16" y="9" width="6" height="6" rx="1"/><path d="M8 12h7M12 9l3 3-3 3"/>'),
       scope: 'any',
       run: () => (onBoard() ? (board.startConnecting(), true) : false),
+    },
+    {
+      id: 'board.color',
+      name: 'Farge på det som er valgt',
+      icon: svg('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor"/>'),
+      scope: 'any',
+      run: () => {
+        if (!onBoard()) return false;
+        const items = board.colorMenuFor();
+        const button = document.querySelector<HTMLElement>('#board-tools [data-command="board.color"]');
+        if (items && button) showMenuUnder(button, items);
+        return true;
+      },
+    },
+    {
+      id: 'board.delete',
+      name: 'Slett det som er valgt (Delete)',
+      icon: svg('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'),
+      scope: 'any',
+      run: () => (onBoard() ? (board.deleteSelected(), true) : false),
     },
     {
       id: 'board.fit',
@@ -442,7 +462,7 @@ export async function startApp(): Promise<void> {
   if (import.meta.env.DEV) Object.assign(window, { editorView: view, workspace: ws, debug, terminal, board });
   const editBar = renderButtons(el('edit-actions'), ['edit.undo', 'edit.redo'], getView);
   const mdToolbar = renderButtons(el('md-tools'), getSettings().toolbar, formatView);
-  renderButtons(el('board-tools'), ['board.addCard', 'board.addGroup', 'board.connect', 'board.fit', '|', 'board.toDocument'], getView);
+  renderButtons(el('board-tools'), ['board.addCard', 'board.addGroup', 'board.connect', 'board.color', 'board.delete', 'board.fit', '|', 'board.toDocument'], getView);
   const codeBar = new CodeBar(el('code-tools'), getView, debug, (doc, lang) => void ws.setLanguage(doc, lang));
   const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save', 'file.export'], getView);
   const viewBar = renderButtons(

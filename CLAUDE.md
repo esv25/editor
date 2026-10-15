@@ -273,7 +273,11 @@ JSON Canvas vises som feil og skrives aldri over.
   endring, så ulagret-status, autolagring (navn fra første kort), økten og Ctrl+S virker som ellers.
 - `view.ts`: én `BoardView` (i `#board`, ved siden av `#editor`, som skjules). Hvert tekstkort er en egen
   `EditorView` med `createMarkdownState(text, extra)` – samme features som notater (formler, lister, tabeller,
-  bilder relativt til tavlas mappe). Kortenes høyde følger teksten (måles med ResizeObserver; lagret høyde
+  bilder relativt til tavlas mappe). Kortene har ingen boks eller håndtak (brukeren ville ikke ha «kort»): teksten
+  står rett på tavla, ramme vises ved hover/valg/skriving, farge er en svak markering bak teksten. Hele teksten er
+  håndtaket: dra = flytt, klikk = velg, klikk på valgt tekst = skriv der (`editCardAt`, `posAtCoords`); mens man
+  ikke skriver har kortets editor `pointer-events: none`. Bredden følger teksten opp til lagret `width` (der den
+  brytes; `max-width`), og pilene treffer den tegnede bredden (`measuredWidth`). Kortenes høyde følger teksten (måles med ResizeObserver; lagret høyde
   oppdateres bare når kortet skrives i eller får ny bredde, så det å åpne en tavle endrer ingenting). Kort som
   ikke er i fokus viser alt ferdig formatert (livePreview viser bare markering i fokusert editor).
   Kortenes oppdateringer går ikke til `Workspace` (`onUpdate` i `app.ts` ser på `u.view`); `getView()` gir kortet
@@ -283,8 +287,8 @@ JSON Canvas vises som feil og skrives aldri over.
   når man går ut av kortet; inni kortet er Ctrl+Z kortets egen. Et nytt kort som forlates tomt, forsvinner (også
   fra angrelista). `edit.undo`/`edit.redo` pakkes inn i `app.ts` så knappene går til tavla.
 - Betjening (samme valg som tegnevinduet: dra med terskel `settings.diagram.dragThreshold`, alt snapper til
-  `settings.diagram.grid`, hint-linje nederst): dobbeltklikk/Enter = nytt kort, dra i stripa øverst = flytt, hjørnet =
-  bredde (områder: begge veier), dra tomrom/midtknapp/hjul = panorer, Ctrl+hjul = zoom, Shift+dra = marker, Tab =
+  `settings.diagram.grid`, hint-linje nederst): dobbeltklikk/Enter = nytt kort, dra i teksten = flytt, hjørnet =
+  bredde (områder: begge veier), farge/slett/pil også i verktøylinja (`board.color`, `board.delete`), dra tomrom/midtknapp/hjul = panorer, Ctrl+hjul = zoom, Shift+dra = marker, Tab =
   neste kort, piltaster flytter, Ctrl+pil eller «+» på sidene = nytt kort med pil, Esc = ferdig med kortet,
   høyreklikk = meny (farge, pilspisser, snu, tekst på pila). Kommandoene `board.*` og `file.newBoard` ligger i `app.ts`.
 - Farger: `--board-1…6` (Obsidians seks forhåndsfarger) og `--board-*`/`--card-*` i `theme.css`; hex-farger fra fila

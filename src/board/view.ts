@@ -84,9 +84,6 @@ const ARROWS: Record<string, Direction> = { ArrowUp: 'up', ArrowDown: 'down', Ar
 const icon = (body: string, size = 16) =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 const ICONS = {
-  color: icon('<circle cx="12" cy="12" r="7"/>'),
-  connect: icon('<path d="M5 12h12M13 7l5 5-5 5"/>'),
-  remove: icon('<path d="M6 6l12 12M18 6 6 18"/>'),
   plus: icon('<path d="M12 5v14M5 12h14"/>', 18),
 };
 
@@ -108,7 +105,7 @@ interface NodeDom {
 
 type Gesture =
   | { kind: 'pan'; startX: number; startY: number; pan: { x: number; y: number }; moved: boolean; click: 'empty' | 'none' }
-  | { kind: 'move'; startX: number; startY: number; ids: string[]; before: Board; moved: boolean; anchor: Rect; target: string }
+  | { kind: 'move'; startX: number; startY: number; ids: string[]; before: Board; moved: boolean; anchor: Rect; target: string; write: boolean }
   | { kind: 'resize'; startX: number; startY: number; id: string; before: Board; moved: boolean; orig: Rect }
   | { kind: 'marquee'; startX: number; startY: number; moved: boolean; base: Set<string> };
 
@@ -135,6 +132,8 @@ export class BoardView {
   private nodes = new Map<string, NodeDom>();
   /** Rendered heights of cards (they grow with their text). */
   private measured = new Map<string, number>();
+  /** Drawn widths of cards: as wide as their text, at most their stored width. */
+  private measuredWidth = new Map<string, number>();
   private selected = new Set<string>();
   private selectedEdges = new Set<string>();
   /** The card being written in. */
@@ -201,7 +200,11 @@ export class BoardView {
     root.addEventListener('contextmenu', (e) => this.contextMenu(e));
 
     this.resizeObserver = new ResizeObserver((entries) => this.measuredResize(entries));
-    new ResizeObserver(() => this.applyTransform()).observe(root);
+    // The board got smaller (the math panel opened below): keep the text being written in sight.
+    new ResizeObserver(() => {
+      this.applyTransform();
+      if (this.editing) this.ensureVisible(this.editing);
+    }).observe(root);
     onSettingsChange(() => {
       for (const dom of this.nodes.values()) dom.view?.dispatch({ effects: refreshForSettings(dom.view.state) });
     });
@@ -247,6 +250,7 @@ export class BoardView {
     for (const dom of this.nodes.values()) this.dropNode(dom);
     this.nodes.clear();
     this.measured.clear();
+    this.measuredWidth.clear();
     this.selected.clear();
     this.selectedEdges.clear();
     this.connecting = null;
@@ -355,8 +359,13 @@ export class BoardView {
   }
 
   private rectOf(node: BoardNode): Rect {
-    const height = isCard(node) ? (this.measured.get(node.id) ?? node.height) : node.height;
-    return { x: node.x, y: node.y, width: node.width, height };
+    if (!isCard(node)) return { x: node.x, y: node.y, width: node.width, height: node.height };
+    return {
+      x: node.x,
+      y: node.y,
+      width: this.measuredWidth.get(node.id) ?? node.width,
+      height: this.measured.get(node.id) ?? node.height,
+    };
   }
 
   /** A new card at a point on the board, written in at once; optionally with an arrow from another node. */
@@ -456,6 +465,23 @@ export class BoardView {
     this.commit(next);
   }
 
+  /** «Farge»: the colour menu for what's selected, under a button. */
+  colorMenuFor(): MenuItem[] | null {
+    if (!this.selected.size && !this.selectedEdges.size) return null;
+    return this.colorMenu([...this.selected], [...this.selectedEdges]);
+  }
+
+  /** «Slett»: what's selected (or the card being written in). */
+  deleteSelected(): void {
+    if (this.editing) {
+      const id = this.editing;
+      this.stopEditing();
+      if (!nodeById(this.board, id)) return;
+      this.select([id]);
+    }
+    this.deleteSelection();
+  }
+
   /** «Lag dokument av tavla». */
   toDocument(): void {
     if (!this.doc || this.broken) return;
@@ -470,6 +496,15 @@ export class BoardView {
     const view = this.nodes.get(id)?.view;
     if (!view) return;
     if (at === 'end') view.dispatch({ selection: { anchor: view.state.doc.length } });
+    view.focus();
+  }
+
+  /** Start writing in a card with the cursor where it was clicked (or at the end). */
+  private editCardAt(id: string, clientX: number, clientY: number): void {
+    const view = this.nodes.get(id)?.view;
+    if (!view) return;
+    const pos = view.posAtCoords({ x: clientX, y: clientY });
+    view.dispatch({ selection: { anchor: pos ?? view.state.doc.length } });
     view.focus();
   }
 
@@ -558,6 +593,7 @@ export class BoardView {
       this.dropNode(dom);
       this.nodes.delete(id);
       this.measured.delete(id);
+      this.measuredWidth.delete(id);
     }
     this.renderEdges();
     this.renderChrome();
@@ -581,35 +617,15 @@ export class BoardView {
       box.dataset.id = id;
       return { el: box, type: node.type, label };
     }
+    // No frame or handle: the text stands on the board. Drag it anywhere to move it;
+    // a click selects it, another click (or Enter) starts writing.
     const card = el('div', 'board-card');
     card.dataset.id = id;
-    const bar = el('div', 'board-card-bar');
-    bar.title = 'Dra for å flytte · høyreklikk for flere valg';
-    const barButton = (cls: string, svg: string, title: string, action: (e: MouseEvent) => void) => {
-      const b = el('button', `board-bar-button ${cls}`);
-      b.type = 'button';
-      b.innerHTML = svg;
-      b.title = title;
-      b.addEventListener('mousedown', (e) => e.preventDefault());
-      b.addEventListener('click', (e) => {
-        e.stopPropagation();
-        action(e);
-      });
-      return b;
-    };
-    bar.append(
-      barButton('board-color-button', ICONS.color, 'Farge', (e) => showContextMenu(e, this.colorMenu([id], []))),
-      barButton('', ICONS.connect, 'Pil til et annet kort (klikk så på kortet)', () => this.startConnecting(id)),
-      barButton('', ICONS.remove, 'Slett kortet (Delete)', () => {
-        this.select([id]);
-        this.stopEditing();
-        this.deleteSelection();
-      }),
-    );
+    card.title = 'Dra for å flytte · klikk igjen for å skrive · høyreklikk for flere valg';
     const body = el('div', 'board-card-body');
     const resize = el('div', 'board-resize');
-    resize.title = 'Dra for å gjøre kortet bredere eller smalere';
-    card.append(bar, body, resize);
+    resize.title = 'Dra for å gjøre teksten bredere eller smalere';
+    card.append(body, resize);
     const dom: NodeDom = { el: card, type: node.type };
     if (isCard(node)) {
       dom.view = new EditorView({ parent: body, state: this.cardState(id, node.text ?? '') });
@@ -636,7 +652,9 @@ export class BoardView {
     const s = dom.el.style;
     s.left = `${node.x}px`;
     s.top = `${node.y}px`;
-    s.width = `${node.width}px`;
+    // A text is as wide as it needs, up to its stored width (where it wraps); the rest are fixed.
+    if (isCard(node)) s.maxWidth = `${node.width}px`;
+    else s.width = `${node.width}px`;
     // Areas lie under the arrows, cards over them.
     s.zIndex = String(isGroup(node) ? index : 1000 + index);
     const color = colorValue(node.color);
@@ -768,16 +786,16 @@ export class BoardView {
     let hint: string;
     if (this.broken) hint = '';
     else if (this.connecting) hint = 'Klikk på kortet pila skal gå til – eller på et tomt sted for et nytt kort. Esc avbryter.';
-    else if (this.editing) hint = 'Esc: ferdig med kortet · + på sidene: nytt kort med pil · dra i stripa øverst for å flytte kortet';
+    else if (this.editing) hint = 'Esc: ferdig · + på sidene: ny tekst med pil · dra i kanten for å flytte';
     else if (this.selectedEdges.size) hint = 'Enter: skriv tekst på pila · høyreklikk: snu, farge, pilspisser · Delete sletter';
     else if (this.selected.size) {
       const node = this.singleSelected();
       hint =
         node && isGroup(node)
           ? 'Dra i navnet for å flytte området med det som er inni · Enter gir nytt navn · Delete sletter området (kortene blir)'
-          : 'Enter: skriv i kortet · Ctrl+pil eller +: nytt kort med pil · piltaster flytter · Delete sletter';
-    } else if (!this.board.nodes.length) hint = 'Dobbeltklikk hvor som helst (eller trykk Enter) for å skrive et kort. Start gjerne flere steder!';
-    else hint = 'Dobbeltklikk på et tomt sted for et nytt kort · dra i tomrommet for å flytte tavla · Ctrl+hjul zoomer · Shift+dra markerer';
+          : 'Klikk igjen (eller Enter) for å skrive · dra for å flytte · Ctrl+pil eller +: ny tekst med pil · Delete sletter';
+    } else if (!this.board.nodes.length) hint = 'Dobbeltklikk hvor som helst (eller trykk Enter) for å skrive. Start gjerne flere steder!';
+    else hint = 'Dobbeltklikk på et tomt sted for å skrive · dra tekst for å flytte den · dra i tomrommet for å flytte tavla · Ctrl+hjul zoomer';
     this.hintEl.textContent = hint;
     this.hintEl.hidden = !hint;
   }
@@ -799,9 +817,12 @@ export class BoardView {
       const id = target.dataset.id;
       if (!id || !target.isConnected) continue;
       const height = target.offsetHeight;
+      const width = target.offsetWidth;
+      if (this.measured.get(id) === height && this.measuredWidth.get(id) === width) continue;
+      changed = true;
+      this.measuredWidth.set(id, width);
       if (this.measured.get(id) === height) continue;
       this.measured.set(id, height);
-      changed = true;
       // The stored height follows the text while it's being written, and after the width
       // changed (so other programs show the card right). Not otherwise: opening a board changes nothing.
       const node = nodeById(this.board, id);
@@ -916,7 +937,7 @@ export class BoardView {
   private pointerDown(e: PointerEvent): void {
     if (this.broken || e.button === 2) return;
     const target = e.target as HTMLElement;
-    if (target.closest('.board-zoom, .board-add, .board-bar-button, input')) return;
+    if (target.closest('.board-zoom, .board-add, input')) return;
     if (e.button === 1) {
       e.preventDefault();
       this.capture(e);
@@ -924,10 +945,11 @@ export class BoardView {
       return;
     }
     if (e.button !== 0) return;
-    // Writing in a card: the editor handles the pointer itself.
-    if (target.closest('.cm-editor')) return;
     const nodeEl = target.closest<HTMLElement>('.board-card, .board-group');
     const nodeId = nodeEl?.dataset.id;
+    // Writing in this card: the editor handles the pointer itself (its edge still moves it).
+    if (target.closest('.cm-editor') && nodeId === this.editing) return;
+    const wasOnlySelected = !!nodeId && this.selected.size === 1 && this.selected.has(nodeId) && !this.selectedEdges.size;
     const edgeId = (target.closest('[data-edge]') as SVGElement | null)?.dataset.edge;
     const p = this.toBoard(e.clientX, e.clientY);
     this.pointer = p;
@@ -961,6 +983,8 @@ export class BoardView {
         moved: false,
         anchor: this.rectOf(node),
         target: nodeId,
+        // A second click on the selected card starts writing where it was clicked.
+        write: wasOnlySelected && isCard(node) && this.editing !== nodeId && !(e.shiftKey || e.ctrlKey || e.metaKey),
       };
       return;
     }
@@ -1074,6 +1098,7 @@ export class BoardView {
       this.commit(after, g.before);
       return;
     }
+    if (g.kind === 'move' && !g.moved && g.write) return this.editCardAt(g.target, e.clientX, e.clientY);
     if (g.kind === 'move' && !g.moved && !(e.shiftKey || e.ctrlKey || e.metaKey) && this.selected.size > 1) {
       // A click on one of several selected cards selects just that one.
       this.select([g.target]);
@@ -1102,7 +1127,8 @@ export class BoardView {
   private doubleClick(e: MouseEvent): void {
     if (this.broken) return;
     const target = e.target as HTMLElement;
-    if (target.closest('.cm-editor, .board-zoom, .board-add, .board-bar-button, input')) return;
+    if (target.closest('.board-zoom, .board-add, input')) return;
+    if (target.closest('.board-card.editing')) return;
     const edgeId = (target.closest('[data-edge]') as SVGElement | null)?.dataset.edge;
     if (edgeId) return this.editEdgeLabel(edgeId);
     if (target.closest('.board-group-label')) {
