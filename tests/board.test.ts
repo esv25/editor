@@ -16,10 +16,13 @@ import {
   removeNodes,
   reverseEdge,
   serializeBoard,
+  shapeOf,
   updateNode,
+  withShape,
   type Board,
   type BoardNode,
 } from '../src/board/model';
+import { cleanStroke, inkNode, inkPoints, isDrawing, simplify, smoothPath } from '../src/board/ink';
 import { kindForName } from '../src/code/languages';
 import { History } from '../src/diagram/history';
 
@@ -243,5 +246,78 @@ describe('reading a board in order', () => {
     expect(boardTitleText(b)).toBe('# Tavle om funksjoner');
     expect(boardText(b)).toContain('så');
     expect(boardTitleText(board([]))).toBe('');
+  });
+});
+
+describe('shapes', () => {
+  it('reads and writes the shape like Advanced Canvas, keeping other style attributes', () => {
+    const plain = card('a', 0, 0, 'Start', { styleAttributes: { border: 'dashed' } });
+    expect(shapeOf(plain)).toBeNull();
+    const round = withShape(plain, 'circle');
+    expect(shapeOf(round)).toBe('circle');
+    expect(round.styleAttributes).toEqual({ border: 'dashed', shape: 'circle' });
+    expect(withShape(round, null).styleAttributes).toEqual({ border: 'dashed' });
+    expect('styleAttributes' in withShape(withShape(card('b', 0, 0), 'diamond'), null)).toBe(false);
+  });
+
+  it('ignores shapes it does not know, and shapes on things that are not texts', () => {
+    expect(shapeOf(card('a', 0, 0, 'x', { styleAttributes: { shape: 'database' } }))).toBeNull();
+    expect(shapeOf({ ...group('g', 0, 0, 10, 10), styleAttributes: { shape: 'circle' } })).toBeNull();
+  });
+});
+
+describe('pen strokes', () => {
+  it('drops resting shakes and small wobbles', () => {
+    const shaky = [
+      { x: 0, y: 0 },
+      { x: 0.5, y: 0.3 },
+      { x: 10, y: 0.4 },
+      { x: 20, y: -0.3 },
+      { x: 30, y: 0 },
+    ];
+    expect(cleanStroke(shaky)).toEqual([
+      { x: 0, y: 0 },
+      { x: 30, y: 0 },
+    ]);
+  });
+
+  it('keeps corners', () => {
+    const corner = [
+      { x: 0, y: 0 },
+      { x: 50, y: 0 },
+      { x: 50, y: 50 },
+    ];
+    expect(simplify(corner, 1)).toEqual(corner);
+  });
+
+  it('stores a stroke as fractions of its box, and draws it back the same', () => {
+    const node = inkNode(
+      [
+        { x: 100, y: 100 },
+        { x: 200, y: 150 },
+      ],
+      { width: 4, color: '1', id: 's' },
+    );
+    expect(node).toMatchObject({ id: 's', type: 'drawing', x: 96, y: 96, width: 108, height: 58, strokeWidth: 4, color: '1' });
+    const back = inkPoints(node).map((p) => ({ x: Math.round(p.x + node.x), y: Math.round(p.y + node.y) }));
+    expect(back).toEqual([
+      { x: 100, y: 100 },
+      { x: 200, y: 150 },
+    ]);
+    // Moving the node moves the stroke; the file keeps it.
+    expect(parseBoard(serializeBoard(board([node]))).nodes[0].points).toEqual(node.points);
+  });
+
+  it('draws a dot, a line and a curve', () => {
+    expect(smoothPath([{ x: 1, y: 2 }])).toBe('M 1 2 l 0.01 0');
+    expect(smoothPath([{ x: 1, y: 2 }, { x: 3, y: 4 }])).toBe('M 1 2 L 3 4');
+    expect(smoothPath([{ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 0 }]).match(/C/g)).toHaveLength(2);
+  });
+
+  it('is left out of documents and word counts', () => {
+    const b = board([card('a', 0, 0, 'Tekst'), inkNode([{ x: 0, y: 0 }, { x: 5, y: 5 }], { id: 'i' })]);
+    expect(boardToMarkdown(b)).toBe('Tekst\n');
+    expect(boardText(b).trim()).toBe('Tekst');
+    expect(isDrawing(b.nodes[1])).toBe(true);
   });
 });

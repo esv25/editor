@@ -80,6 +80,7 @@ src/
   board/                  tavla (se «Tavle» under)
     model.ts              Board = JSON Canvas (.canvas, som Obsidian): kort, områder, piler – ren logikk
     view.ts               BoardView: viser tavle-dokumentet i stedet for editoren
+    ink.ts                pennestreker: glatting (thin/simplify), kurve (smoothPath), node ⇄ punkter
   features/               én CodeMirror-funksjon per fil (se under)
     index.ts              listen over aktive features
     types.ts              Feature-grensesnittet
@@ -291,6 +292,18 @@ JSON Canvas vises som feil og skrives aldri over.
   bredde (områder: begge veier), farge/slett/pil også i verktøylinja (`board.color`, `board.delete`), dra tomrom/midtknapp/hjul = panorer, Ctrl+hjul = zoom, Shift+dra = marker, Tab =
   neste kort, piltaster flytter, Ctrl+pil eller «+» på sidene = nytt kort med pil, Esc = ferdig med kortet,
   høyreklikk = meny (farge, pilspisser, snu, tekst på pila). Kommandoene `board.*` og `file.newBoard` ligger i `app.ts`.
+- **Former** (`ShapeKind` i `model.ts`: rectangle, pill, circle, diamond, triangle): en tekstnode med
+  `styleAttributes.shape`, som Obsidian-pluginen Advanced Canvas (pill/circle/diamond kjenner den; Obsidian alene
+  viser vanlig tekst). En form har fast størrelse (begge veier, `min-height` så teksten kan vokse), teksten står i
+  midten; rektangel/avrundet/sirkel er kortets egen ramme, rombe/trekant et SVG-omriss bak teksten. Tomme former
+  blir stående (bare tomme *tekster* forsvinner). «Form»-menyen (`shapeMenu`) setter valgte tekster i en form, og/eller
+  velger en form å plassere (`tool` = formen; klikk = standardstørrelse, dra = størrelse; skrivingen starter med en gang).
+  Ctrl+pil/+ fra en form lager samme form.
+- **Penn** (`tool` = 'pen', `board.pen`): en strek er en node av typen `'drawing'` (ikke JSON Canvas – Obsidian
+  viser den ikke) med `points` som brøkdeler av boksen, `strokeWidth` og `color`. Dra = frihånd (`cleanStroke`:
+  dropper skjelv og små vrikk), klikk = punkt for punkt (`inkLine`; klikk på siste punkt/Enter/høyreklikk = ferdig),
+  Esc = legg bort pennen. Bare selve streken tar imot klikk (`.board-ink-hit`). Pennens farge/tykkelse velges i
+  Farge-menyen mens pennen er på (`penMenu`). Strekene er med i angring, flytting og størrelse, men ikke i «Til dokument».
 - Farger: `--board-1…6` (Obsidians seks forhåndsfarger) og `--board-*`/`--card-*` i `theme.css`; hex-farger fra fila
   brukes bare hvis de er `#rgb`/`#rrggbb`. All tekst fra fila settes med `textContent`.
 

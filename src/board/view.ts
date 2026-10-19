@@ -38,6 +38,9 @@ import {
   parseBoard,
   placeNextTo,
   readingOrder,
+  SHAPES,
+  shapeOf,
+  withShape,
   removeEdges,
   removeNodes,
   reverseEdge,
@@ -50,7 +53,12 @@ import {
   type BoardNode,
   type Direction,
   type Rect,
+  type ShapeKind,
 } from './model';
+import { DEFAULT_INK_WIDTH, INK_WIDTHS, cleanStroke, inkNode, inkPoints, inkWidth, isDrawing, smoothPath, type Point } from './ink';
+
+/** What a click on the board does: select and move (the default), draw with the pen, or place a shape. */
+export type BoardTool = 'select' | 'pen' | ShapeKind;
 
 export interface BoardHost {
   /** The board changed: write it to its document (and remember the session). */
@@ -107,7 +115,9 @@ type Gesture =
   | { kind: 'pan'; startX: number; startY: number; pan: { x: number; y: number }; moved: boolean; click: 'empty' | 'none' }
   | { kind: 'move'; startX: number; startY: number; ids: string[]; before: Board; moved: boolean; anchor: Rect; target: string; write: boolean }
   | { kind: 'resize'; startX: number; startY: number; id: string; before: Board; moved: boolean; orig: Rect }
-  | { kind: 'marquee'; startX: number; startY: number; moved: boolean; base: Set<string> };
+  | { kind: 'marquee'; startX: number; startY: number; moved: boolean; base: Set<string> }
+  | { kind: 'ink'; startX: number; startY: number; moved: boolean; points: Point[] }
+  | { kind: 'place'; startX: number; startY: number; moved: boolean; shape: ShapeKind };
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string): HTMLElementTagNameMap[K] => {
   const e = document.createElement(tag);
@@ -151,6 +161,14 @@ export class BoardView {
   private heightFollows = new Set<string>();
   /** A name or arrow text being typed. */
   private textInput: HTMLInputElement | null = null;
+  private currentTool: BoardTool = 'select';
+  /** Colour and width of new pen strokes. */
+  private penColor: string | undefined;
+  private penWidth = DEFAULT_INK_WIDTH;
+  /** A pen line made by clicking point after point (instead of dragging). */
+  private inkLine: Point[] | null = null;
+  /** The stroke or shape being drawn, before it's done. */
+  private preview = document.createElementNS(SVG_NS, 'svg');
 
   private pan = { x: 0, y: 0 };
   private zoom = 1;
@@ -165,7 +183,8 @@ export class BoardView {
     root.tabIndex = 0;
     root.classList.add('board');
     this.edgeLayer.classList.add('board-edges');
-    this.world.append(this.edgeLayer, this.chrome);
+    this.preview.classList.add('board-preview');
+    this.world.append(this.edgeLayer, this.chrome, this.preview);
     const zoomBar = el('div', 'board-zoom');
     const zoomButton = (text: string, title: string, action: () => void) => {
       const b = el('button', 'board-zoom-button');
@@ -255,6 +274,8 @@ export class BoardView {
     this.selectedEdges.clear();
     this.connecting = null;
     this.gesture = null;
+    this.inkLine = null;
+    this.setTool('select');
     this.closeTextInput(false);
     this.doc = null;
     this.root.hidden = true;
@@ -404,7 +425,12 @@ export class BoardView {
     if (!from || !this.doc || this.broken) return;
     const grid = getSettings().diagram.grid;
     const r = placeNextTo(this.laidOut(), this.rectOf(from), direction);
-    const card: BoardNode = { id: newId(), type: 'text', text: '', x: snap(r.x, grid), y: snap(r.y, grid), width: r.width, height: r.height };
+    // Next to a shape comes the same shape (a flowchart grows step by step).
+    const shape = shapeOf(from);
+    const size = shape ? this.rectOf(from) : { width: r.width, height: r.height };
+    const spot = shape ? placeNextTo(this.laidOut(), this.rectOf(from), direction, size) : r;
+    let card: BoardNode = { id: newId(), type: 'text', text: '', x: snap(spot.x, grid), y: snap(spot.y, grid), width: size.width, height: size.height };
+    if (shape) card = withShape(card, shape);
     if (from.color && isCard(from)) card.color = from.color;
     this.addCard(card, fromId);
   }
@@ -467,7 +493,9 @@ export class BoardView {
 
   /** «Farge»: the colour menu for what's selected, under a button. */
   colorMenuFor(): MenuItem[] | null {
-    if (!this.selected.size && !this.selectedEdges.size) return null;
+    if (this.currentTool === 'pen') return this.penMenu();
+    if (this.editing && !this.selected.size) this.selected.add(this.editing);
+    if (!this.selected.size && !this.selectedEdges.size) return [{ heading: 'Velg en tekst, form, pil eller strek først' }];
     return this.colorMenu([...this.selected], [...this.selectedEdges]);
   }
 
@@ -480,6 +508,143 @@ export class BoardView {
       this.select([id]);
     }
     this.deleteSelection();
+  }
+
+  // --- Pen and shapes ----------------------------------------------------------------------
+
+  get tool(): BoardTool {
+    return this.currentTool;
+  }
+
+  setTool(tool: BoardTool): void {
+    if (tool !== 'pen') this.finishInkLine();
+    this.currentTool = tool;
+    if (tool !== 'select') {
+      this.stopEditing();
+      this.connecting = null;
+    }
+    this.root.classList.toggle('tool-pen', tool === 'pen');
+    this.root.classList.toggle('tool-shape', tool !== 'select' && tool !== 'pen');
+    this.renderPreview();
+    this.renderChrome();
+    this.host.changed();
+  }
+
+  /** «Penn»: on, or off again. */
+  togglePen(): void {
+    this.setTool(this.currentTool === 'pen' ? 'select' : 'pen');
+    if (this.currentTool === 'pen') this.root.focus({ preventScroll: true });
+  }
+
+  /**
+   * «Form»: put the selected texts in a shape (or take them out), or, with
+   * nothing selected, pick a shape to place with the next click.
+   */
+  shapeMenu(): MenuItem[] {
+    const texts = [...this.selected].map((id) => nodeById(this.board, id)).filter((n): n is BoardNode => !!n && isCard(n));
+    if (this.editing && !texts.some((n) => n.id === this.editing)) {
+      const editing = nodeById(this.board, this.editing);
+      if (editing) texts.push(editing);
+    }
+    const place: MenuItem[] = [
+      { heading: 'Tegn en ny form (klikk på tavla etterpå)' },
+      ...SHAPES.map((s) => ({ label: s.name, checked: this.currentTool === s.id, action: () => this.setTool(s.id) })),
+    ];
+    if (!texts.length) return place;
+    const current = shapeOf(texts[0]);
+    return [
+      { heading: texts.length > 1 ? 'Sett de valgte i en form' : 'Sett teksten i en form' },
+      ...SHAPES.map((s) => ({ label: s.name, checked: current === s.id, action: () => this.setShape(texts.map((n) => n.id), s.id) })),
+      { label: 'Ingen form (bare tekst)', checked: !current, action: () => this.setShape(texts.map((n) => n.id), null) },
+      'separator',
+      ...place,
+    ];
+  }
+
+  private setShape(ids: string[], shape: ShapeKind | null): void {
+    const grid = getSettings().diagram.grid;
+    const size = SHAPES.find((s) => s.id === shape);
+    let next = this.board;
+    for (const id of ids) {
+      const node = nodeById(next, id);
+      if (!node || shapeOf(node) === shape) continue;
+      const drawn = this.rectOf(node);
+      let patch: Partial<BoardNode> = {};
+      if (shape && size) {
+        // Big enough for the text that's in it, and round shapes round.
+        const roomy = shape === 'diamond' || shape === 'triangle' || shape === 'circle' ? 1.5 : 1.15;
+        let width = snap(Math.max(size.width, (shapeOf(node) ? 0 : drawn.width) * roomy), grid);
+        let height = snap(Math.max(size.height, (shapeOf(node) ? 0 : drawn.height) * roomy), grid);
+        if (shapeOf(node)) [width, height] = [Math.max(width, node.width), Math.max(height, node.height)];
+        if (shape === 'circle') width = height = Math.max(width, height);
+        patch = { width, height };
+      } else {
+        patch = { width: Math.max(CARD_WIDTH, node.width) };
+      }
+      next = updateNode(next, id, { ...withShape(node, shape), ...patch });
+      this.heightFollows.add(id);
+    }
+    this.commit(next);
+  }
+
+  /** A shape (no text yet) where it was placed; writing in it starts at once. */
+  private placeShape(shape: ShapeKind, r: Rect | null, at: Point): void {
+    const grid = getSettings().diagram.grid;
+    const size = SHAPES.find((s) => s.id === shape)!;
+    const rect = r && r.width >= 20 && r.height >= 20 ? r : { x: at.x - size.width / 2, y: at.y - size.height / 2, width: size.width, height: size.height };
+    const node = withShape(
+      {
+        id: newId(),
+        type: 'text',
+        text: '',
+        x: snap(rect.x, grid),
+        y: snap(rect.y, grid),
+        width: Math.max(grid * 2, snap(rect.width, grid)),
+        height: Math.max(grid * 2, snap(rect.height, grid)),
+      },
+      shape,
+    );
+    this.setTool('select');
+    this.commit(addNode(this.board, node));
+    this.select([node.id]);
+    this.editCard(node.id);
+  }
+
+  private finishInkLine(): void {
+    const line = this.inkLine;
+    this.inkLine = null;
+    if (line && line.length >= 2) this.addStroke(line);
+    this.renderPreview();
+  }
+
+  private addStroke(points: Point[]): void {
+    if (!points.length || !this.doc || this.broken) return;
+    this.commit(addNode(this.board, inkNode(points, { width: this.penWidth, color: this.penColor })));
+  }
+
+  /** The stroke being drawn (or the pen line between clicks, following the pointer). */
+  private renderPreview(points?: Point[]): void {
+    this.preview.replaceChildren();
+    const line = points ?? (this.inkLine && this.pointer ? [...this.inkLine, this.pointer] : null);
+    if (!line?.length) return;
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', smoothPath(line));
+    path.setAttribute('class', 'board-ink-line');
+    path.style.strokeWidth = String(this.penWidth);
+    const color = colorValue(this.penColor);
+    if (color) path.style.stroke = color;
+    this.preview.append(path);
+  }
+
+  private penMenu(): MenuItem[] {
+    return [
+      { heading: 'Pennens farge' },
+      { label: 'Vanlig (som teksten)', checked: !this.penColor, action: () => (this.penColor = undefined) },
+      ...BOARD_COLORS.map((c) => ({ label: c.name, checked: this.penColor === c.id, action: () => (this.penColor = c.id) })),
+      'separator',
+      { heading: 'Tykkelse' },
+      ...INK_WIDTHS.map((w) => ({ label: w.name, checked: this.penWidth === w.width, action: () => (this.penWidth = w.width) })),
+    ];
   }
 
   /** «Lag dokument av tavla». */
@@ -523,7 +688,7 @@ export class BoardView {
     if (this.editing !== id) return;
     this.editing = null;
     const card = nodeById(this.board, id);
-    if (card && this.fresh?.id === id && !(card.text ?? '').trim()) {
+    if (card && this.fresh?.id === id && !(card.text ?? '').trim() && !shapeOf(card)) {
       // Nothing was written in the new card: as if it was never made.
       this.history.forget(this.fresh.before);
       this.board = this.fresh.before;
@@ -608,6 +773,21 @@ export class BoardView {
 
   private createNode(node: BoardNode): NodeDom {
     const id = node.id;
+    if (isDrawing(node)) {
+      // Only the line itself (and the corner, when selected) takes clicks; the box around it is board.
+      const box = el('div', 'board-ink');
+      box.dataset.id = id;
+      const svg = document.createElementNS(SVG_NS, 'svg');
+      const hit = document.createElementNS(SVG_NS, 'path');
+      hit.setAttribute('class', 'board-ink-hit');
+      const line = document.createElementNS(SVG_NS, 'path');
+      line.setAttribute('class', 'board-ink-line');
+      svg.append(hit, line);
+      const resize = el('div', 'board-resize');
+      resize.title = 'Dra for å endre størrelsen';
+      box.append(svg, resize);
+      return { el: box, type: node.type };
+    }
     if (isGroup(node)) {
       const box = el('div', 'board-group');
       const label = el('div', 'board-group-label');
@@ -622,10 +802,18 @@ export class BoardView {
     const card = el('div', 'board-card');
     card.dataset.id = id;
     card.title = 'Dra for å flytte · klikk igjen for å skrive · høyreklikk for flere valg';
+    // The outline of a rombe or a triangle (other shapes are drawn with the card's border).
+    const outline = document.createElementNS(SVG_NS, 'svg');
+    outline.setAttribute('class', 'board-shape');
+    outline.setAttribute('viewBox', '0 0 100 100');
+    outline.setAttribute('preserveAspectRatio', 'none');
+    const polygon = document.createElementNS(SVG_NS, 'polygon');
+    polygon.setAttribute('vector-effect', 'non-scaling-stroke');
+    outline.append(polygon);
     const body = el('div', 'board-card-body');
     const resize = el('div', 'board-resize');
-    resize.title = 'Dra for å gjøre teksten bredere eller smalere';
-    card.append(body, resize);
+    resize.title = 'Dra for å endre størrelsen';
+    card.append(outline, body, resize);
     const dom: NodeDom = { el: card, type: node.type };
     if (isCard(node)) {
       dom.view = new EditorView({ parent: body, state: this.cardState(id, node.text ?? '') });
@@ -652,9 +840,24 @@ export class BoardView {
     const s = dom.el.style;
     s.left = `${node.x}px`;
     s.top = `${node.y}px`;
-    // A text is as wide as it needs, up to its stored width (where it wraps); the rest are fixed.
-    if (isCard(node)) s.maxWidth = `${node.width}px`;
-    else s.width = `${node.width}px`;
+    // A text is as wide as it needs, up to its stored width (where it wraps); shapes and the rest are fixed.
+    const shape = shapeOf(node);
+    if (isCard(node) && !shape) {
+      s.maxWidth = `${node.width}px`;
+      s.width = '';
+      s.minHeight = '';
+    } else {
+      s.maxWidth = '';
+      s.width = `${node.width}px`;
+    }
+    if (isCard(node)) {
+      for (const kind of SHAPES) dom.el.classList.toggle(`shape-${kind.id}`, shape === kind.id);
+      dom.el.classList.toggle('shape', !!shape);
+      // A shape is at least its stored height, and grows if the text needs more.
+      if (shape) s.minHeight = `${node.height}px`;
+      const points = shape === 'diamond' ? '50,1 99,50 50,99 1,50' : shape === 'triangle' ? '50,1 99,99 1,99' : '';
+      dom.el.querySelector('.board-shape polygon')?.setAttribute('points', points);
+    }
     // Areas lie under the arrows, cards over them.
     s.zIndex = String(isGroup(node) ? index : 1000 + index);
     const color = colorValue(node.color);
@@ -667,6 +870,15 @@ export class BoardView {
     if (isGroup(node)) {
       s.height = `${node.height}px`;
       if (dom.label && !dom.label.contains(this.textInput)) dom.label.textContent = node.label?.trim() || 'Område';
+    } else if (isDrawing(node)) {
+      s.height = `${node.height}px`;
+      const svg = dom.el.querySelector('svg')!;
+      svg.setAttribute('viewBox', `0 0 ${node.width} ${node.height}`);
+      const d = smoothPath(inkPoints(node));
+      for (const path of svg.querySelectorAll('path')) path.setAttribute('d', d);
+      const line = svg.querySelector<SVGPathElement>('.board-ink-line')!;
+      line.style.strokeWidth = String(inkWidth(node));
+      line.style.stroke = color ?? '';
     } else if (!isCard(node)) {
       s.height = `${node.height}px`;
     }
@@ -784,14 +996,21 @@ export class BoardView {
 
   private updateHint(): void {
     let hint: string;
+    const placing = SHAPES.some((s) => s.id === this.currentTool);
     if (this.broken) hint = '';
+    else if (this.inkLine) hint = 'Klikk neste punkt · klikk på siste punkt, Enter eller høyreklikk: ferdig';
+    else if (this.currentTool === 'pen')
+      hint = 'Penn: dra for å tegne, eller klikk punkt for punkt · Farge-knappen velger farge og tykkelse · Esc: ferdig med pennen';
+    else if (placing) hint = 'Klikk der formen skal stå, eller dra for å bestemme størrelsen · Esc avbryter';
     else if (this.connecting) hint = 'Klikk på kortet pila skal gå til – eller på et tomt sted for et nytt kort. Esc avbryter.';
     else if (this.editing) hint = 'Esc: ferdig · + på sidene: ny tekst med pil · dra i kanten for å flytte';
     else if (this.selectedEdges.size) hint = 'Enter: skriv tekst på pila · høyreklikk: snu, farge, pilspisser · Delete sletter';
     else if (this.selected.size) {
       const node = this.singleSelected();
       hint =
-        node && isGroup(node)
+        node && isDrawing(node)
+          ? 'Dra for å flytte · dra i hjørnet for størrelsen · Farge-knappen bytter farge · Delete sletter'
+          : node && isGroup(node)
           ? 'Dra i navnet for å flytte området med det som er inni · Enter gir nytt navn · Delete sletter området (kortene blir)'
           : 'Klikk igjen (eller Enter) for å skrive · dra for å flytte · Ctrl+pil eller +: ny tekst med pil · Delete sletter';
     } else if (!this.board.nodes.length) hint = 'Dobbeltklikk hvor som helst (eller trykk Enter) for å skrive. Start gjerne flere steder!';
@@ -945,7 +1164,20 @@ export class BoardView {
       return;
     }
     if (e.button !== 0) return;
-    const nodeEl = target.closest<HTMLElement>('.board-card, .board-group');
+    // The pen draws, and a picked shape is placed, wherever the click lands.
+    if (this.currentTool !== 'select') {
+      e.preventDefault();
+      this.stopEditing();
+      this.root.focus({ preventScroll: true });
+      this.capture(e);
+      this.pointer = this.toBoard(e.clientX, e.clientY);
+      this.gesture =
+        this.currentTool === 'pen'
+          ? { kind: 'ink', startX: e.clientX, startY: e.clientY, moved: false, points: [this.pointer] }
+          : { kind: 'place', startX: e.clientX, startY: e.clientY, moved: false, shape: this.currentTool };
+      return;
+    }
+    const nodeEl = target.closest<HTMLElement>('.board-card, .board-group, .board-ink');
     const nodeId = nodeEl?.dataset.id;
     // Writing in this card: the editor handles the pointer itself (its edge still moves it).
     if (target.closest('.cm-editor') && nodeId === this.editing) return;
@@ -954,7 +1186,7 @@ export class BoardView {
     const p = this.toBoard(e.clientX, e.clientY);
     this.pointer = p;
 
-    if (nodeId && (nodeEl!.classList.contains('board-card') || target.closest('.board-group-label, .board-resize'))) {
+    if (nodeId && (!nodeEl!.classList.contains('board-group') || target.closest('.board-group-label, .board-resize'))) {
       e.preventDefault();
       if (this.connecting) return this.finishConnecting(nodeId);
       // Grabbing another card ends writing in this one; grabbing the card itself keeps it.
@@ -1027,8 +1259,10 @@ export class BoardView {
     const p = this.toBoard(e.clientX, e.clientY);
     this.pointer = p;
     if (this.connecting && !this.gesture) this.renderEdges();
+    if (this.inkLine && !this.gesture) this.renderPreview();
     const g = this.gesture;
     if (!g) return;
+    if (g.kind === 'ink') g.points.push(p);
     const dxScreen = e.clientX - g.startX;
     const dyScreen = e.clientY - g.startY;
     if (!g.moved) {
@@ -1056,11 +1290,21 @@ export class BoardView {
       case 'resize': {
         const node = nodeById(g.before, g.id);
         if (!node) break;
-        const width = Math.max(isGroup(node) ? MIN_GROUP.width : MIN_CARD_WIDTH, snap(g.orig.width + dx, grid));
+        // Texts get wider or narrower; areas, shapes and pen strokes change both ways.
+        const min = isGroup(node) ? MIN_GROUP : isDrawing(node) ? { width: 10, height: 10 } : shapeOf(node) ? { width: 40, height: 40 } : { width: MIN_CARD_WIDTH, height: 0 };
+        const width = Math.max(min.width, isDrawing(node) ? g.orig.width + dx : snap(g.orig.width + dx, grid));
         const patch: Partial<BoardNode> = { width };
-        if (!isCard(node)) patch.height = Math.max(MIN_GROUP.height, snap(g.orig.height + dy, grid));
+        if (!isCard(node) || shapeOf(node)) patch.height = Math.max(min.height, isDrawing(node) ? g.orig.height + dy : snap(g.orig.height + dy, grid));
         this.board = updateNode(g.before, g.id, patch);
         this.render();
+        break;
+      }
+      case 'ink':
+        this.renderPreview(g.points);
+        break;
+      case 'place': {
+        const r = this.placeRect(g, p);
+        this.showMarquee(r);
         break;
       }
       case 'marquee': {
@@ -1086,6 +1330,27 @@ export class BoardView {
     if (!g) return;
     this.gesture = null;
     this.marqueeEl.hidden = true;
+    if (g.kind === 'ink') {
+      if (g.moved && !this.inkLine) {
+        // A line drawn with the button held down.
+        this.renderPreview([]);
+        this.addStroke(cleanStroke(g.points, this.zoom));
+        return;
+      }
+      // Clicks: point after point; a click on the last point (or Enter, Esc, a right click) ends the line.
+      const p = this.toBoard(e.clientX, e.clientY);
+      const last = this.inkLine?.[this.inkLine.length - 1];
+      if (last && Math.hypot(p.x - last.x, p.y - last.y) * this.zoom < getSettings().diagram.hitTolerance) this.finishInkLine();
+      else this.inkLine = [...(this.inkLine ?? []), p];
+      this.renderPreview();
+      this.updateHint();
+      return;
+    }
+    if (g.kind === 'place') {
+      const p = this.toBoard(e.clientX, e.clientY);
+      this.placeShape(g.shape, g.moved ? this.placeRect(g, p) : null, p);
+      return;
+    }
     if ((g.kind === 'move' || g.kind === 'resize') && g.moved) {
       let after = this.board;
       if (g.kind === 'resize') {
@@ -1114,6 +1379,26 @@ export class BoardView {
     this.renderChrome();
   }
 
+  /** The rectangle dragged out for a new shape (a circle stays round). */
+  private placeRect(g: { startX: number; startY: number; shape: ShapeKind }, p: Point): Rect {
+    const a = this.toBoard(g.startX, g.startY);
+    let width = Math.abs(p.x - a.x);
+    let height = Math.abs(p.y - a.y);
+    if (g.shape === 'circle') width = height = Math.max(width, height);
+    return { x: p.x < a.x ? a.x - width : a.x, y: p.y < a.y ? a.y - height : a.y, width, height };
+  }
+
+  /** The dashed rectangle (selecting with Shift+drag, or a shape being dragged out). */
+  private showMarquee(r: Rect): void {
+    Object.assign(this.marqueeEl.style, {
+      left: `${(r.x - this.pan.x) * this.zoom}px`,
+      top: `${(r.y - this.pan.y) * this.zoom}px`,
+      width: `${r.width * this.zoom}px`,
+      height: `${r.height * this.zoom}px`,
+    });
+    this.marqueeEl.hidden = false;
+  }
+
   private cancelGesture(): void {
     const g = this.gesture;
     this.gesture = null;
@@ -1122,10 +1407,11 @@ export class BoardView {
       this.board = g.before;
       this.render();
     }
+    if (g?.kind === 'ink') this.renderPreview();
   }
 
   private doubleClick(e: MouseEvent): void {
-    if (this.broken) return;
+    if (this.broken || this.currentTool !== 'select') return;
     const target = e.target as HTMLElement;
     if (target.closest('.board-zoom, .board-add, input')) return;
     if (target.closest('.board-card.editing')) return;
@@ -1136,6 +1422,7 @@ export class BoardView {
       if (id) this.renameGroup(id);
       return;
     }
+    if (target.closest('.board-ink')) return;
     const nodeEl = target.closest<HTMLElement>('.board-card');
     if (nodeEl?.dataset.id) {
       const node = nodeById(this.board, nodeEl.dataset.id);
@@ -1165,7 +1452,11 @@ export class BoardView {
     const grid = getSettings().diagram.grid;
     const single = this.singleSelected();
     let handled = true;
-    if (key === 'Escape') {
+    if (this.currentTool !== 'select' && (key === 'Escape' || key === 'Enter')) {
+      // Enter/Esc ends a pen line made by clicking; Esc again puts the pen away.
+      if (this.inkLine) this.finishInkLine();
+      else if (key === 'Escape') this.setTool('select');
+    } else if (key === 'Escape') {
       if (this.connecting) {
         this.connecting = null;
         this.render();
@@ -1280,13 +1571,20 @@ export class BoardView {
     if (target.closest('.cm-content, input')) return;
     const p = this.toBoard(e.clientX, e.clientY);
     const edgeId = (target.closest('[data-edge]') as SVGElement | null)?.dataset.edge;
-    const nodeId = target.closest<HTMLElement>('.board-card, .board-group-label, .board-resize')
-      ? target.closest<HTMLElement>('.board-card, .board-group')?.dataset.id
+    const nodeId = target.closest<HTMLElement>('.board-card, .board-group-label, .board-resize, .board-ink')
+      ? target.closest<HTMLElement>('.board-card, .board-group, .board-ink')?.dataset.id
       : undefined;
     if (this.connecting) {
       e.preventDefault();
       this.connecting = null;
       this.render();
+      return;
+    }
+    // With the pen or a shape picked, a right click ends the line, then puts the tool away (as Esc).
+    if (this.currentTool !== 'select') {
+      e.preventDefault();
+      if (this.inkLine) this.finishInkLine();
+      else this.setTool('select');
       return;
     }
     if (edgeId) {
@@ -1315,12 +1613,17 @@ export class BoardView {
       const ids = [...this.selected];
       const items: MenuItem[] = [];
       if (isCard(node)) {
+        const current = shapeOf(node);
         items.push(
-          { label: 'Skriv i kortet', action: () => this.editCard(nodeId) },
+          { label: current ? 'Skriv i formen' : 'Skriv i kortet', action: () => this.editCard(nodeId) },
           { label: 'Pil til et annet kort …', action: () => this.startConnecting(nodeId) },
           { label: 'Nytt kort til høyre, med pil', action: () => this.addNeighbor(nodeId, 'right') },
           { label: 'Nytt kort under, med pil', action: () => this.addNeighbor(nodeId, 'down') },
           { label: 'Lag område rundt', action: () => this.addGroup() },
+          'separator',
+          { heading: 'Form' },
+          ...SHAPES.map((s) => ({ label: s.name, checked: current === s.id, action: () => this.setShape(ids, s.id) })),
+          { label: 'Ingen form (bare tekst)', checked: !current, action: () => this.setShape(ids, null) },
         );
       } else if (isGroup(node)) {
         items.push({ label: 'Gi nytt navn', action: () => this.renameGroup(nodeId) });

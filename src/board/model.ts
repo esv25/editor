@@ -137,6 +137,38 @@ export const edgeById = (board: Board, id: string) => board.edges.find((e) => e.
 export const isCard = (node: BoardNode) => node.type === 'text';
 export const isGroup = (node: BoardNode) => node.type === 'group';
 
+/**
+ * A text can stand in a shape (or be a shape without text). Stored as
+ * `styleAttributes.shape`, the way the Advanced Canvas plugin for Obsidian
+ * does it (it knows pill, circle and diamond); Obsidian on its own shows the text as usual.
+ */
+export type ShapeKind = 'rectangle' | 'pill' | 'circle' | 'diamond' | 'triangle';
+
+export const SHAPES: { id: ShapeKind; name: string; width: number; height: number }[] = [
+  { id: 'rectangle', name: 'Rektangel', width: 200, height: 120 },
+  { id: 'pill', name: 'Avrundet', width: 220, height: 80 },
+  { id: 'circle', name: 'Sirkel', width: 140, height: 140 },
+  { id: 'diamond', name: 'Rombe', width: 180, height: 140 },
+  { id: 'triangle', name: 'Trekant', width: 160, height: 140 },
+];
+
+export function shapeOf(node: BoardNode): ShapeKind | null {
+  if (!isCard(node)) return null;
+  const attrs = node.styleAttributes;
+  const shape = attrs && typeof attrs === 'object' ? (attrs as Record<string, unknown>).shape : undefined;
+  return SHAPES.some((s) => s.id === shape) ? (shape as ShapeKind) : null;
+}
+
+/** Put a text in a shape (or take it out with null), keeping its other style attributes. */
+export function withShape(node: BoardNode, shape: ShapeKind | null): BoardNode {
+  const attrs = { ...((node.styleAttributes as Record<string, unknown> | undefined) ?? {}) };
+  if (shape) attrs.shape = shape;
+  else delete attrs.shape;
+  const out: BoardNode = { ...node, styleAttributes: attrs };
+  if (!Object.keys(attrs).length) delete out.styleAttributes;
+  return out;
+}
+
 const inside = (inner: Rect, outer: Rect) =>
   inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height;
 

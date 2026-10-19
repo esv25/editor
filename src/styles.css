@@ -1380,6 +1380,57 @@ html, body {
 .board-card:not(.editing) .board-card-body { pointer-events: none; }
 .board-card.editing .board-card-body { cursor: text; user-select: text; }
 .board-card-other { padding: 10px 14px; color: var(--muted); cursor: default; overflow: hidden; text-overflow: ellipsis; }
+/* Shapes: the text sits in the middle of a rectangle, pill, circle, rombe or triangle. The first three
+   are the card's own border; the rombe and the triangle are an outline drawn behind the text. */
+.board-card .board-shape { display: none; }
+.board-card.shape {
+  --shape-line: color-mix(in srgb, var(--fg) 60%, transparent);
+  --shape-fill: var(--card-bg);
+  justify-content: center;
+  border-color: var(--shape-line);
+  border-width: 2px;
+  background: var(--shape-fill);
+}
+.board-card.shape.colored { --shape-line: var(--node-color); --shape-fill: color-mix(in srgb, var(--node-color) 14%, var(--card-bg)); }
+.board-card.shape-pill { border-radius: 999px; padding-inline: 18px; }
+.board-card.shape-circle { border-radius: 50%; padding: 14%; }
+.board-card.shape-diamond, .board-card.shape-triangle { border-color: transparent; background: none; }
+.board-card.shape-diamond { padding: 14% 20%; }
+.board-card.shape-triangle { padding: 38% 22% 6%; }
+.board-card.shape-diamond .board-shape, .board-card.shape-triangle .board-shape {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: -1;
+}
+.board-card.shape .board-shape polygon { fill: var(--shape-fill); stroke: var(--shape-line); stroke-width: 2; }
+.board-card.shape.editing { background: var(--shape-fill); box-shadow: none; }
+.board-card.shape-diamond.editing, .board-card.shape-triangle.editing { background: none; }
+.board-card.shape .cm-line { text-align: center; }
+.board-card.shape .cm-placeholder { display: none; }
+.board-card.shape-diamond.selected, .board-card.shape-triangle.selected, .board-card.shape-circle.selected { box-shadow: none; }
+.board-card.shape { isolation: isolate; }
+.board-card.shape .board-card-body { flex: 0 0 auto; }
+.board-card.shape.selected, .board-card.shape.editing { outline: 2px dashed var(--accent); outline-offset: 4px; }
+
+/* Pen strokes: only the line takes clicks. */
+.board-ink { position: absolute; pointer-events: none; }
+.board-ink svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.board-ink-line { fill: none; stroke: var(--fg); stroke-linecap: round; stroke-linejoin: round; }
+.board-ink-hit { fill: none; stroke: transparent; stroke-width: 16; stroke-linecap: round; pointer-events: stroke; cursor: grab; }
+.board-ink.selected { outline: 1.5px dashed var(--accent); outline-offset: 2px; }
+.board-ink .board-resize { pointer-events: auto; }
+.board-ink.selected .board-resize { opacity: 1; }
+.board-preview { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; z-index: 2500; pointer-events: none; }
+.board-preview .board-ink-line { opacity: 0.85; }
+/* With the pen or a shape picked, everything is something to draw on. */
+.board.tool-pen, .board.tool-pen .board-card, .board.tool-pen .board-ink-hit,
+.board.tool-shape, .board.tool-shape .board-card, .board.tool-shape .board-ink-hit { cursor: crosshair; }
+
 /* The card's editor: the note editor, made to fit a card. */
 .board-card .cm-editor { height: auto; background: transparent; font-size: calc(var(--font-size) * 0.92); }
 .board-card .cm-scroller { overflow: visible !important; line-height: 1.5; }

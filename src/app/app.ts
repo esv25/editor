@@ -32,7 +32,7 @@ import { renderCount, renderProblems, renderSaveStatus, renderTitle } from '../u
 import { TabsUI } from '../ui/tabs';
 import { setupUpdates } from '../ui/updates';
 import { openWhatsNew, showWhatsNewOnStart } from '../ui/whatsNew';
-import { renderButtons } from '../ui/toolbar';
+import { renderButtons, type ButtonBar } from '../ui/toolbar';
 import { initAppearance, resolvedTheme } from '../appearance';
 import { EditorDocument } from './document';
 import { loadSession } from './session';
@@ -61,6 +61,7 @@ export async function startApp(): Promise<void> {
   let view!: EditorView;
   let debug!: DebugController;
   let board!: BoardView;
+  let boardBar: ButtonBar | undefined;
   /** On a board, the card being written in is the editor; otherwise the editor itself. */
   const getView = () => board?.editingView ?? view;
   /** Formatting buttons on a board also work on the selected card (and start writing in it). */
@@ -132,8 +133,29 @@ export async function startApp(): Promise<void> {
       run: () => (onBoard() ? (board.startConnecting(), true) : false),
     },
     {
+      id: 'board.pen',
+      name: 'Penn: tegn fritt på tavla (Esc legger den bort)',
+      icon: svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
+      scope: 'any',
+      run: () => (onBoard() ? (board.togglePen(), true) : false),
+      isActive: () => !!board && board.tool === 'pen',
+    },
+    {
+      id: 'board.shape',
+      name: 'Form: sett teksten i en sirkel, rombe … eller tegn en form',
+      icon: svg('<circle cx="8" cy="8" r="5"/><rect x="11" y="11" width="10" height="10" rx="1"/>'),
+      scope: 'any',
+      run: () => {
+        if (!onBoard()) return false;
+        const button = document.querySelector<HTMLElement>('#board-tools [data-command="board.shape"]');
+        if (button) showMenuUnder(button, board.shapeMenu());
+        return true;
+      },
+      isActive: () => !!board && board.tool !== 'select' && board.tool !== 'pen',
+    },
+    {
       id: 'board.color',
-      name: 'Farge på det som er valgt',
+      name: 'Farge på det som er valgt (med pennen: pennens farge og tykkelse)',
       icon: svg('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor"/>'),
       scope: 'any',
       run: () => {
@@ -442,6 +464,7 @@ export async function startApp(): Promise<void> {
       const state = getView().state;
       editBar.update(state);
       mdToolbar.update(state);
+      boardBar?.update(state);
     },
     openPath: (path) => void ws.openPath(path),
     createDocument: (markdown) =>
@@ -462,7 +485,11 @@ export async function startApp(): Promise<void> {
   if (import.meta.env.DEV) Object.assign(window, { editorView: view, workspace: ws, debug, terminal, board });
   const editBar = renderButtons(el('edit-actions'), ['edit.undo', 'edit.redo'], getView);
   const mdToolbar = renderButtons(el('md-tools'), getSettings().toolbar, formatView);
-  renderButtons(el('board-tools'), ['board.addCard', 'board.addGroup', 'board.connect', 'board.color', 'board.delete', 'board.fit', '|', 'board.toDocument'], getView);
+  boardBar = renderButtons(
+    el('board-tools'),
+    ['board.addCard', 'board.shape', 'board.pen', 'board.addGroup', 'board.connect', 'board.color', 'board.delete', 'board.fit', '|', 'board.toDocument'],
+    getView,
+  );
   const codeBar = new CodeBar(el('code-tools'), getView, debug, (doc, lang) => void ws.setLanguage(doc, lang));
   const fileBar = renderButtons(el('file-actions'), ['file.new', 'file.open', 'file.save', 'file.export'], getView);
   const viewBar = renderButtons(
