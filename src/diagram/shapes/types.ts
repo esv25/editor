@@ -38,6 +38,8 @@ export interface ShapeType {
   distance?(node: DiagramNode, p: Point): number;
   /** Points that lines snap to (default: corners and side middles of the box). */
   anchors?(node: DiagramNode): Point[];
+  /** Where the text is typed, left-aligned (default: over the whole figure, centred). */
+  textArea?(node: DiagramNode): { x: number; y: number; w: number; h: number };
   /** Made with its own tool rather than placed with a click (freehand). */
   ownTool?: boolean;
 }
