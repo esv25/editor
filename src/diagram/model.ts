@@ -140,13 +140,36 @@ export function moveNodes(d: Diagram, ids: string[], dx: number, dy: number): Di
   return { ...d, nodes: d.nodes.map((n) => (moving.has(n.id) ? { ...n, x: n.x + dx, y: n.y + dy } : n)) };
 }
 
-/** Nodes that touch the rectangle (any corner order) – forgiving, so a rough drag catches them. */
+/** A frame (shapes/frame.ts): a rectangle around other figures, which move with it. */
+export const isFrame = (n: DiagramNode) => n.shape === 'frame';
+
+const contains = (outer: DiagramNode, inner: DiagramNode) =>
+  inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h;
+
+/** These nodes plus everything lying wholly inside the frames among them (frames inside frames included): what moves together. */
+export function withFramed(d: Diagram, ids: string[]): string[] {
+  const result = new Set(ids);
+  for (const frame of d.nodes) {
+    if (!result.has(frame.id) || !isFrame(frame)) continue;
+    for (const n of d.nodes) if (n !== frame && contains(frame, n)) result.add(n.id);
+  }
+  return [...result];
+}
+
+/**
+ * Nodes that touch the rectangle (any corner order) – forgiving, so a rough
+ * drag catches them. A frame counts only when the rectangle reaches its
+ * outline, so marking figures inside a frame doesn't take the frame too.
+ */
 export function nodesInRect(d: Diagram, a: Point, b: Point): DiagramNode[] {
   const left = Math.min(a.x, b.x);
   const right = Math.max(a.x, b.x);
   const top = Math.min(a.y, b.y);
   const bottom = Math.max(a.y, b.y);
-  return d.nodes.filter((n) => n.x <= right && n.x + n.w >= left && n.y <= bottom && n.y + n.h >= top);
+  const within = (n: DiagramNode) => left > n.x && right < n.x + n.w && top > n.y && bottom < n.y + n.h;
+  return d.nodes.filter(
+    (n) => n.x <= right && n.x + n.w >= left && n.y <= bottom && n.y + n.h >= top && !(isFrame(n) && within(n)),
+  );
 }
 
 /** Lines with both ends among these nodes. */

@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Tegnevinduet: ny figur **Ramme** (tast G) som rammer inn andre figurer – en pakke, en systemgrense eller en gruppe, med navnet i en fane øverst til venstre. Rammen ligger alltid bak de andre figurene, og når du flytter den, følger alt som står inni med. Klikk på kanten eller navnet for å velge den; inni rammen kan du plassere og velge figurer som vanlig.
+
 ## 0.9.4 – 2026-10-15
 
 - Tabeller: formler i en celle redigeres med formelfeltet, som ellers i notatet – klikk på formelen, gå inn med piltastene eller Backspace, eller lag en ny med Ctrl+M. Mattepanelet og egne mattetaster virker der også.

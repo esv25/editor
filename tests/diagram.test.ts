@@ -18,10 +18,11 @@ import {
   snap,
   updateEdge,
   updateNode,
+  withFramed,
   type Diagram,
 } from '../src/diagram/model';
 import { edgePresets, renderEdge } from '../src/diagram/edges';
-import { edgePoints, fontSizes } from '../src/diagram/render';
+import { edgePoints, fontSizes, renderDiagram } from '../src/diagram/render';
 import { cornerPath, offsetPolyline, routeBetween, trim } from '../src/diagram/routing';
 import { shapeFor } from '../src/diagram/shapes';
 import { setUnderline, styledLine, textUnderline } from '../src/diagram/shapes/common';
@@ -543,6 +544,92 @@ describe('Velg tool', () => {
     expect(ids(ctx.selection)).toEqual(['node:n2', 'node:n1']);
     expect(selectTool.cancel!(ctx)).toBe(true);
     expect(ids(ctx.selection)).toEqual(['node:n2']);
+  });
+});
+
+describe('frames', () => {
+  /** A frame (n1) holding a box (n2) and a smaller frame (n3) with a box (n4); n5 stands outside. */
+  function framed(): Diagram {
+    let d = addNode(emptyDiagram(), { shape: 'frame', x: 0, y: 0, w: 600, h: 400, text: 'System' }).diagram;
+    d = addNode(d, box(40, 60)).diagram;
+    d = addNode(d, { shape: 'frame', x: 260, y: 60, w: 300, h: 300, text: '' }).diagram;
+    d = addNode(d, box(300, 120)).diagram;
+    d = addNode(d, box(700, 0)).diagram;
+    return d;
+  }
+  const frameShape = shapeFor('frame');
+  const hit = (d: Diagram, p: { x: number; y: number }) =>
+    nodeAt(d, p, 10, (n, q) => shapeFor(n.shape).distance?.(n, q) ?? Math.hypot(Math.max(n.x - q.x, 0, q.x - n.x - n.w), Math.max(n.y - q.y, 0, q.y - n.y - n.h)));
+
+  it('takes along everything wholly inside it, frames inside frames too', () => {
+    const d = framed();
+    expect(withFramed(d, ['n1']).sort()).toEqual(['n1', 'n2', 'n3', 'n4']);
+    expect(withFramed(d, ['n3']).sort()).toEqual(['n3', 'n4']);
+    expect(withFramed(d, ['n2'])).toEqual(['n2']);
+    // Half outside doesn't count.
+    const half = updateNode(d, 'n2', { x: -40 });
+    expect(withFramed(half, ['n1'])).not.toContain('n2');
+  });
+
+  it('is only hit on its outline and name tab, so the inside stays free', () => {
+    const d = framed();
+    const outer = d.nodes[0];
+    expect(frameShape.distance!(outer, { x: 200, y: 300 })).toBeGreaterThan(50);
+    expect(frameShape.distance!(outer, { x: 2, y: 200 })).toBeLessThan(10);
+    expect(frameShape.distance!(outer, { x: 15, y: 12 })).toBe(0);
+    expect(hit(d, { x: 200, y: 300 })).toBeNull();
+    expect(hit(d, { x: 100, y: 100 })?.id).toBe('n2');
+    // A figure lying on the outline wins over the frame.
+    const onEdge = updateNode(d, 'n2', { x: -80 });
+    expect(hit(onEdge, { x: 0, y: 100 })?.id).toBe('n2');
+  });
+
+  it('is drawn behind everything, the biggest at the back', () => {
+    const d = framed();
+    const order = renderDiagram({ ...d, nodes: [...d.nodes].reverse() }).map((el) => el.attrs?.['data-node']);
+    expect(order).toEqual(['n1', 'n3', 'n5', 'n4', 'n2']);
+  });
+
+  it('is not marked by an area drawn inside it', () => {
+    const d = framed();
+    expect(nodesInRect(d, { x: 20, y: 40 }, { x: 220, y: 160 }).map((n) => n.id)).toEqual(['n2']);
+    expect(nodesInRect(d, { x: -20, y: 40 }, { x: 220, y: 160 }).map((n) => n.id)).toEqual(['n1', 'n2']);
+  });
+
+  it('Velg: dragging the frame moves what is inside; dragging inside it moves the view', () => {
+    const d = framed();
+    const commits: Diagram[] = [];
+    const panned: number[][] = [];
+    let selection: readonly Selection[] = [];
+    const ctx = {
+      get diagram() {
+        return commits.at(-1) ?? d;
+      },
+      get selection() {
+        return selection;
+      },
+      grid: 20, tolerance: 10, dragThreshold: 6, alignTolerance: 0, handleSize: 14,
+      commit: (next: Diagram) => commits.push(next),
+      select: (s: Selection | readonly Selection[] | null) => (selection = s === null ? [] : Array.isArray(s) ? s : [s as Selection]),
+      editText: () => {}, setTool: () => {},
+      nodeAt: (p: { x: number; y: number }) => hit(commits.at(-1) ?? d, p),
+      snapPoint: (p: { x: number; y: number }) => ({ point: p, anchored: false }),
+      edgeAt: () => null, refresh: () => {},
+      panBy: (dx: number, dy: number) => panned.push([dx, dy]),
+    } as ToolContext;
+
+    selectTool.pointerDown(ctx, { x: 200, y: 300 });
+    selectTool.pointerMove!(ctx, { x: 240, y: 300 });
+    selectTool.pointerUp!(ctx, { x: 240, y: 300 });
+    expect(panned.length).toBeGreaterThan(0);
+    expect(commits).toEqual([]);
+
+    selectTool.pointerDown(ctx, { x: 15, y: 12 });
+    selectTool.pointerMove!(ctx, { x: 55, y: 32 });
+    selectTool.pointerUp!(ctx, { x: 55, y: 32 });
+    expect(commits.at(-1)!.nodes.map((n) => [n.id, n.x, n.y])).toEqual([
+      ['n1', 40, 20], ['n2', 80, 80], ['n3', 300, 80], ['n4', 340, 140], ['n5', 700, 0],
+    ]);
   });
 });
 

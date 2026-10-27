@@ -13,6 +13,7 @@ import {
   distanceToSegment,
   findNode,
   moveNodes,
+  withFramed,
   nodeAt,
   removeEdges,
   removeNodes,
@@ -275,7 +276,7 @@ export class DiagramCanvas {
 
   /** Arrow keys: move every selected figure. */
   private nudge(dx: number, dy: number): void {
-    this.commit(moveNodes(this.diagram, this.selectedIds('node'), dx, dy));
+    this.commit(moveNodes(this.diagram, withFramed(this.diagram, this.selectedIds('node')), dx, dy));
   }
 
   edgeAt(p: Point): DiagramEdge | null {
@@ -363,8 +364,11 @@ export class DiagramCanvas {
       value: node.text,
       multiline: !!shape.multiline,
       placeholder: shape.placeholder ?? '',
-      align: shape.multiline ? 'left' : 'center',
-      place: () => findNode(this.diagram, nodeId) ?? null,
+      align: shape.multiline || shape.textArea ? 'left' : 'center',
+      place: () => {
+        const current = findNode(this.diagram, nodeId);
+        return current ? (shape.textArea?.(current) ?? current) : null;
+      },
       fontSize: () => fontSizes(this.diagram).get(nodeId),
       save: (text) => {
         const current = findNode(this.diagram, nodeId);

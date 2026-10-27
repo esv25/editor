@@ -2,7 +2,7 @@
  * Diagram → SVG tree. Used for both the canvas and the saved file.
  */
 import { renderEdge } from './edges';
-import { findNode, type Diagram, type DiagramEdge, type Point } from './model';
+import { findNode, isFrame, type Diagram, type DiagramEdge, type DiagramNode, type Point } from './model';
 import { textScale } from './textSize';
 import { routeBetween, simplify } from './routing';
 import { drawingStyle, MAX_TEXT_SCALE, textExtent } from './shapes/common';
@@ -50,7 +50,10 @@ export function fontSizes(d: Diagram): Map<string, number> {
 
 export function renderDiagram(d: Diagram): SvgNode[] {
   const sizes = fontSizes(d);
-  const nodes = d.nodes.map((n) => {
+  // Frames behind everything else, the biggest at the back, so what they hold is never hidden.
+  const area = (n: DiagramNode) => n.w * n.h;
+  const order = [...d.nodes.filter(isFrame).sort((a, b) => area(b) - area(a)), ...d.nodes.filter((n) => !isFrame(n))];
+  const nodes = order.map((n) => {
     const el = shapeFor(n.shape).render(n, sizes.get(n.id));
     return { ...el, attrs: { ...el.attrs, 'data-node': n.id } };
   });

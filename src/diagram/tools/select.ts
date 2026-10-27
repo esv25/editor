@@ -13,7 +13,7 @@
  *   empty space marks everything the rectangle touches.
  */
 import { alignMove, alignResize, guidesFor, type Box } from '../align';
-import { edgesBetween, findNode, moveNodes, nodesInRect, updateNode, type Diagram, type Point } from '../model';
+import { edgesBetween, findNode, moveNodes, nodesInRect, updateNode, withFramed, type Diagram, type Point } from '../model';
 import { h } from '../svg';
 import { shapeIcon } from '../shapes/common';
 import { guideMarks } from './preview';
@@ -109,7 +109,8 @@ function makeSelectTool(tool: { id: string; name: string; key: string; icon: str
 
   const startMove = (ctx: ToolContext, p: Point, grab: string, onClick?: () => void) => {
     const selected = selectedNodeIds(ctx);
-    const ids = selected.includes(grab) ? selected : [grab];
+    // A frame takes along what's inside it.
+    const ids = withFramed(ctx.diagram, selected.includes(grab) ? selected : [grab]);
     const box = boxOf(ctx.diagram, ids)!;
     mode = { kind: 'move', grab, ids, start: p, dx: p.x - box.x, dy: p.y - box.y, dragging: false, onClick };
   };

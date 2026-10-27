@@ -303,6 +303,10 @@ ikke flytter noe. Streker/piler/frihånd er klikk–klikk. Store knapper med tek
   oppover vokser figurer rundt midten (to rutenett-steg om gangen) til teksten får plass, og løse
   strekender som ligger på et festepunkt festes først (`fastenLooseEnds`) så de følger med.
   UML-klasse: én tekst der linjer med `--` deler i navn/felt/metoder (`classSections`).
+  Ramme (`frame.ts`): rektangel uten fyll rundt andre figurer, navnet i en fane øverst til venstre
+  (`textArea` sier hvor teksten skrives). Tegnes bakerst (`renderDiagram`, største først), treffes bare på
+  kanten og fanen (`distance`), og flytting tar med alt som ligger helt inni (`withFramed` i `model.ts`, brukt av
+  Velg og piltastene); `nodesInRect` tar den ikke med når området ligger inni den.
   ER (Chen): entitet = boks, attributt = ellipse, relasjon = rombe, Linje + kardinalitet.
 - Verktøy (`tools/`, én fil per verktøy, `Tool`-grensesnittet i `tools/types.ts`;
   `pointerDown`/`pointerMove`/`pointerUp`, lerretet fanger pekeren mens knappen er nede):
