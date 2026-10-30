@@ -76,6 +76,7 @@ src/
     inlineValues.ts       fremhevede variabler i koden: verdier ved pauselinja, farget der de står
     debuggers.ts          språk → feilsøker (standard + settings.debuggers)
     dap.ts                DAP-klient + backend (debugpy for Python)
+    pythonValues.ts       Python-objekter: instansvariablene som verdi («Node(element=3, …)»)
     node.ts               Node-backend over Chrome DevTools Protocol (JS/TS)
   features/               én CodeMirror-funksjon per fil (se under)
     index.ts              listen over aktive features

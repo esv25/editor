@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Feilsøking i Python: objekter viser instansvariablene sine rett i verdien, f.eks. `Node(element=3, neste=Node(element=13, neste=None))` i stedet for `<__main__.Node object at 0x…>`. Objekter inne i lister vises som `Node(…)`. Klikk på objektet for å se alle feltene.
+
 ## 0.9.5 – 2026-10-27
 
 - Tegnevinduet: ny figur **Ramme** (tast G) som rammer inn andre figurer – en pakke, en systemgrense eller en gruppe, med navnet i en fane øverst til venstre. Rammen ligger alltid bak de andre figurene, og når du flytter den, følger alt som står inni med. Klikk på kanten eller navnet for å velge den; inni rammen kan du plassere og velge figurer som vanlig.
