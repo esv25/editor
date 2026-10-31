@@ -128,6 +128,7 @@ export class DebugPanel {
     status.textContent = `${reasonText(c)} · ${c.name}`;
 
     const parts: HTMLElement[] = [header, status, this.controls()];
+    if (c.canShowHeap) parts.push(this.heapButton());
     if (c.inPast) parts.push(this.pastBanner());
     if (c.stop?.reason === 'exception' && c.stop.text) {
       const box = document.createElement('div');
@@ -186,6 +187,20 @@ export class DebugPanel {
     button('debug.restart', debugIcons.restart, 'På nytt', true);
     button('debug.stop', debugIcons.stop, c.finished ? 'Lukk' : 'Stopp', true, 'danger', c.finished ? withKey('Lukk feilsøkingen', 'debug.stop') : undefined);
     return row;
+  }
+
+  /** Open or close the drawing of the data structures beside the code. */
+  private heapButton(): HTMLElement {
+    const c = this.debug;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `debug-heap-button${c.heapOpen ? ' on' : ''}`;
+    b.textContent = c.heapOpen ? 'Skjul datastrukturene' : 'Tegn datastrukturene';
+    b.title = withKey(c.heapOpen ? 'Skjul tegningen av variablene og objektene' : 'Tegn variablene og objektene med piler ved siden av koden', 'debug.heap');
+    b.setAttribute('aria-pressed', String(c.heapOpen));
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', () => c.toggleHeap());
+    return b;
   }
 
   /** Stepping back: say clearly that this is how things were, not where the program is. */

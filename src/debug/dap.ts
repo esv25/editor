@@ -6,11 +6,14 @@
 import type { AdapterProcess } from '../platform';
 import { normalizeLang } from '../features/codeBlockTools/runners';
 import { fillLaunchArgs, type DebuggerConfig } from './debuggers';
+import { decodeHeapPart, mergeHeap, pythonHeapExpression, type HeapGraph } from './heap';
 import { isPlainObject, isSummary, shortenObjects, summaryExpression } from './pythonValues';
 import type { DebugBackend, DebugEvents, DebugHost, LaunchOptions, Scope, StackFrame, Variable } from './types';
 
 /** Objects summarized per `variables` call (each one is an extra request). */
 const MAX_SUMMARIES = 50;
+/** Function calls shown in the data structure view (innermost). */
+const MAX_HEAP_FRAMES = 20;
 
 interface DapMessage {
   seq: number;
@@ -304,6 +307,30 @@ export class DapBackend implements DebugBackend {
     } catch {
       // E.g. an object without __dict__ (__slots__): keep debugpy's text.
     }
+  }
+
+  get canShowHeap(): boolean {
+    return this.python;
+  }
+
+  async heap(frames: StackFrame[]): Promise<HeapGraph> {
+    if (!this.python) throw new Error('Støttes ikke for dette språket');
+    // Outermost call first, like the program reads; a frame that fails shows without variables.
+    const calls = frames.filter((f) => f.path).slice(0, MAX_HEAP_FRAMES).reverse();
+    const parts = await Promise.all(
+      calls.map(async (f) => {
+        const main = f.name === '<module>';
+        const name = main ? 'Hovedprogram' : f.name;
+        try {
+          const body = await this.client.request('evaluate', { expression: pythonHeapExpression(main), frameId: f.id, context: 'watch' });
+          return { name, part: decodeHeapPart(body.result), ok: true };
+        } catch {
+          return { name, part: { vars: [], objects: {} }, ok: false };
+        }
+      }),
+    );
+    if (calls.length && !parts.some((p) => p.ok)) throw new Error('Fikk ikke hentet datastrukturene');
+    return mergeHeap(parts);
   }
 
   async stop(): Promise<void> {

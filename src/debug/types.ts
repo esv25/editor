@@ -4,6 +4,7 @@
  * `DebugBackend`; the rest of the app doesn't know which one it talks to.
  */
 import type { ProcessHost } from '../platform';
+import type { HeapGraph } from './heap';
 
 export interface StackFrame {
   id: number;
@@ -87,6 +88,10 @@ export interface DebugBackend {
   scopes(frameId: number): Promise<Scope[]>;
   variables(ref: number): Promise<Variable[]>;
   evaluate(expression: string, frameId: number | undefined): Promise<Variable>;
+  /** The data structures can be drawn (`heap`) – Python and JavaScript. */
+  readonly canShowHeap: boolean;
+  /** The variables of the calls in `frames` (the user's own) and the objects they reach. */
+  heap(frames: StackFrame[]): Promise<HeapGraph>;
   /** End the session and the program. */
   stop(): Promise<void>;
 }

@@ -26,6 +26,7 @@ import {
   type Snapshot,
   type WatchResult,
 } from './history';
+import { heapChanges, type HeapGraph } from './heap';
 import { NodeBackend } from './node';
 import { samePath, type DebugBackend, type DebugHost, type Scope, type StackFrame, type StopInfo, type Variable } from './types';
 
@@ -42,6 +43,17 @@ export interface PinState {
 type Action = 'continue' | 'step' | 'pause';
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+// Whether the data structure view is open, also between runs of the app.
+const HEAP_KEY = 'editor.debugHeap.v1';
+
+function readHeapOpen(): boolean {
+  try {
+    return localStorage.getItem(HEAP_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 // Highlighted variables are remembered per program, also between runs of the app.
 const PINS_KEY = 'editor.debugPins.v1';
@@ -91,6 +103,10 @@ export class DebugController {
   watches: string[] = [];
   /** Highlighted variables (or expressions) for the program being debugged. */
   pins: Pin[] = [];
+  /** The data structure view is open (shown while debugging a language that has it). */
+  heapOpen = readHeapOpen();
+  /** The session's debugger can draw data structures (kept after the program ends). */
+  canShowHeap = false;
 
   /** The stop the program is at (null while it runs). */
   private current: Snapshot | null = null;
@@ -255,12 +271,15 @@ export class DebugController {
     const backend = this.createBackend(config, session);
     this.backend = backend;
     try {
-      await backend.start({
+      const started = backend.start({
         program,
         cwd: program.replace(/[\\/][^\\/]*$/, ''),
         lang: doc.lang,
         breakpoints: this.allBreakpoints(),
       });
+      // Known once it has the language (the program may stop before `start` is done).
+      this.canShowHeap = backend.canShowHeap;
+      await started;
       if (session === this.session && this.status === 'starting') {
         this.status = 'running';
         this.changed();
@@ -475,7 +494,7 @@ export class DebugController {
 
   /** Fetch the variables and expressions for the present stop's selected frame. */
   private async load(snapshot: Snapshot): Promise<void> {
-    await Promise.all([this.loadScopes(snapshot), this.evaluate(snapshot)]);
+    await Promise.all([this.loadScopes(snapshot), this.evaluate(snapshot), this.heapOpen ? this.loadHeap(snapshot) : undefined]);
   }
 
   /** Pick a frame in the call stack: show its line and its variables. */
@@ -637,6 +656,62 @@ export class DebugController {
     if (!this.isLive(snapshot) || frameId !== snapshot.frames[snapshot.frameIndex]?.id) return;
     snapshot.watchResults = watches;
     snapshot.pinResults = pins;
+    this.changed();
+  }
+
+  // ---------- Data structures ----------
+
+  /** The data structure view is shown now. */
+  get heapVisible(): boolean {
+    return this.heapOpen && this.canShowHeap && this.visible;
+  }
+
+  /** Open or close the data structure view. */
+  toggleHeap(): boolean {
+    if (!this.visible || !this.canShowHeap) {
+      this.ws.showError(this.visible ? 'Datastrukturer kan bare tegnes for Python og JavaScript' : 'Start feilsøkingen først (F5)');
+      return true;
+    }
+    this.heapOpen = !this.heapOpen;
+    try {
+      localStorage.setItem(HEAP_KEY, this.heapOpen ? '1' : '0');
+    } catch {
+      // Remembered until the app closes.
+    }
+    this.changed();
+    if (this.heapOpen && this.current) void this.loadHeap(this.current);
+    return true;
+  }
+
+  /** The data structures at the stop shown: the graph, or why there is none (undefined while fetching). */
+  heapState(): { graph?: HeapGraph; error?: string; changed: Set<string> } | undefined {
+    const snapshot = this.shown;
+    if (!snapshot) return { error: 'Programmet kjører', changed: new Set() };
+    if (snapshot.heap) {
+      const index = this.history.indexOf(snapshot);
+      const before = this.history.slice(0, index).reverse().find((s) => s.heap)?.heap;
+      return { graph: snapshot.heap, changed: before ? heapChanges(before, snapshot.heap) : new Set() };
+    }
+    if (snapshot.heapError) return { error: snapshot.heapError, changed: new Set() };
+    if (!this.isLive(snapshot)) return { error: 'Datastrukturene ble ikke hentet ved dette steget.', changed: new Set() };
+    return undefined;
+  }
+
+  private loadingHeap = new Set<Snapshot>();
+
+  private async loadHeap(snapshot: Snapshot): Promise<void> {
+    const { backend } = this;
+    if (!backend?.canShowHeap || snapshot.heap || this.loadingHeap.has(snapshot) || !this.isLive(snapshot)) return;
+    this.loadingHeap.add(snapshot);
+    try {
+      const heap = await backend.heap(snapshot.frames);
+      if (this.isLive(snapshot)) snapshot.heap = heap;
+    } catch (err) {
+      // If the program went on meanwhile, the answer is just missing for this stop.
+      if (this.isLive(snapshot)) snapshot.heapError = errorText(err);
+    } finally {
+      this.loadingHeap.delete(snapshot);
+    }
     this.changed();
   }
 

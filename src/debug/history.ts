@@ -8,6 +8,7 @@
  *
  * Pure logic, tested without a debugger (tests/debugHistory.test.ts).
  */
+import type { HeapGraph } from './heap';
 import type { Scope, StackFrame, StopInfo, Variable } from './types';
 
 export interface ScopeState {
@@ -37,6 +38,9 @@ export interface Snapshot {
   pinResults: WatchResult[];
   /** Children of variables opened at this stop, by handle. */
   children: Map<number, Variable[]>;
+  /** The data structures, fetched while their view is open (`heapError` if that failed). */
+  heap?: HeapGraph;
+  heapError?: string;
 }
 
 /** Stops kept for stepping back. */
