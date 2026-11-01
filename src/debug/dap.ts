@@ -4,8 +4,16 @@
  * https://microsoft.github.io/debug-adapter-protocol/
  */
 import type { AdapterProcess } from '../platform';
+import { normalizeLang } from '../features/codeBlockTools/runners';
 import { fillLaunchArgs, type DebuggerConfig } from './debuggers';
+import { decodeHeapPart, mergeHeap, pythonHeapExpression, type HeapGraph } from './heap';
+import { isPlainObject, isSummary, shortenObjects, summaryExpression } from './pythonValues';
 import type { DebugBackend, DebugEvents, DebugHost, LaunchOptions, Scope, StackFrame, Variable } from './types';
+
+/** Objects summarized per `variables` call (each one is an extra request). */
+const MAX_SUMMARIES = 50;
+/** Function calls shown in the data structure view (innermost). */
+const MAX_HEAP_FRAMES = 20;
 
 interface DapMessage {
   seq: number;
@@ -94,6 +102,10 @@ export class DapBackend implements DebugBackend {
   private resolveInitialized!: () => void;
   private stderr = '';
   private ended = false;
+  /** Python: objects get their instance variables as value (see pythonValues.ts). */
+  private python = false;
+  /** Variables handle -> the frame it belongs to (for evaluating summaries there). */
+  private refFrames = new Map<number, number>();
 
   constructor(
     private config: DebuggerConfig,
@@ -109,6 +121,7 @@ export class DapBackend implements DebugBackend {
 
   async start(options: LaunchOptions): Promise<void> {
     const { config } = this;
+    this.python = normalizeLang(options.lang) === 'python';
     this.process = await this.host.processes.startAdapter(
       { program: config.command ?? '', args: config.args ?? [], cwd: options.cwd },
       {
@@ -173,6 +186,7 @@ export class DapBackend implements DebugBackend {
 
   private async stopped(body: any): Promise<void> {
     const threadId = body.threadId ?? 1;
+    this.refFrames.clear();
     let text: string | undefined;
     if (body.reason === 'exception') {
       text = body.text ?? body.description;
@@ -246,6 +260,7 @@ export class DapBackend implements DebugBackend {
 
   async scopes(frameId: number): Promise<Scope[]> {
     const body = await this.client.request('scopes', { frameId });
+    for (const s of body.scopes ?? []) this.refFrames.set(s.variablesReference, frameId);
     // The first scope is the most relevant one (local variables); the rest start closed.
     return (body.scopes ?? []).map((s: any, i: number) => ({
       name: s.name,
@@ -257,18 +272,65 @@ export class DapBackend implements DebugBackend {
 
   async variables(ref: number): Promise<Variable[]> {
     const body = await this.client.request('variables', { variablesReference: ref });
-    return (body.variables ?? []).map((v: any) => ({
-      name: v.name,
-      value: v.value,
-      type: v.type,
-      ref: v.variablesReference ?? 0,
-      evaluateName: v.evaluateName,
-    }));
+    const frameId = this.refFrames.get(ref);
+    const vars: Variable[] = (body.variables ?? []).map((v: any) => {
+      const child = v.variablesReference ?? 0;
+      if (child && frameId !== undefined) this.refFrames.set(child, frameId);
+      return { name: v.name, value: v.value, type: v.type, ref: child, evaluateName: v.evaluateName };
+    });
+    if (this.python) {
+      const objects = vars.filter((v) => v.evaluateName && isPlainObject(v.value)).slice(0, MAX_SUMMARIES);
+      await Promise.all(objects.map((v) => this.summarize(v, frameId)));
+      for (const v of vars) v.value = shortenObjects(v.value);
+    }
+    return vars;
   }
 
   async evaluate(expression: string, frameId: number | undefined): Promise<Variable> {
     const body = await this.client.request('evaluate', { expression, frameId, context: 'watch' });
-    return { name: expression, value: body.result, type: body.type, ref: body.variablesReference ?? 0, evaluateName: expression };
+    const ref = body.variablesReference ?? 0;
+    if (ref && frameId !== undefined) this.refFrames.set(ref, frameId);
+    const v: Variable = { name: expression, value: body.result, type: body.type, ref, evaluateName: expression };
+    if (this.python) {
+      await this.summarize(v, frameId);
+      v.value = shortenObjects(v.value);
+    }
+    return v;
+  }
+
+  /** Python: "<__main__.Hund object at 0x…>" → "Hund(navn='Fido', alder=3)", if that works. */
+  private async summarize(v: Variable, frameId: number | undefined): Promise<void> {
+    if (!v.evaluateName || frameId === undefined || !isPlainObject(v.value)) return;
+    try {
+      const body = await this.client.request('evaluate', { expression: summaryExpression(v.evaluateName), frameId, context: 'watch' });
+      if (typeof body.result === 'string' && isSummary(body.result)) v.value = body.result;
+    } catch {
+      // E.g. an object without __dict__ (__slots__): keep debugpy's text.
+    }
+  }
+
+  get canShowHeap(): boolean {
+    return this.python;
+  }
+
+  async heap(frames: StackFrame[]): Promise<HeapGraph> {
+    if (!this.python) throw new Error('Støttes ikke for dette språket');
+    // Outermost call first, like the program reads; a frame that fails shows without variables.
+    const calls = frames.filter((f) => f.path).slice(0, MAX_HEAP_FRAMES).reverse();
+    const parts = await Promise.all(
+      calls.map(async (f) => {
+        const main = f.name === '<module>';
+        const name = main ? 'Hovedprogram' : f.name;
+        try {
+          const body = await this.client.request('evaluate', { expression: pythonHeapExpression(main), frameId: f.id, context: 'watch' });
+          return { name, part: decodeHeapPart(body.result), ok: true };
+        } catch {
+          return { name, part: { vars: [], objects: {} }, ok: false };
+        }
+      }),
+    );
+    if (calls.length && !parts.some((p) => p.ok)) throw new Error('Fikk ikke hentet datastrukturene');
+    return mergeHeap(parts);
   }
 
   async stop(): Promise<void> {

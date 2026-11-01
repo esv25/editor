@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DapClient } from '../src/debug/dap';
 import { fillLaunchArgs } from '../src/debug/debuggers';
 import { describeValue, fileUrlToPath, pathToFileUrl, urlRegexFor } from '../src/debug/node';
+import { isPlainObject, isSummary, shortenObjects, summaryExpression } from '../src/debug/pythonValues';
 
 describe('DapClient', () => {
   function setup(reverse: (command: string, args: any) => Promise<unknown> = async () => ({})) {
@@ -109,5 +110,32 @@ describe('describeValue', () => {
         preview: { type: 'object', overflow: true, properties: [{ name: 'navn', type: 'string', value: 'Eirik' }] },
       }),
     ).toBe('{navn: "Eirik", …}');
+  });
+});
+
+describe('Python objects', () => {
+  it('recognizes objects without their own repr', () => {
+    expect(isPlainObject('<__main__.Hund object at 0x000001F1F38212B0>')).toBe(true);
+    expect(isPlainObject('<oblig.set_hash.Node object at 0x1f>')).toBe(true);
+    expect(isPlainObject('<__main__.Størrelse object at 0xAB>')).toBe(true);
+    expect(isPlainObject("<class '__main__.Hund'>")).toBe(false);
+    expect(isPlainObject('[<__main__.Node object at 0x1f>]')).toBe(false);
+  });
+
+  it('shortens objects inside other values', () => {
+    expect(shortenObjects('[None, <__main__.Node object at 0x1F>, <x.Node object at 0x2>]')).toBe('[None, Node(…), Node(…)]');
+    expect(shortenObjects("'tekst'")).toBe("'tekst'");
+  });
+
+  it('knows a summary from a failed one', () => {
+    expect(isSummary("Hund(navn='Fido', alder=3)")).toBe(true);
+    expect(isSummary('Tom()')).toBe(true);
+    expect(isSummary('<__main__. object at 0x1F>')).toBe(false);
+  });
+
+  it('passes the object in from the frame', () => {
+    const expression = summaryExpression('self.buckets[3]');
+    expect(expression).toContain('((self.buckets[3]),');
+    expect(expression).toContain('vars(o)');
   });
 });

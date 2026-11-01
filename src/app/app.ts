@@ -23,6 +23,7 @@ import { CodeBar } from '../ui/codeBar';
 import { codeHelpLevelName, openCodeHelp } from '../ui/codeHelp';
 import { showMenuUnder, type MenuItem } from '../ui/contextMenu';
 import { DebugPanel } from '../ui/debugPanel';
+import { HeapView } from '../ui/heapView';
 import { FileTree } from '../ui/fileTree';
 import { openKeybindings } from '../ui/keybindings';
 import { MathPanel } from '../ui/mathPanel';
@@ -238,6 +239,7 @@ export async function startApp(): Promise<void> {
     { id: 'debug.pin', name: 'Fremhev variabelen ved markøren', key: 'Shift-F9', scope: 'code', run: () => debug.pinAtCursor() },
     { id: 'debug.restart', name: 'Start feilsøkingen på nytt', key: 'Mod-Shift-F5', scope: 'any', run: () => debug.restart() },
     { id: 'debug.stop', name: 'Stopp feilsøkingen', key: 'Shift-F5', scope: 'any', run: () => debug.stopSession() },
+    { id: 'debug.heap', name: 'Vis datastrukturene (tegnet med piler)', key: 'F7', scope: 'any', run: () => debug.toggleHeap() },
     { id: 'debug.toggleBreakpoint', name: 'Stoppunkt av/på', key: 'F9', scope: 'code', run: toggleBreakpoint },
     {
       id: 'view.toggleTheme',
@@ -368,6 +370,7 @@ export async function startApp(): Promise<void> {
     getView,
   );
   new DebugPanel(el('debug'), debug, getView);
+  new HeapView(el('heap'), debug);
   // The sidebar holds the debug view, so it shows while debugging even if it's otherwise hidden.
   const updateSidebar = () => {
     el('sidebar').hidden = !(getSettings().outlineVisible || debug.visible);

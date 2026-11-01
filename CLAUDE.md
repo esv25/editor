@@ -76,6 +76,10 @@ src/
     inlineValues.ts       fremhevede variabler i koden: verdier ved pauselinja, farget der de står
     debuggers.ts          språk → feilsøker (standard + settings.debuggers)
     dap.ts                DAP-klient + backend (debugpy for Python)
+    pythonValues.ts       Python-objekter: instansvariablene som verdi («Node(element=3, …)»)
+    heap.ts               datastrukturene som graf (kall, objekter, pekere) + programmene som henter
+                          den i Python/JS, og hva som er endret – ren logikk
+    heapLayout.ts         plassering av boksene og pilene i datastrukturvisningen – ren logikk
     node.ts               Node-backend over Chrome DevTools Protocol (JS/TS)
   features/               én CodeMirror-funksjon per fil (se under)
     index.ts              listen over aktive features
@@ -469,6 +473,17 @@ Alt unntatt `index.ts` er ren logikk uten CodeMirror (testet i `tests/codeAssist
   med hver sin farge (`--pin-1…5`), huskes per program i localStorage (`editor.debugPins.v1`).
   Verdien tas fra variabellista når det er et navn (virker da også for gamle stopp), ellers
   evalueres uttrykket. `ExecutionLine.pins` bærer verdiene til editoren (`inlineValues.ts`).
+- **Datastrukturer** (`debug.heap`/F7, `ui/heapView.ts` i `#heap` til høyre for editoren): variablene
+  i hvert av brukerens kall og objektene de når, som bokser med piler (som Python Tutor). Python:
+  ett `evaluate` per ramme som kjører et lite program med `exec` (`pythonHeapExpression`; objekter
+  identifiseres med `id()`, globale filtreres bort i funksjoner fordi debugpy evaluerer med begge).
+  Node: variablene hentes fra scopene og sendes som argumenter til én `Runtime.callFunctionOn`
+  (`JS_HEAP_FUNCTION`), så ingenting legges igjen i programmet. Grafen lagres i `Snapshot.heap`
+  (hentes bare mens visningen er åpen), så tilbakeblikk virker. Visningen måler boksene og
+  `layoutHeap` plasserer dem som et liggende tre (`heapTree`: et objekt tilhører pekeren som
+  først når det, én kolonne til høyre): hver struktur og hvert undertre får sitt eget bånd, så
+  pilene ikke krysser. Andre pekere til samme objekt (delte, sykler) tegnes stiplet og svakere
+  (`Arrow.shared`). Grenser: `MAX_OBJECTS`/`MAX_ENTRIES`. Testet i `tests/heap.test.ts`.
 - Feilsøking i dev: `window.debug` og `window.terminal`. Testes uten DOM:
   `tests/breakpoints.test.ts`, `tests/debugProtocols.test.ts`, `tests/keys.test.ts`.
 
@@ -499,7 +514,7 @@ Ctrl+Enter kryss av oppgave, Ctrl+Shift+Enter kjør kodeblokk/fil, Ctrl+Shift+H 
 overskrift, Ctrl+N nytt dokument, Ctrl+O/S/Shift+S fil, Ctrl+P skriv ut, Ctrl+W lukk fane, Ctrl+Tab /
 Ctrl+PageDown neste fane, Ctrl+Shift+N ny gruppe, Ctrl+Shift+O disposisjon, Ctrl+J
 terminal, Ctrl+F5 kjør i terminal, F5 feilsøk/fortsett, F9 stoppunkt, F10/F11/Shift+F11
-steg, Shift+F10 steg tilbake, Shift+F9 fremhev variabel, F6 pause, Shift+F5 stopp, Ctrl+Shift+F5
+steg, Shift+F10 steg tilbake, Shift+F9 fremhev variabel, F7 datastrukturer, F6 pause, Shift+F5 stopp, Ctrl+Shift+F5
 start på nytt, Ctrl+M formel, Ctrl+Shift+M formelblokk (inne i formler: Ctrl+↑/↓ potens/indeks).
 I kodefiler: F8/Shift+F8 neste/forrige problem, Ctrl+Shift+M problemlisten, F2 nytt navn overalt,
 F12 gå til definisjon, Ctrl+Mellomrom forslag.

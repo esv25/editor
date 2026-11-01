@@ -4,6 +4,7 @@
  * --inspect-brk; this translates between the protocol and `DebugBackend`.
  */
 import { runnerFor } from '../features/codeBlockTools/runners';
+import { decodeJsHeap, JS_HEAP_FUNCTION, type HeapGraph } from './heap';
 import type { DebugBackend, DebugEvents, DebugHost, LaunchOptions, Scope, StackFrame, Variable } from './types';
 
 interface RemoteObject {
@@ -155,6 +156,19 @@ export function jsChildExpression(parent: string | undefined, name: string): str
 /** Objects can be expanded (except null). */
 const expandable = (o: RemoteObject | undefined) => !!o?.objectId && (o.type === 'object' || o.type === 'function') && o.subtype !== 'null';
 
+/** Scopes whose variables the data structure view shows: a call's own, and for the main program also the top level. */
+const HEAP_SCOPES = new Set(['local', 'block', 'catch']);
+const HEAP_MAIN_SCOPES = new Set([...HEAP_SCOPES, 'script', 'module']);
+const COMMONJS_NAMES = new Set(['exports', 'require', 'module', '__filename', '__dirname']);
+const MAX_HEAP_FRAMES = 20;
+
+/** A value as an argument for Runtime.callFunctionOn. */
+function callArgument(o: RemoteObject): unknown {
+  if (o.objectId) return { objectId: o.objectId };
+  if (o.unserializableValue) return { unserializableValue: o.unserializableValue };
+  return o.type === 'undefined' ? {} : { value: o.value };
+}
+
 // ---------- Backend ----------
 
 export class NodeBackend implements DebugBackend {
@@ -168,6 +182,8 @@ export class NodeBackend implements DebugBackend {
   private refs = new Map<number, { objectId: string; expression?: string }>();
   private nextRef = 1;
   private firstPause = true;
+  /** The program's execution context (for running the data structure function in it). */
+  private contextId: number | undefined;
   /** A step was asked for (so a pause in Node's own code is passed through, not shown). */
   private stepping = false;
   private ended = false;
@@ -235,6 +251,9 @@ export class NodeBackend implements DebugBackend {
         break;
       case 'Debugger.resumed':
         this.events.continued();
+        break;
+      case 'Runtime.executionContextCreated':
+        this.contextId ??= params.context?.id;
         break;
       case 'Runtime.executionContextDestroyed':
         // The program is done; Node waits for us to disconnect before it exits.
@@ -392,6 +411,39 @@ export class NodeBackend implements DebugBackend {
     // Children of e.g. "a + b" need parentheses: "(a + b).length".
     const simple = /^[\p{L}_$][\p{L}\p{N}_$.]*$/u.test(expression);
     return this.variable(expression, result.result, simple ? expression : `(${expression})`);
+  }
+
+  readonly canShowHeap = true;
+
+  async heap(frames: StackFrame[]): Promise<HeapGraph> {
+    // Outermost call first. Each call's own variables; the top-level ones (script/module) once.
+    const calls = frames.filter((f) => f.path && this.frames[f.id]).slice(0, MAX_HEAP_FRAMES).reverse();
+    const names: string[][] = [];
+    const args: unknown[] = [];
+    for (const [i, f] of calls.entries()) {
+      const own = i === 0 ? HEAP_MAIN_SCOPES : HEAP_SCOPES;
+      const vars: string[] = [];
+      for (const scope of this.frames[f.id].scopeChain) {
+        if (!own.has(scope.type) || !scope.object.objectId) continue;
+        const result = await this.send('Runtime.getProperties', { objectId: scope.object.objectId, ownProperties: true });
+        for (const p of result.result ?? []) {
+          // An inner scope's name hides the outer one's; CommonJS's own variables aren't the program's.
+          if (!p.value || p.value.type === 'function' || vars.includes(p.name) || (i === 0 && COMMONJS_NAMES.has(p.name))) continue;
+          vars.push(p.name);
+          args.push(callArgument(p.value));
+        }
+      }
+      names.push(vars);
+    }
+    const result = await this.send('Runtime.callFunctionOn', {
+      functionDeclaration: JS_HEAP_FUNCTION,
+      executionContextId: this.contextId,
+      arguments: [{ value: names }, ...args],
+      returnByValue: true,
+      silent: true,
+    });
+    if (result.exceptionDetails) throw new Error('Fikk ikke hentet datastrukturene');
+    return decodeJsHeap(String(result.result?.value ?? ''), calls.map((f) => f.name));
   }
 
   async stop(): Promise<void> {
