@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+## 0.9.6 – 2026-11-01
+
 - Feilsøking i Python: objekter viser instansvariablene sine rett i verdien, f.eks. `Node(element=3, neste=Node(element=13, neste=None))` i stedet for `<__main__.Node object at 0x…>`. Objekter inne i lister vises som `Node(…)`. Klikk på objektet for å se alle feltene.
 - Feilsøking: **Tegn datastrukturene** (knapp i feilsøkingspanelet, eller F7) viser variablene og objektene ved siden av koden som bokser med piler, slik som i Python Tutor – lenkede lister, trær, hashtabeller og lister du har laget selv. Tegningen oppdateres ved hvert steg, det som er endret siden forrige steg er markert, og tilbakeblikk (Shift+F10) viser også hvordan det så ut før. Pek på en boks for å se pilene inn og ut av den. Virker for Python og JavaScript.
 
