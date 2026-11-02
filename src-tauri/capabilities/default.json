@@ -76,6 +76,14 @@
     },
     "opener:allow-reveal-item-in-dir",
     {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://*" },
+        { "url": "http://*" },
+        { "url": "mailto:*" }
+      ]
+    },
+    {
       "identifier": "opener:allow-open-path",
       "allow": [
         {

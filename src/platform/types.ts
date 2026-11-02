@@ -94,6 +94,8 @@ export interface Platform {
   revealPath?(path: string): Promise<void>;
   /** Open a file in its default program, e.g. a .docx in Word (desktop only). */
   openPath?(path: string): Promise<void>;
+  /** Open a web address in the default browser (desktop only). */
+  openUrl?(url: string): Promise<void>;
   /** Print the window's page straight to a PDF file, without a dialog (desktop only; see src/export/print.ts). */
   printToPdf?(path: string): Promise<void>;
   /** The installed app's version (desktop only). */

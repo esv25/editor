@@ -11,6 +11,7 @@ import { runContext } from '../features/codeBlockTools';
 import { allowRunning } from './trust';
 import { runnerFor } from '../features/codeBlockTools/runners';
 import { imageContext, redrawImages, reloadImages } from '../features/images';
+import { examContext } from '../features/exam';
 import { dirOf } from '../features/util/imagePath';
 import { platform } from '../platform';
 import { getSettings, onSettingsChange, updateSettings } from '../settings';
@@ -414,6 +415,9 @@ export async function startApp(): Promise<void> {
   runContext.allow = () => allowRunning(ws.activeDoc?.file?.path);
   // Relative image paths are relative to the document; redraw them if it moves (autosave, Lagre som).
   imageContext.baseDir = () => dirOf(ws.activeDoc?.file?.path);
+  // Exam practice: links open documents as tabs, web addresses in the browser.
+  examContext.openDocument = (path) => void ws.openPath(path);
+  if (platform.openUrl) examContext.openUrl = (url) => void platform.openUrl!(url);
   // Drawings open in their own window (one per file); when it saves, the picture in the note is redrawn.
   imageContext.openDrawing = (path) => {
     const key = path ? `diagram-${hashOf(path.toLowerCase())}` : `diagram-new-${Date.now().toString(36)}`;

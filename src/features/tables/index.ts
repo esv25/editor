@@ -22,6 +22,9 @@ import { cellMathKey, closeMathField, openCellField, setCellFormulaStarter, type
 import type { Exit } from '../math/editor';
 import { renderMath } from '../math/render';
 import type { Feature } from '../types';
+import { followLink, openNoteAt } from '../exam';
+import { noteButton, pickRating, ratingChip } from '../exam/dom';
+import { findNotes, findRatings, noteText, ratingText } from '../exam/model';
 import {
   cellDocRange,
   cellOf,
@@ -254,6 +257,54 @@ const blocks = new WeakMap<HTMLElement, Drawn>();
 
 const editing = (td: HTMLElement) => td.dataset.editing === 'true';
 
+/** A cell in a "Forståelse" column holding a rating or nothing (exam practice). */
+function isRatingCell(drawn: Drawn, row: number, col: number): boolean {
+  if (row === 0 || !/forståelse/i.test(drawn.raw[0]?.[col] ?? '')) return false;
+  const raw = (drawn.raw[row]?.[col] ?? '').trim();
+  return raw === '' || /^\{(10|[1-9])\/10\}$/.test(raw);
+}
+
+/** Notes `^[…]` and ratings `{n/10}` in drawn text become 💬 buttons and number chips. */
+function drawExamTokens(td: HTMLElement): void {
+  const walker = document.createTreeWalker(td, NodeFilter.SHOW_TEXT);
+  const texts: Text[] = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) texts.push(n as Text);
+  for (const text of texts) {
+    const data = text.data;
+    const tokens = [
+      ...findNotes(data).map((t) => ({ ...t, el: () => noteButton(t.text) })),
+      ...findRatings(data).map((t) => ({ ...t, el: () => ratingChip(t.value) })),
+    ].sort((a, b) => a.from - b.from);
+    if (!tokens.length) continue;
+    const parts: (string | Node)[] = [];
+    let at = 0;
+    for (const t of tokens) {
+      parts.push(data.slice(at, t.from), t.el());
+      at = t.to;
+    }
+    parts.push(data.slice(at));
+    text.replaceWith(...parts.filter((p) => p !== ''));
+  }
+}
+
+/** A cell with notes: each a 💬 button with the start of its text beside it, so the table gives an overview. */
+function drawNotes(td: HTMLElement, raw: string): void {
+  let at = 0;
+  for (const note of findNotes(raw)) {
+    const before = raw.slice(at, note.from).trim();
+    if (before) td.append(before + ' ');
+    const b = noteButton(note.text);
+    const preview = document.createElement('span');
+    preview.className = 'cm-exam-note-preview';
+    preview.textContent = note.text;
+    b.append(preview);
+    td.append(b);
+    at = note.to;
+  }
+  const after = raw.slice(at).trim();
+  if (after) td.append(' ' + after);
+}
+
 /** Show a cell's drawn content (when it isn't being edited); a formula shows its answer, live. */
 function drawCell(td: HTMLElement, drawn: Drawn): void {
   const row = Number(td.dataset.row);
@@ -268,8 +319,21 @@ function drawCell(td: HTMLElement, drawn: Drawn): void {
     td.textContent = formatValue(value);
     td.title = `${cellName(row, col)}: ${formula}`;
     if (value instanceof FormulaError) td.classList.add('cm-table-error');
+  } else if (isRatingCell(drawn, row, col)) {
+    // Exam practice: the understanding column is a number to click (1–10).
+    td.append(ratingChip(findRatings(drawn.raw[row]?.[col] ?? '')[0]?.value ?? null));
+  } else if (row > 0 && /notat/i.test(drawn.raw[0]?.[col] ?? '') && !(drawn.raw[row]?.[col] ?? '').trim() && drawn.raw[0].some((h) => /forståelse/i.test(h))) {
+    const add = document.createElement('span');
+    add.className = 'cm-exam-note-add';
+    add.setAttribute('role', 'button');
+    add.textContent = '+ notat';
+    td.append(add);
+  } else if (findNotes(drawn.raw[row]?.[col] ?? '').length) {
+    // Markdown reads "^[…]" as plain text with brackets; draw notes from the cell's own text.
+    drawNotes(td, drawn.raw[row][col]);
   } else {
     renderInlines(td, cellContent(drawn.block, row, col));
+    drawExamTokens(td);
   }
   const align = drawn.block.align[col];
   // Numbers line up on the right unless the column says otherwise.
@@ -629,6 +693,54 @@ function insertReference(formulaCell: HTMLElement, target: HTMLElement, range: b
   document.execCommand('insertText', false, extend ? `:${name}` : name);
 }
 
+/**
+ * Exam practice in a drawn cell: the rating chip opens a 1–10 picker, 💬 opens the note's window, and a
+ * link opens (in a table with ratings, or with Ctrl). True when the click was handled.
+ */
+function examClick(view: EditorView, root: HTMLElement, td: HTMLElement, e: MouseEvent): boolean {
+  const target = e.target instanceof Element ? e.target : null;
+  const chip = target?.closest<HTMLElement>('.cm-exam-rating');
+  const note = target?.closest<HTMLElement>('.cm-exam-note');
+  if (target?.closest('.cm-exam-note-add')) {
+    const range = cellRange(view, root, td);
+    if (!range) return false;
+    e.preventDefault();
+    const rect = td.getBoundingClientRect();
+    const insert = noteText('Forklaring');
+    view.dispatch({ changes: { from: range[0], to: range[1], insert }, userEvent: 'input.examNote' });
+    openNoteAt(view, range[0], rect);
+    return true;
+  }
+  const link = target?.closest<HTMLElement>('.cm-table-link');
+  const examTable = !!root.querySelector('.cm-exam-rating');
+  if (!chip && !note && !(link && (examTable || e.ctrlKey || e.metaKey))) return false;
+  const range = cellRange(view, root, td);
+  if (!range) return false;
+  const raw = view.state.sliceDoc(range[0], range[1]);
+  if (chip) {
+    const index = Math.max(0, [...td.querySelectorAll('.cm-exam-rating')].indexOf(chip));
+    pickRating(chip.getBoundingClientRect(), findRatings(raw)[index]?.value ?? null, (value) => {
+      // The document may have changed while the picker was open: find the cell again.
+      const now = cellRange(view, root, td);
+      if (!now) return;
+      const token = findRatings(view.state.sliceDoc(now[0], now[1]))[index];
+      const insert = value === null ? '' : ratingText(value);
+      view.dispatch({
+        changes: token ? { from: now[0] + token.from, to: now[0] + token.to, insert } : { from: now[0], to: now[1], insert },
+        userEvent: 'input.examRating',
+      });
+    });
+  } else if (note) {
+    const token = findNotes(raw)[[...td.querySelectorAll('.cm-exam-note')].indexOf(note)];
+    if (!token) return false;
+    openNoteAt(view, range[0] + token.from, note.getBoundingClientRect());
+  } else if (!link || !followLink(link.title)) {
+    return false;
+  }
+  e.preventDefault();
+  return true;
+}
+
 function wireCell(view: EditorView, root: HTMLElement, td: HTMLElement): void {
   td.addEventListener('focus', () => {
     startEditing(view, root, td);
@@ -643,6 +755,7 @@ function wireCell(view: EditorView, root: HTMLElement, td: HTMLElement): void {
       insertReference(writing, td, e.shiftKey);
       return;
     }
+    if (e.button === 0 && !editing(td) && examClick(view, root, td, e)) return;
     // A formula: open it where it was clicked.
     const math = e.button === 0 && e.target instanceof Element ? e.target.closest<HTMLElement>('.cm-math') : null;
     if (math && td.contains(math)) {

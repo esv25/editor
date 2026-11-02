@@ -151,7 +151,18 @@ modul-lasting, ellers fanges ikke endringer opp.
 
 Dagens features: `livePreview` (overskriftsstørrelser, skjuling av markeringstegn, inline
 kode), `codeBlocks`, `codeBlockTools`, `images`, `headings`, `inlineFormat`, `lists`,
-`taskList`, `smartLists`, `headingSuggestion`, `closeBrackets`, `math`, `tables`.
+`taskList`, `smartLists`, `headingSuggestion`, `closeBrackets`, `math`, `tables`, `exam`.
+
+### Eksamensøving (`features/exam/`)
+
+Pensum som GFM-tabeller per tema (`| Uke | Emne | Forståelse | Notat | Lenker |`) eller som
+listeelementer (`- [ ] Emne {7/10} [Notat](n.md) ^[kort forklaring]`). I tabeller tegner
+`features/tables/index.ts` tallene/💬 (`drawCell`, `examClick`; kolonnene finnes på overskriftsnavnet).
+Uke-kolonnen gir `weekStats` og `sortTablesByWeek` (oversikten). `{n/10}` =
+forståelse 1–10 (farget tall; klikk åpner velgeren `pickRating` i `dom.ts`, tom = ikke vurdert), `^[…]` = notat (pandoc-fotnote; 💬 åpner et lite flytende vindu
+som skriver tilbake til teksten). Lenker følges med vanlig klikk på vurderte linjer, Ctrl+klikk ellers
+(`examContext` settes i `app.ts`; nettadresser via `platform.openUrl`). `model.ts`/`commands.ts` er
+ren logikk (testet i `tests/exam.test.ts`); `exam.overview` viser svakeste emner først.
 
 ### Matte (`features/math/`)
 

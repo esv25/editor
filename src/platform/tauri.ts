@@ -4,7 +4,7 @@ import { emit, listen as listenEvent } from '@tauri-apps/api/event';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { ask } from '@tauri-apps/plugin-dialog';
-import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
+import { openPath, openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
 import type { AvailableUpdate, Platform, ProcessHost, RunRequest, RunResult } from './types';
@@ -77,6 +77,10 @@ export const tauriPlatform: Platform = {
 
   revealPath(path: string) {
     return revealItemInDir(path);
+  },
+
+  openUrl(url: string) {
+    return openUrl(url);
   },
 
   openPath(path: string) {

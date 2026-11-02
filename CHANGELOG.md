@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- **Eksamensøving**: lag en pensumoversikt (knappen «Eksamen» i verktøylinja) med én tabell per tema: uke, emne, forståelse, notat og lenker. Forståelse er et tall fra 1 til 10: klikk i cellen og velg (eller trykk et tall), og notater åpnes i et eget lite vindu når du klikker 💬 (tomme celler har «+ notat»). «Oversikt» viser snittet uke for uke og emnene sortert etter svakest først eller etter uke, og kan sortere tabellene etter uke. Lenker i tabellen åpnes med et klikk (Ctrl+klikk i andre notater).
+
 ## 0.9.6 – 2026-11-01
 
 - Feilsøking i Python: objekter viser instansvariablene sine rett i verdien, f.eks. `Node(element=3, neste=Node(element=13, neste=None))` i stedet for `<__main__.Node object at 0x…>`. Objekter inne i lister vises som `Node(…)`. Klikk på objektet for å se alle feltene.
