@@ -123,6 +123,7 @@ export const defaultSettings: Settings = {
     'list.bullet', 'list.ordered', 'list.task', '|',
     'codeblock.toggle', 'table.insert', 'image.insert', 'diagram.new', '|',
     'math.inline', 'math.block', 'math.palette',
+    '|', 'exam.new', 'exam.overview',
   ],
   diagram: { grid: 20, hitTolerance: 16, dragThreshold: 6, alignTolerance: 10, autosaveDelayMs: 500, toolKeys: {} },
   math: {

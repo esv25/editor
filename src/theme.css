@@ -57,6 +57,12 @@
   --diag-error: #e0321f;
   --diag-warning: #c98500;
   --diag-info: #3a6fd8;
+  --exam-r0: #b3ada3;
+  --exam-r1: #d2412f;
+  --exam-r2: #d97a2b;
+  --exam-r3: #c39a12;
+  --exam-r4: #6aa33a;
+  --exam-r5: #2d8a55;
   --diag-error-line: rgb(224 50 31 / 0.07);
   --diag-warning-line: rgb(201 133 0 / 0.08);
   --diag-info-line: rgb(58 111 216 / 0.06);
@@ -137,6 +143,12 @@
   --diag-error: #ff6b5b;
   --diag-warning: #e8b84a;
   --diag-info: #6cb2f0;
+  --exam-r0: #6b6e75;
+  --exam-r1: #e8665a;
+  --exam-r2: #e8935a;
+  --exam-r3: #d9b84a;
+  --exam-r4: #8cc25e;
+  --exam-r5: #4fb37a;
   --diag-error-line: rgb(255 107 91 / 0.08);
   --diag-warning-line: rgb(232 184 74 / 0.08);
   --diag-info-line: rgb(108 178 240 / 0.06);

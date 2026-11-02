@@ -17,6 +17,7 @@ import { closeBrackets } from './closeBrackets';
 import { images } from './images';
 import { math } from './math';
 import { tables } from './tables';
+import { exam } from './exam';
 
 export const features: Feature[] = [
   livePreview,
@@ -24,6 +25,7 @@ export const features: Feature[] = [
   codeBlockTools,
   images,
   tables,
+  exam,
   math,
   headings,
   inlineFormat,
