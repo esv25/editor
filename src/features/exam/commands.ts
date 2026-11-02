@@ -54,7 +54,7 @@ export function addLinkChange(state: EditorState, lineNo: number, label: string,
   const line = state.doc.line(lineNo);
   const note = findNotes(line.text)[0];
   const at = note ? note.from : line.text.trimEnd().length;
-  const link = `[${label.replace(/([[\]])/g, '\\$1')}](${/[\s()]/.test(dest) ? `<${dest}>` : dest})`;
+  const link = `[${label.replace(/([\\[\]])/g, '\\$1')}](${/[\s()]/.test(dest) ? `<${dest}>` : dest})`;
   const pad = at > 0 && line.text[at - 1] !== ' ' ? ' ' : '';
   return { from: line.from + at, insert: pad + link + (note ? ' ' : '') };
 }

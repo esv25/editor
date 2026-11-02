@@ -81,5 +81,8 @@ describe('exam commands', () => {
     const state = stateOf('- A {1/10} ^[n]|');
     expect(state.update({ changes: addLinkChange(state, 1, 'Mitt notat', 'mapper/mitt notat.md') }).state.doc.toString())
       .toBe('- A {1/10} [Mitt notat](<mapper/mitt notat.md>) ^[n]');
+    // Backslashes in the label are escaped too, so they can't escape the closing bracket.
+    expect(state.update({ changes: addLinkChange(state, 1, 'a\\]b', 'x.md') }).state.doc.toString())
+      .toBe('- A {1/10} [a\\\\\\]b](x.md) ^[n]');
   });
 });
