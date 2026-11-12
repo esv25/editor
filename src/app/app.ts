@@ -14,7 +14,7 @@ import { imageContext, redrawImages, reloadImages } from '../features/images';
 import { examContext } from '../features/exam';
 import { dirOf } from '../features/util/imagePath';
 import { platform } from '../platform';
-import { getSettings, onSettingsChange, updateSettings } from '../settings';
+import { defaultSettings, getSettings, onSettingsChange, updateSettings } from '../settings';
 import { drafts, storage } from '../storage';
 import { TerminalPanel } from '../terminal/terminalPanel';
 import { diagnosticsChanged } from '../code/assist';
@@ -256,6 +256,9 @@ export async function startApp(): Promise<void> {
       scope: 'any',
       run: () => (openKeybindings(getView), true),
     },
+    { id: 'view.textLarger', name: 'Større tekst', key: 'Mod-+', scope: 'any', run: () => (changeFontSize(1), true) },
+    { id: 'view.textSmaller', name: 'Mindre tekst', key: 'Mod--', scope: 'any', run: () => (changeFontSize(-1), true) },
+    { id: 'view.textReset', name: 'Vanlig tekststørrelse', key: 'Mod-0', scope: 'any', run: () => (changeFontSize(0), true) },
     { id: 'app.whatsNew', name: 'Hva er nytt', scope: 'any', run: () => (void openWhatsNew(), true) },
     { id: 'app.codeHelp', name: 'Kodehjelp (hvor mye hjelp du får i kodefiler)', scope: 'any', run: () => (openCodeHelp(), true) },
     {
@@ -270,6 +273,14 @@ export async function startApp(): Promise<void> {
       },
     },
   ]);
+
+  /** Text size steps: +1/-1 px (2 px above 24), 0 = back to the default. */
+  function changeFontSize(direction: -1 | 0 | 1): void {
+    const current = getSettings().fontSize;
+    const step = current >= 24 ? 2 : 1;
+    const next = direction === 0 ? defaultSettings.fontSize : Math.min(40, Math.max(10, current + direction * step));
+    updateSettings({ fontSize: next });
+  }
 
   /** Files exported this session, newest first (the export menu lists them, like Chrome's downloads). */
   const recentExports: string[] = [];
@@ -323,6 +334,11 @@ export async function startApp(): Promise<void> {
       { heading: 'Vis' },
       { label: 'Sidefeltet (filer og disposisjon)', checked: s.outlineVisible, action: run('view.toggleOutline') },
       ...(terminal.available ? [{ label: 'Terminalen', checked: terminal.visible, action: run('view.toggleTerminal') }] : []),
+      'separator',
+      { heading: `Tekststørrelse (${s.fontSize} px)` },
+      { label: 'Større tekst', action: run('view.textLarger') },
+      { label: 'Mindre tekst', action: run('view.textSmaller') },
+      { label: 'Vanlig størrelse', action: run('view.textReset') },
       'separator',
       { heading: 'Tema' },
       { label: 'Lyst', checked: s.theme === 'light', action: theme('light') },
