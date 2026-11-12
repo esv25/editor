@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+- Større og mindre tekst: Ctrl++ og Ctrl+- (Ctrl+0 tilbake til vanlig), også i tannhjulmenyen.
+
 ## 0.9.7 – 2026-11-02
 
 - **Eksamensøving**: lag en pensumoversikt (knappen «Eksamen» i verktøylinja) med én tabell per tema: uke, emne, forståelse, notat og lenker. Forståelse er et tall fra 1 til 10: klikk i cellen og velg (eller trykk et tall), og notater åpnes i et eget lite vindu når du klikker 💬 (tomme celler har «+ notat»). «Oversikt» viser snittet uke for uke og emnene sortert etter svakest først eller etter uke, og kan sortere tabellene etter uke. Lenker i tabellen åpnes med et klikk (Ctrl+klikk i andre notater).
