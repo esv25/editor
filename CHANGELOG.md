@@ -6,6 +6,8 @@ inn – `npm run release` gjør overskriften om til versjonsnummeret.
 
 ## Neste versjon
 
+## 0.9.8 – 2026-11-12
+
 - Større og mindre tekst: Ctrl++ og Ctrl+- (Ctrl+0 tilbake til vanlig), også i tannhjulmenyen.
 
 ## 0.9.7 – 2026-11-02
